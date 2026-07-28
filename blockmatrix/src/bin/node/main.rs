@@ -26,6 +26,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use tracing::{info, Level};
 
+use blockmatrix::bootstrap as bootstrap_lib;
 use blockmatrix::bootstrap::node_id;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 
@@ -72,21 +73,30 @@ async fn main() -> Result<()> {
         std::path::PathBuf::from(&cli.data_dir)
     };
 
-    // Device-auth invariant: the data-dir key (`nid`) is a coordinate-derived
-    // alias kept for the migration window so existing persisted state is
-    // still found. The IDENTITY and the matrix cell are separate concerns:
-    //   - identity  = BLAKE3(falcon_pubkey), loaded from the data dir
-    //   - cell      = derive_cell(identity), unless CLI coords override
+    // D5 "node ≡ asset ≡ index": the data dir is keyed by the device IDENTITY,
+    // not the matrix coordinate. Chicken-and-egg — the key is derived from the
+    // identity, but the identity is loaded from disk — is resolved by ordering:
+    //   1. identity lives at a coordinate-independent `data_dir/identity/`
+    //      (adopting a legacy in-tree copy if this is a pre-migration install),
+    //   2. load/create it and derive `device_node_id`,
+    //   3. key the data dir by that identity, adopting a legacy coord-keyed
+    //      state dir so an existing install keeps its chain,
+    //   4. derive the matrix cell from the identity (CLI coords may override).
+    // The `node_{x}_{y}_{z}` string survives ONLY as the legacy lookup key.
     let coord_override = cli.coord_x != 0 || cli.coord_y != 0 || cli.coord_z != 0;
     let cli_coord = MatrixCoordinate::new(cli.coord_x, cli.coord_y, cli.coord_z)?;
-    let nid = node_id(&cli_coord);
+    let legacy_key = node_id(&cli_coord);
 
-    // Resolve the device identity from the (coord-aliased) data dir so the
-    // genesis proofs collapse to one canonical node ID.
-    let identity_dir = data_dir.join(&nid).join("identity");
+    // Step 1 + 2: coordinate-independent identity, then derive the device id.
+    let identity_dir = bootstrap_lib::adopt_legacy_identity(&data_dir, &legacy_key)?;
     let device_node_id =
         blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?.node_id;
 
+    // Step 3: the data-dir key IS the device identity. Adopt legacy state.
+    let nid = bootstrap_lib::state_dir_key(&device_node_id);
+    bootstrap_lib::adopt_legacy_state_dir(&data_dir, &legacy_key, &nid)?;
+
+    // Step 4: matrix cell.
     let coord = if coord_override {
         info!(
             "Matrix cell OVERRIDE via CLI: ({}, {}, {})",
@@ -112,10 +122,18 @@ async fn main() -> Result<()> {
     let has_persisted_state = metadata_path.exists();
 
     let (boot, persistence) = if has_persisted_state {
-        bootstrap::resume_node(&data_dir, &nid, coord, cli.require_hardware_auth).await?
-    } else {
-        bootstrap::fresh_boot(&data_dir, &nid, coord, &device_node_id, cli.require_hardware_auth)
+        bootstrap::resume_node(&data_dir, &nid, &identity_dir, coord, cli.require_hardware_auth)
             .await?
+    } else {
+        bootstrap::fresh_boot(
+            &data_dir,
+            &nid,
+            &identity_dir,
+            coord,
+            &device_node_id,
+            cli.require_hardware_auth,
+        )
+        .await?
     };
 
     load_persisted_dns(boot.dns(), &data_dir, &nid).await;

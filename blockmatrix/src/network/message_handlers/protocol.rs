@@ -113,3 +113,43 @@ pub(crate) const TAG_SHARD_LOCATE: u8 = 0x52;
 /// dispatch layer only matches the request tag (responses are read by the caller).
 #[allow(dead_code)]
 pub(crate) const TAG_SHARD_LOCATE_RESPONSE: u8 = 0x53;
+
+// ── S3.4: mirror attestation submission ──────────────────────────────
+//
+// S3.3 built the attestation type, its verification, the off-spine pool
+// and the owner's seal — but nothing carried an attestation from the
+// mirror that produced it to the owner that seals it. This is that hop.
+//
+// One-way and fire-and-forget, exactly like `TAG_SHARD_ANNOUNCE`: a
+// mirror states "I hold and validated asset A at matrix cell C as of
+// spine point P". There is no response tag, because acceptance is not a
+// negotiation — the receiver verifies the FALCON envelope and records
+// it, or does not.
+//
+// Wire payload and codec: `network::attestation_wire`.
+
+/// Mirror attestation submission:
+/// `[TAG_MIRROR_ATTEST][len(4 LE)][MirrorAttestation JSON]`.
+pub(crate) const TAG_MIRROR_ATTEST: u8 =
+    crate::network::attestation_wire::MIRROR_ATTEST_TAG;
+
+// ── D3: presented asset-chain submission ─────────────────────────────
+//
+// D2 produced the unified `accept_asset_chain` receive operation but gave
+// it no network ingress — only tests reached it. This is that ingress: a
+// peer presents an asset's verified sub-chain (entries, never a `Block`),
+// and the node runs it through `accept_asset_chain`'s full internal
+// verification. The tag sits adjacent to `TAG_MIRROR_ATTEST` (0x54)
+// because the two are the halves of the per-asset receive story.
+//
+// One-way and fire-and-forget, like `TAG_MIRROR_ATTEST`: there is no
+// response tag, because adoption is not a negotiation — the receiver
+// verifies lineage + every signer's FALCON envelope + the bounds, and
+// files it off-spine, or does not.
+//
+// Wire payload and codec: `network::asset_chain_wire`.
+
+/// Presented asset-chain submission:
+/// `[TAG_ASSET_CHAIN][len(4 LE)][PresentedAssetChain JSON]`.
+pub(crate) const TAG_ASSET_CHAIN: u8 =
+    crate::network::asset_chain_wire::ASSET_CHAIN_TAG;

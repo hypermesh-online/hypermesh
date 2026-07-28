@@ -189,13 +189,118 @@ pub struct NodeBootstrap {
     bootstrapped_at: SystemTime,
 }
 
-/// Derive a deterministic node ID from matrix coordinates.
+/// Legacy coordinate-derived data-dir key (`node_{x}_{y}_{z}`).
 ///
-/// Used as the persistence directory name under `~/.blockmatrix/`.
-/// The same coordinates always produce the same ID, so restarting
-/// with the same coordinates finds the same persisted state.
+/// D5: this is the MIGRATION-WINDOW alias only. A node's state used to live
+/// under `data_dir/node_{x}_{y}_{z}/`, keyed by the matrix coordinate string.
+/// The canonical key is now the device identity ([`state_dir_key`]); this
+/// function survives ONLY to locate a pre-migration data dir so an existing
+/// install can be adopted (see [`adopt_legacy_state_dir`]). It touches no chain
+/// bytes — it was always a filesystem path key.
 pub fn node_id(coord: &MatrixCoordinate) -> String {
     format!("node_{}_{}_{}", coord.x, coord.y, coord.z)
+}
+
+/// The coordinate-INDEPENDENT identity directory for a data dir.
+///
+/// D5: the device identity (`BLAKE3(falcon_pubkey)`) is what keys the data dir,
+/// so the identity itself cannot live UNDER that key without a chicken-and-egg.
+/// It lives at a fixed `data_dir/identity/` instead — loadable before the key
+/// is known, and shared by every command that needs the node's keypair.
+pub fn identity_dir(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("identity")
+}
+
+/// The canonical data-dir key: the device identity hex (`BLAKE3(falcon_pubkey)`).
+///
+/// D5 "node ≡ asset ≡ index": the node's on-disk state is keyed by WHO the node
+/// is, not WHERE it sits in the matrix. Passed to `PersistenceManager` as the
+/// storage sub-directory and used as the runtime node-id string.
+pub fn state_dir_key(device_node_id: &str) -> String {
+    device_node_id.to_string()
+}
+
+/// D5 Part 1 — adopt a pre-migration in-tree identity directory.
+///
+/// Resolves the coordinate-independent [`identity_dir`] and, if it does not yet
+/// exist while a legacy `data_dir/{legacy_key}/identity` does, migrates the
+/// legacy identity up so the device keypair (and therefore the derived data-dir
+/// key) is unchanged across the upgrade. A fresh node has neither directory and
+/// this is a no-op — `load_or_create` then creates the new location directly.
+///
+/// Idempotent: once the new location exists it is used as-is; the legacy copy is
+/// never allowed to clobber it.
+pub fn adopt_legacy_identity(
+    data_dir: &std::path::Path,
+    legacy_key: &str,
+) -> Result<std::path::PathBuf> {
+    let new_identity = identity_dir(data_dir);
+    if new_identity.exists() {
+        return Ok(new_identity);
+    }
+    let legacy_identity = data_dir.join(legacy_key).join("identity");
+    if legacy_identity.exists() {
+        if let Some(parent) = new_identity.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                anyhow!("failed to create data dir {}: {e}", parent.display())
+            })?;
+        }
+        std::fs::rename(&legacy_identity, &new_identity).map_err(|e| {
+            anyhow!(
+                "failed to adopt legacy identity {} -> {}: {e}",
+                legacy_identity.display(),
+                new_identity.display()
+            )
+        })?;
+        info!(
+            "Adopted legacy identity {} -> {} (D5 data-dir migration)",
+            legacy_identity.display(),
+            new_identity.display()
+        );
+    }
+    Ok(new_identity)
+}
+
+/// D5 Part 1 — adopt pre-migration coordinate-keyed chain state.
+///
+/// If the identity-keyed state dir (`data_dir/{state_key}`) does not exist while
+/// a legacy `data_dir/{legacy_key}` does, the legacy directory is renamed onto
+/// the new key so the node keeps its persisted chain, certificate, matrix state
+/// and shards. [`adopt_legacy_identity`] must run FIRST so the legacy identity
+/// has already been moved to its own location and does not travel with the
+/// rename. A fresh node (no legacy dir) is a no-op — the state dir is created
+/// under the new key by the persistence manager.
+///
+/// Idempotent and fail-safe: an already-migrated node (new dir present) is left
+/// untouched, and a legacy key equal to the new key is skipped.
+pub fn adopt_legacy_state_dir(
+    data_dir: &std::path::Path,
+    legacy_key: &str,
+    state_key: &str,
+) -> Result<()> {
+    if legacy_key == state_key {
+        return Ok(());
+    }
+    let new_dir = data_dir.join(state_key);
+    if new_dir.exists() {
+        return Ok(());
+    }
+    let legacy_dir = data_dir.join(legacy_key);
+    if legacy_dir.is_dir() {
+        std::fs::rename(&legacy_dir, &new_dir).map_err(|e| {
+            anyhow!(
+                "failed to adopt legacy state dir {} -> {}: {e}",
+                legacy_dir.display(),
+                new_dir.display()
+            )
+        })?;
+        info!(
+            "Adopted legacy chain state {} -> {} (D5 data-dir migration)",
+            legacy_dir.display(),
+            new_dir.display()
+        );
+    }
+    Ok(())
 }
 
 impl NodeBootstrap {

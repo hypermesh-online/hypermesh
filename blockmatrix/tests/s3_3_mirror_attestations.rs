@@ -429,7 +429,12 @@ async fn s3_3_seal_is_hash_committed_through_proof_hash() {
     // hash changes. A stripped or swapped seal cannot hide inside a valid block.
     let mut forged = block.clone();
     let mut seal = receipt.seal.clone();
-    seal.root = format!("0{}", &seal.root[1..]);
+    // Flip the first hex nibble to a GUARANTEED-different value. (Prepending
+    // '0' was a no-op ~1/16 of the time — whenever the root already began with
+    // '0' — which made this a flaky test, not a real mutation.)
+    let mut root_chars: Vec<char> = seal.root.chars().collect();
+    root_chars[0] = if root_chars[0] == '0' { '1' } else { '0' };
+    seal.root = root_chars.into_iter().collect();
     forged.entries[0].state_proof.mirror_seal = Some(seal);
     let bytes = serde_json::to_vec(&forged.entries[0].state_proof).expect("test: serialize");
     forged.entries[0].proof_hash = *blake3::hash(&bytes).as_bytes();

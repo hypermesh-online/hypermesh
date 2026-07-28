@@ -471,7 +471,8 @@ async fn start_network(
         shard_store.count().await
     );
 
-    let identity_dir = data_dir.join(nid).join("identity");
+    // D5: identity lives at the coordinate-independent `data_dir/identity`.
+    let identity_dir = blockmatrix::bootstrap::identity_dir(data_dir);
     let falcon_identity =
         blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)?;
     info!(

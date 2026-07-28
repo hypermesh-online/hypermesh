@@ -291,18 +291,18 @@ async fn s3_2_received_foreign_asset_chain_is_rejected_not_silently_accepted() {
     let id = FalconIdentity::generate();
 
     // seq 5 for an asset whose first four entries we have never seen: the
-    // provenance is unverifiable here. S3.4 will verify + graft such a chain;
-    // until then it must be REJECTED, never accepted with a hole in it.
+    // provenance is unverifiable in the block-accept path. It must be REJECTED
+    // and routed to the asset-chain accept path, never accepted with a hole.
     let entry = received_entry(&id, [0xD1u8; 32], Some(hex::encode([0x42u8; 32])), 5);
     let block = Block::new(1, vec![entry], genesis.hash.clone());
 
     let err = chain
         .insert_received_block(block)
         .await
-        .expect_err("test: foreign asset-chain must be rejected");
+        .expect_err("test: an unverified asset history must be rejected by the block path");
     assert!(
-        err.contains("FOREIGN asset-chain") && err.contains("S3.4"),
-        "rejection must be explicit about the S3.4 gap, got: {err}",
+        err.contains("asset-chain accept path") && err.contains("accept_asset_chain"),
+        "rejection must route to the asset-chain accept path, got: {err}",
     );
     assert!(chain.asset_lineage(&[0xD1u8; 32]).await.is_empty());
 }

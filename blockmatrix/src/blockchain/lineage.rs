@@ -23,6 +23,22 @@
 //! That verification is deliberately self-contained: it takes only the entries,
 //! not the chain, because S3.5's transfer hands exactly this list to a
 //! recipient who has never seen our container.
+//!
+//! # D1 — this is the authoritative per-asset object
+//!
+//! Under the unification inversion, [`AssetLineage`] is THE authority for every
+//! per-asset question — "what is this asset's head / predecessor / history?".
+//! It answers from the entries themselves, addressed by their `lineage_id`
+//! (`= hex(proof_hash)`, spine-offset-free): a predecessor is named by its
+//! `lineage_id`, never by a block index. The linear spine
+//! (`NodeBlockchain.blocks`, keyed by block index) is DEMOTED to a
+//! batching/durability log — it stores the entries and preserves on-disk
+//! back-compat and spine-sync, but it holds no per-asset authority and no
+//! asset-authority question may consult a block index as identity. Block index
+//! survives only as a storage-fetch detail (which block to read an entry out
+//! of), routed through the derived [`AssetChainIndex`] cache.
+//!
+//! [`AssetChainIndex`]: super::asset_index::AssetChainIndex
 
 use super::block::BlockAssetEntry;
 use super::chain::NodeBlockchain;
@@ -216,20 +232,42 @@ impl AssetLineage {
 }
 
 impl NodeBlockchain {
-    /// S3.2 — an asset's provenance chain from this container, in chain order.
+    /// S3.2 — an asset's provenance chain from this container, in chain order,
+    /// from whichever side of the container holds it.
     ///
-    /// Backed by the S3.1 index, so this is O(entries for the asset), not a
-    /// chain scan. Entries whose block has been pruned to a header are absent
-    /// (they are also absent from the index) — a lineage with a hole fails
-    /// [`AssetLineage::verify`] rather than silently pretending to be whole.
+    /// The block chain is consulted FIRST — it is authoritative for the assets
+    /// it holds — and its answer, when non-empty, is returned as-is. Only when
+    /// the block chain has no history for the asset does this fall through to a
+    /// RECEIVED chain adopted by
+    /// [`accept_asset_chain`](Self::accept_asset_chain). That fall-through is
+    /// safe precisely because the accept path refuses any asset the block chain
+    /// has ever held, and [`received_asset_lineage`](Self::received_asset_lineage)
+    /// returns `None` the moment the block chain takes an asset over — so a
+    /// received chain can only ever surface here for an asset the block chain
+    /// genuinely does not hold, never as a second opinion about a local title.
+    ///
+    /// Backed by the S3.1 index for the block-chain side, so that half is
+    /// O(entries for the asset), not a chain scan. Entries whose block has been
+    /// pruned to a header are absent (they are also absent from the index) — a
+    /// lineage with a hole fails [`AssetLineage::verify`] rather than silently
+    /// pretending to be whole.
     ///
     /// This is the object S3.5's transfer hands to a recipient: the asset's
     /// full, self-verifying history.
     pub async fn asset_lineage(&self, asset_hash: &[u8; 32]) -> AssetLineage {
-        AssetLineage {
-            asset_hash: *asset_hash,
-            entries: self.asset_history_entries(asset_hash).await,
+        let spine = self.asset_history_entries(asset_hash).await;
+        if !spine.is_empty() {
+            return AssetLineage {
+                asset_hash: *asset_hash,
+                entries: spine,
+            };
         }
+        self.received_asset_lineage(asset_hash)
+            .await
+            .unwrap_or(AssetLineage {
+                asset_hash: *asset_hash,
+                entries: Vec::new(),
+            })
     }
 
     /// [`asset_lineage`](Self::asset_lineage) plus its verification verdict.

@@ -165,6 +165,23 @@ pub struct NodeBlockchain {
     /// any of them (the seal path snapshots it, drops the guard, and only then
     /// calls `add_block`), so it adds no cycle to the S3.0 order.
     pub(crate) mirror_attestations: Arc<RwLock<MirrorAttestationPool>>,
+
+    /// S3.4: adopted RECEIVED asset-chains, held aside from the node's own
+    /// block chain — see [`ReceivedAssetStore`](super::accept::ReceivedAssetStore).
+    ///
+    /// A received asset's history is a run of entries from somebody else's
+    /// container. It cannot join `blocks` (its blocks have their indices, their
+    /// predecessors and their genesis, none of which are ours), and the
+    /// block-accept path correctly refuses it. It lives here instead, verified
+    /// against its own internal lineage and every signer, and queryable without
+    /// any of it being able to move `head`, `blocks`, `stats` or `asset_index`.
+    ///
+    /// LOCK ORDER: acquired LAST, after `mirror_attestations` —
+    /// `append_lock → blocks → headers → hash_index → head → stats →
+    /// asset_index → mirror_attestations → received_chains`. The accept path
+    /// releases every other lock before taking it (it reads
+    /// `has_ever_seen_asset` first, then writes here), so it adds no cycle.
+    pub(crate) received_chains: Arc<RwLock<super::accept::ReceivedAssetStore>>,
 }
 
 /// Maximum number of buffered orphan blocks (P6 task #22.2). Beyond this the
@@ -246,6 +263,7 @@ impl NodeBlockchain {
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
             mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
+            received_chains: Arc::new(RwLock::new(super::accept::ReceivedAssetStore::new())),
         }
     }
 
@@ -389,6 +407,7 @@ impl NodeBlockchain {
             append_lock: Arc::new(tokio::sync::Mutex::new(())),
             asset_index: Arc::new(RwLock::new(asset_index)),
             mirror_attestations: Arc::new(RwLock::new(MirrorAttestationPool::new())),
+            received_chains: Arc::new(RwLock::new(super::accept::ReceivedAssetStore::new())),
         })
     }
 

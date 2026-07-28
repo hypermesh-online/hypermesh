@@ -349,6 +349,67 @@ async fn s3_1_rebuild_from_blocks_equals_incremental_index() {
     assert_eq!(AssetChainIndex::rebuild(reversed.iter()), incremental);
 }
 
+/// D1 — the reframed semantics: `lineage_id` is the authoritative address of an
+/// entry; the `AssetChainIndex` locator (`block_index`) is a throwaway cache
+/// pointer. Two things this proves, over a populated chain:
+///
+/// 1. **Cache agrees with authority.** For every asset, the head the derived
+///    index points at (by `block_index`) resolves to the SAME entry the
+///    authoritative [`AssetLineage`] names (by `lineage_id`).
+/// 2. **Identity survives cache loss.** Throw the whole index away and rebuild
+///    it from the blocks: the authoritative `lineage_id` of every asset's head
+///    is unchanged. The cache is reconstructable; the identity is not derived
+///    from it.
+#[tokio::test]
+async fn s3_1_lineage_id_is_authority_locator_is_a_throwaway_cache() {
+    let (chain, assets, _) = populate(0xD1_CAC4E_0001, 40).await;
+    assert!(!assets.is_empty(), "fixture must register assets");
+
+    let blocks = chain.get_chain().await;
+    let rebuilt = AssetChainIndex::rebuild(blocks.iter());
+
+    for asset in &assets {
+        // Authoritative head: the last entry of the asset's own lineage,
+        // addressed by lineage_id (spine-offset-free).
+        let lineage = chain.asset_lineage(asset).await;
+        let Some(authoritative_head) = lineage.head() else {
+            continue;
+        };
+        let authoritative_id = authoritative_head.lineage_id();
+
+        // (1) The live cache locator resolves to the same entry identity.
+        let cache_locator = chain
+            .asset_head(asset)
+            .await
+            .expect("test: indexed head for a held asset");
+        let via_cache = chain
+            .entry_at(&cache_locator)
+            .await
+            .expect("test: locator resolves to its entry");
+        assert_eq!(
+            via_cache.lineage_id(),
+            authoritative_id,
+            "cache locator and authoritative lineage disagree on the head entry",
+        );
+
+        // (2) A rebuilt-from-scratch cache names the same identity — the
+        // block_index pointer may be regenerated, the lineage_id may not change.
+        let rebuilt_head = rebuilt
+            .asset_head(asset)
+            .expect("test: rebuilt cache head for a held asset");
+        let via_rebuilt = blocks
+            .iter()
+            .find(|b| b.index == rebuilt_head.block_index)
+            .and_then(|b| b.entries.get(rebuilt_head.entry_ix))
+            .expect("test: rebuilt locator resolves to its entry");
+        assert_eq!(
+            via_rebuilt.lineage_id(),
+            authoritative_id,
+            "authoritative identity changed when the cache was rebuilt",
+        );
+    }
+}
+
 #[tokio::test]
 async fn s3_1_index_survives_a_real_persist_reload_round_trip() {
     let dir = tempfile::tempdir().expect("test: temp dir");

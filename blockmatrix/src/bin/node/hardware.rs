@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use tracing::{info, warn};
 
 use blockmatrix::assets::core::{
-    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope, NodeFingerprint,
 };
 use blockmatrix::create_os_abstraction;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -99,9 +99,15 @@ pub fn build_identity_asset_registration(
         definition: identity.public_key.clone(),
         metadata: identity.kyber_public_key.clone(),
     };
+    // D5 Part 2: the node's identity is a first-class asset chain scoped to the
+    // node itself (`Private(NodeFingerprint)`) — key rotations extend THIS
+    // lineage. The fingerprint is `BLAKE3(falcon_pubkey)`, the same value as
+    // `identity.node_id`.
+    let fingerprint =
+        NodeFingerprint::from(hypermesh_lib::NodeId::from_public_key(&identity.public_key));
     AssetRegistration::from_asset_data(
         &asset_data,
-        NetworkScope::Global,
+        NetworkScope::Private(fingerprint),
         AssetCategory::BaseSystem(BaseSystemType::Identity),
     )
 }

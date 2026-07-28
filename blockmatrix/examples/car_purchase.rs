@@ -184,6 +184,12 @@ fn create_test_proof(stake_holder: &str, stake_holder_id: &str) -> StateProof {
             "work-123".to_string(),
             b"the title-transfer work that was actually done",
         ),
+        // S3.2/S3.3 asset-lineage fields: a freshly constructed proof is the
+        // asset's own genesis (no predecessor, seq 0) and carries no mirror
+        // seal. The chain's write chokepoint stamps real lineage on append.
+        prev_asset_entry: None,
+        asset_seq: 0,
+        mirror_seal: None,
     }
 }
 

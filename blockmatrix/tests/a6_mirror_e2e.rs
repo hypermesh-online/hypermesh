@@ -318,9 +318,10 @@ async fn wait_ready(node: &Node) -> Result<(), String> {
 /// Read a node's connected-peer NETWORK node_ids via `network.peers`.
 ///
 /// These are the real handshake-derived node_ids (BLAKE3(FALCON pubkey) hex) —
-/// the SAME identity a `shard.fetch` result reports in its `peer` field. NOTE:
-/// `status.node_id` returns a coordinate LABEL (e.g. `node_0_0_0`), not this
-/// hashed id, so it must NOT be used to match a fetch's `peer`.
+/// the SAME identity a `shard.fetch` result reports in its `peer` field. Since
+/// D5 collapsed the data-dir/runtime id onto the device identity, a node's own
+/// `status.node_id` is now that same `BLAKE3(FALCON pubkey)` hex; peers are
+/// still read here from `network.peers` (the remote-derived ids) for matching.
 async fn network_peer_ids(node: &Node) -> Vec<String> {
     ipc_ok(&node.sock, "network.peers", serde_json::json!({}))
         .await

@@ -35,7 +35,12 @@ fn accept_unsigned_blocks() -> bool {
 /// we bind `hex(BLAKE3(signer_pubkey))` to that claimed WHO. A valid signature
 /// from key K over a proof claiming a DIFFERENT author is rejected — otherwise
 /// any node could sign a proof asserting someone else's stake.
-fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
+///
+/// `pub(crate)` because the received asset-chain accept
+/// ([`super::accept`]) asks the identical question of every entry in a
+/// presented history. Sharing the function — rather than restating the rule —
+/// is what keeps "who may author an entry" a single definition in this crate.
+pub(crate) fn signer_binds_to_author(signer_pubkey: &[u8], entry: &BlockAssetEntry) -> bool {
     let derived = blake3::hash(signer_pubkey).to_hex().to_string();
     entry.state_proof.stake_proof.stake_holder_id == derived
 }
@@ -53,17 +58,20 @@ fn check_entry_lineage(
     entry_ix: usize,
 ) -> Result<(), String> {
     let Some((head_id, head_seq)) = expected else {
-        // Asset unknown here: only a proper asset-genesis may enter. Anything
-        // else is a foreign asset-chain — S3.4's job, explicitly rejected until
-        // then rather than accepted with unverifiable provenance.
+        // Asset unknown here: only a proper asset-genesis may enter via a
+        // block. Anything else is an asset history this container has not
+        // verified — it belongs on the asset-chain accept path
+        // (`accept_asset_chain`), which verifies its lineage and every signer
+        // before adopting it. A block may not graft it in.
         if entry.is_asset_genesis() {
             return Ok(());
         }
         return Err(format!(
-            "Block {block_index} entry {entry_ix} carries a FOREIGN asset-chain: it claims \
-             predecessor {:?} at seq {} for an asset whose history this container has never \
-             seen. Verifying and grafting a foreign asset-chain is S3.4 — rejected until then \
-             (never silently accepted with unverifiable provenance)",
+            "Block {block_index} entry {entry_ix} carries an asset history to route to the \
+             asset-chain accept path (accept_asset_chain): it claims predecessor {:?} at seq \
+             {} for an asset whose history this container has never seen. A block may not graft \
+             an unverified asset history — present it to accept_asset_chain, which verifies its \
+             lineage and every signer before adopting it",
             entry.prev_asset_entry(),
             entry.asset_seq(),
         ));
@@ -158,8 +166,12 @@ impl NodeBlockchain {
                     "Entry {i} proof not bound to its asset_hash (signed-to-content violation)"
                 ));
             }
+            // D4: validate against the rules of the NETWORK that owns the asset
+            // (selected by scope), not one global bar. With no published network
+            // rulesets today the scope resolves to the anchor requirements, so
+            // this is byte-identical to the pre-D4 single-bar call.
             self.state_proof_validator
-                .validate(&entry.state_proof)
+                .validate(&entry.state_proof, &entry.registration.network_scope)
                 .map_err(|e| {
                     format!("State proof validation failed for entry {i}: {e}")
                 })?;
@@ -307,10 +319,12 @@ impl NodeBlockchain {
     ///   re-rooted "asset genesis" for an asset we already hold, or a skipped /
     ///   replayed sequence number is REJECTED.
     /// - **Asset unknown locally** — only a proper asset genesis
-    ///   (`prev = None, seq = 0`) is accepted. Anything else is a FOREIGN
-    ///   ASSET-CHAIN whose history we have never seen; verifying and grafting
-    ///   such a chain is **S3.4**, and until then it is rejected explicitly
-    ///   rather than silently accepted with unverifiable provenance.
+    ///   (`prev = None, seq = 0`) is accepted onto the block spine. An entry
+    ///   mid-history for an asset we have never seen is a received asset-chain:
+    ///   it does not graft onto the spine, it is routed to `accept_asset_chain`,
+    ///   which verifies its internal lineage + every signer off-spine. Accepting
+    ///   it here would admit unverifiable provenance, so the block path rejects
+    ///   it explicitly.
     ///
     /// In-block continuation is handled exactly as on the write side: a second
     /// entry for the same asset within one block succeeds the first.
@@ -471,12 +485,25 @@ impl NodeBlockchain {
             }
 
             // (c) State proof validity: the four-proof StateProof must pass
-            // its own structural/temporal validation.
-            if !entry.state_proof.validate() {
-                return Err(format!(
-                    "Block {} entry {i} state proof validation failed — mirror rejected",
-                    block.index,
-                ));
+            // its own structural validation. D4: routed through the
+            // ValidationService so the received path shares the SAME
+            // scope→rules seam as the local `add_block` path (unifying the
+            // former intrinsic `entry.state_proof.validate()` bypass onto the
+            // service). The effective bar is UNCHANGED — `validate_received`
+            // applies exactly `proof.validate()` (structural only), NOT the
+            // freshness gate, so a historical block replayed from a sync pool
+            // with a stale WHEN offset is not newly rejected.
+            match self.state_proof_validator.validate_received(
+                &entry.state_proof,
+                &entry.registration.network_scope,
+            ) {
+                Ok(true) => {}
+                _ => {
+                    return Err(format!(
+                        "Block {} entry {i} state proof validation failed — mirror rejected",
+                        block.index,
+                    ));
+                }
             }
 
             // (d) H3 — FALCON-in-block PoS verification (the untrusted-remote
@@ -750,36 +777,66 @@ impl NodeBlockchain {
         self.add_block(vec![entry]).await
     }
 
-    /// Write a key rotation entry to the blockchain.
+    /// Write a key rotation entry to the blockchain as a SUCCESSOR of the
+    /// node's identity asset (D5 Part 2 — "node identity is a first-class asset
+    /// chain").
     ///
-    /// Records old->new key transition with FALCON-signed proof (§6.2.2).
-    /// The rotation entry is stored as a `StoragePointer::Local` payload
-    /// so peers receiving the block can extract and verify the chain.
+    /// A key rotation is not a new asset; it is the next event in the node's
+    /// identity lineage. So the entry carries the SAME `asset_hash` as the
+    /// identity asset it extends (`identity_asset_hash` — the content hash of
+    /// the genesis `BaseSystem(Identity)` registration, stable across
+    /// rotations). The single-write chokepoint's lineage stamping
+    /// ([`stamp_asset_lineage`](Self::stamp_asset_lineage)) then chains this
+    /// entry onto the identity head (`prev = head.lineage_id`, `asset_seq + 1`),
+    /// so the node's identity + every rotation walk as ONE [`AssetLineage`].
     ///
-    /// The caller supplies a real `&StateProof` for the owning node
-    /// (mirroring [`register_asset_records`]); this method never fabricates
-    /// a proof.
+    /// The entry is scoped `Private(NodeFingerprint)` (`network_scope`) — a
+    /// node's identity chain belongs to that node — and categorised
+    /// `BaseSystem(KeyRotation)`. The serialized `KeyRotationEntry` rides in the
+    /// `StoragePointer::Local` payload as auxiliary data (the asset is
+    /// content-addressed by `identity_asset_hash`, not by the rotation bytes —
+    /// the same pattern as [`register_dns_asset`](Self::register_dns_asset)).
+    ///
+    /// The caller supplies a real `&StateProof` for the owning node; this method
+    /// never fabricates a proof, and `new_bound` re-binds it to
+    /// `identity_asset_hash` so the signed-to-content invariant (P1) holds.
     pub async fn add_key_rotation_block(
         &self,
         entry: &trustchain::identity::KeyRotationEntry,
         state_proof: &StateProof,
+        identity_asset_hash: [u8; 32],
+        network_scope: crate::assets::core::NetworkScope,
     ) -> Result<Block, String> {
+        use crate::assets::core::{AssetCategory, AssetData, BaseSystemType};
+
         let entry_bytes = serde_json::to_vec(entry).map_err(|e| {
             format!("Failed to serialize key rotation entry: {e}")
         })?;
-        let asset_hash = *blake3::hash(&entry_bytes).as_bytes();
 
-        // Bind the proof to the content hash (signed-to-content invariant, P1).
-        // Here the Local payload IS the content (`entry_bytes`) and
-        // `asset_hash == BLAKE3(entry_bytes)`, so content-validity of the
-        // payload is also directly checkable by receivers.
+        // The rotation registration is metadata (category + scope) for a NEW
+        // entry in an EXISTING asset's chain; its own content hash is unused as
+        // an asset id, because the entry is addressed by `identity_asset_hash`.
+        let registration = AssetRegistration::from_asset_data(
+            &AssetData {
+                config: Vec::new(),
+                definition: entry_bytes.clone(),
+                metadata: Vec::new(),
+            },
+            network_scope,
+            AssetCategory::BaseSystem(BaseSystemType::KeyRotation),
+        );
+
+        // asset_hash = the identity asset being extended, so lineage stamping
+        // links this rotation onto the identity head rather than re-rooting a
+        // fresh single-entry asset. `new_bound` binds the proof to that hash
+        // (signed-to-content, P1); the rotation bytes ride as auxiliary payload.
         let block_entry = BlockAssetEntry::new_bound(
-            asset_hash,
+            identity_asset_hash,
             state_proof,
             StoragePointer::Local {
                 path: String::from_utf8_lossy(&entry_bytes).to_string(),
             },
-            AssetRegistration::genesis(self.node_coordinate),
+            registration,
         );
 
         self.add_block(vec![block_entry]).await

@@ -19,6 +19,21 @@
 //! already in the blocks. Nothing here changes `Block` or `BlockAssetEntry`,
 //! and nothing here is serialized: there is **zero format change**.
 //!
+//! # D1 — derived cache, never authority
+//!
+//! The authoritative per-asset object is
+//! [`AssetLineage`](super::lineage::AssetLineage), addressed by each entry's
+//! `lineage_id` (`= hex(proof_hash)`). `AssetChainIndex` is a **rebuildable
+//! accelerator over that authority** — `by_asset` / `heads` / `by_shard` map an
+//! asset (or shard) to WHERE its entries currently sit in block storage so a
+//! lookup is O(1) instead of a full scan. It carries no truth the blocks do not
+//! already hold: [`rebuild`](Self::rebuild) from the same block set always
+//! yields an equal value (the invariant the S3.1 rebuild proof asserts), so the
+//! whole structure can be thrown away and reconstructed at any time. The
+//! [`AssetEntryLocator`] it returns is a **cache pointer into block storage**,
+//! not the identity of an entry: `block_index` says which block to read, never
+//! "which asset / which position in the lineage" — that is the `lineage_id`.
+//!
 //! # Shape
 //!
 //! Modeled on the existing prototype
@@ -52,14 +67,20 @@ use std::collections::HashMap;
 
 use super::block::{Block, StoragePointer};
 
-/// Address of one asset entry inside the chain: which block, which entry.
+/// A cache pointer to where one asset entry currently sits in block storage:
+/// which block, which entry.
 ///
-/// The block hash is carried alongside so a locator is self-describing — a
-/// caller can name the block an asset's head lives in without re-reading the
-/// `blocks` map, and S3.2's lineage pointers are block hashes.
+/// D1: this is a **storage-fetch detail, never an identity**. `block_index`
+/// answers "which block do I read to materialize this entry?", NOT "what is this
+/// asset / where is it in its lineage?" — the authoritative address of an entry
+/// is its `lineage_id` (`= hex(proof_hash)`), which is spine-offset-free. The
+/// block hash is carried alongside so the pointer is self-describing (a caller
+/// can name the block without re-reading the `blocks` map). Because the locator
+/// is a derived cache value it is **in-memory only** — nothing here is
+/// serialized, and it is reconstructed from the blocks on every load.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AssetEntryLocator {
-    /// Index of the block holding the entry.
+    /// Which block to read the entry from — a storage pointer, never identity.
     pub block_index: u64,
     /// Position of the entry within that block's `entries` vector.
     pub entry_ix: usize,
@@ -96,10 +117,15 @@ struct BlockContribution {
     shards: Vec<[u8; 32]>,
 }
 
-/// In-memory per-asset index over a chain's blocks.
+/// In-memory per-asset index over a chain's blocks — a derived accelerator, not
+/// an authority.
 ///
-/// Derived state only: [`rebuild`](Self::rebuild) from the same block set
-/// always yields an equal value, which is what the S3.1 rebuild proof asserts.
+/// D1: the authority is [`AssetLineage`](super::lineage::AssetLineage), keyed by
+/// `lineage_id`; this index only maps assets and shards to WHERE their entries
+/// currently live in block storage. Derived state only:
+/// [`rebuild`](Self::rebuild) from the same block set always yields an equal
+/// value (the S3.1 rebuild proof), so it can be discarded and reconstructed at
+/// will and holds no truth the blocks do not.
 #[derive(Clone, Debug, Default, Eq)]
 pub struct AssetChainIndex {
     by_asset: HashMap<[u8; 32], Vec<AssetEntryLocator>>,

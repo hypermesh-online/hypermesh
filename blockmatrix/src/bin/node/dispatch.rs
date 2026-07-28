@@ -88,10 +88,10 @@ pub(crate) async fn dispatch_command(
             }
         }
         Some(Commands::Store { path }) => {
-            dispatch_store(path, bootstrap, data_dir, nid).await?;
+            dispatch_store(path, bootstrap, data_dir).await?;
         }
         Some(Commands::Fetch { asset_id, output }) => {
-            dispatch_fetch(asset_id, output, data_dir, nid).await?;
+            dispatch_fetch(asset_id, output, data_dir).await?;
         }
         Some(Commands::Dns { action }) => {
             dispatch_dns(action, bootstrap, data_dir, nid).await?;
@@ -303,12 +303,11 @@ async fn dispatch_store(
     path: std::path::PathBuf,
     bootstrap: &NodeBootstrap,
     data_dir: &std::path::Path,
-    nid: &str,
 ) -> Result<()> {
     // Standalone (no-daemon) store uses the node's own identity keystore for
     // self-custody and honours the current privacy mode for the encryption
     // stage (Private → encrypted, Public/Anonymous → cleartext shards).
-    let identity_dir = data_dir.join(nid).join("identity");
+    let identity_dir = blockmatrix::bootstrap::identity_dir(data_dir);
     let privacy_mode = bootstrap.privacy_mode().await;
     let client = ipc::IpcClient::new();
     if client.is_daemon_running().await {
@@ -336,11 +335,10 @@ async fn dispatch_fetch(
     asset_id: String,
     output: Option<std::path::PathBuf>,
     data_dir: &std::path::Path,
-    nid: &str,
 ) -> Result<()> {
     // Standalone fetch loads the node identity to unwrap the self-custodied
     // decryption key for encrypted assets; cleartext assets need no key.
-    let identity_dir = data_dir.join(nid).join("identity");
+    let identity_dir = blockmatrix::bootstrap::identity_dir(data_dir);
     let client = ipc::IpcClient::new();
     if client.is_daemon_running().await {
         match client
