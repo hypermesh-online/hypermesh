@@ -13,7 +13,7 @@ use blockmatrix::assets::core::{
 };
 use blockmatrix::network::{
     isolation::{DefaultIsolationManager, IsolationManager},
-    multi_network::{MultiNetworkCoordinator, NetworkConfig},
+    multi_network::{NetworkConnectionCoordinator, NetworkConfig},
     trust::{NetworkType, StateProof},
 };
 use std::sync::Arc;
@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
 
     // Initialize coordinator with isolation manager
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     info!("\n📊 Joining Multiple Networks...");
     info!("--------------------------------");
