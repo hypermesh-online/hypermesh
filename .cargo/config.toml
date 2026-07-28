@@ -1,8 +1,8 @@
 # Cargo configuration for Web3 workspace
 
 [build]
-# Use all available cores for parallel compilation
-jobs = 16
+# Parallelism (`jobs`) and `target-dir` are set in user-global ~/.cargo/config.toml
+# so a machine's core count / disk layout is not pinned in a tracked repo file.
 # Enable incremental compilation for faster rebuilds
 incremental = true
 
