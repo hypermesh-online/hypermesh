@@ -905,6 +905,24 @@ async fn start_network(
             let rp_transport = shard_transport.clone();
             let rp_network = network_clone.clone();
             let rp_local_node_id = nid.to_string();
+
+            // P5: mount the dormant world-isolation enforcer for this node's
+            // home world. Until worlds form (VISION §5.5) the home world is
+            // GLOBAL_WORLD, so every same-world check in the loop below is a
+            // strict no-op — the gate only ever rejects a genuine foreign-world
+            // shard, of which there is none in a single-world node.
+            let rp_home_world = hypermesh_lib::GLOBAL_WORLD;
+            let rp_world_type = if privacy_mode == PrivacyMode::ANONYMOUS {
+                blockmatrix::network::trust::NetworkType::Anonymous
+            } else {
+                blockmatrix::network::trust::NetworkType::P2P
+            };
+            let rp_world_gate = blockmatrix::network::isolation::WorldIsolationGate::mount(
+                rp_home_world,
+                rp_world_type,
+            )
+            .await?;
+
             tokio::spawn(async move {
                 let mut interval =
                     tokio::time::interval(tokio::time::Duration::from_secs(30));
@@ -1011,6 +1029,21 @@ async fn start_network(
                         let target_id = hypermesh_lib::NodeId::from_public_key(
                             target_node_id.as_bytes(),
                         );
+
+                        // P5: consult the mounted world-isolation gate before
+                        // fetching. Same-world (GLOBAL_WORLD until worlds form)
+                        // is a strict no-op; a shard belonging to a foreign
+                        // world is rejected here (warn! emitted by the gate)
+                        // before any transfer is attempted, so a world-A node
+                        // never pulls a world-B shard.
+                        if let Err(e) = rp_world_gate
+                            .check_fetch(rp_home_world, &signal.shard_id)
+                            .await
+                        {
+                            debug!("replication-poll: world gate: {e}");
+                            continue;
+                        }
+
                         use blockmatrix::network::shard_transport::ShardTransport;
                         match rp_transport
                             .fetch_shard(&target_id, &signal.shard_id)
