@@ -315,10 +315,12 @@ impl NodeBlockchain {
     ///   re-rooted "asset genesis" for an asset we already hold, or a skipped /
     ///   replayed sequence number is REJECTED.
     /// - **Asset unknown locally** — only a proper asset genesis
-    ///   (`prev = None, seq = 0`) is accepted. Anything else is a FOREIGN
-    ///   ASSET-CHAIN whose history we have never seen; verifying and grafting
-    ///   such a chain is **S3.4**, and until then it is rejected explicitly
-    ///   rather than silently accepted with unverifiable provenance.
+    ///   (`prev = None, seq = 0`) is accepted onto the block spine. An entry
+    ///   mid-history for an asset we have never seen is a received asset-chain:
+    ///   it does not graft onto the spine, it is routed to `accept_asset_chain`,
+    ///   which verifies its internal lineage + every signer off-spine. Accepting
+    ///   it here would admit unverifiable provenance, so the block path rejects
+    ///   it explicitly.
     ///
     /// In-block continuation is handled exactly as on the write side: a second
     /// entry for the same asset within one block succeeds the first.
