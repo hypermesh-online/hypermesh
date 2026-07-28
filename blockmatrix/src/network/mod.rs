@@ -7,6 +7,7 @@
 //! This module provides the actual networking implementation for Block-MATRIX nodes
 //! to discover and communicate with each other using STOQ transport.
 
+pub mod asset_chain_wire;
 pub mod attestation_wire;
 pub mod blockchain_integration;
 pub mod ca_enrollment;

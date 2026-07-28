@@ -13,6 +13,7 @@
 //! - `distributed_ca`: distributed CA key share + threshold signing
 //! - `message_utils`: sync reply, DNS peer resolution, metrics, gossip
 
+mod asset_chain_handlers;
 mod attestation_handlers;
 mod block_handlers;
 mod distributed_ca;
@@ -41,9 +42,18 @@ pub(crate) use peer_connection::{
     dispatch_message, handle_incoming_connection, run_peer_message_loop,
 };
 
+// The dispatch auth gate as a testable predicate — the single source of truth
+// for which wire tags may only be handled for an authenticated same-network
+// peer.
+pub use peer_connection::message_requires_auth;
+
 // S3.4 mirror-attestation send path — used by a mirror to submit its
 // attestation to the peer it fetched from.
 pub use attestation_handlers::send_mirror_attestation;
+
+// D3 presented-asset-chain send path — used by a holder to present an asset's
+// verified sub-chain to a peer that may adopt it.
+pub use asset_chain_handlers::send_presented_asset_chain;
 
 // DNS network fallback used by the DNS resolver.
 pub use message_utils::{distributed_dns_resolve, resolve_from_network};

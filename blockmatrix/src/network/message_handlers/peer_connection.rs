@@ -20,15 +20,16 @@ use super::super::{
 };
 use super::super::peer_auth::{self, AuthenticatedPeers};
 
+use super::asset_chain_handlers::handle_asset_chain;
 use super::attestation_handlers::handle_mirror_attestation;
 use super::block_handlers::handle_block_announce;
 use super::distributed_ca::{handle_ca_key_share, handle_ca_sign_request, handle_ca_sign_response};
 use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
-    TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
-    TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_GOSSIP,
-    TAG_KEY_ROTATION, TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_LOCATE,
-    TAG_SHARD_SEND,
+    TAG_ASSET_CHAIN, TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE,
+    TAG_CA_SIGN_REQUEST, TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE,
+    TAG_GOSSIP, TAG_KEY_ROTATION, TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH,
+    TAG_SHARD_LOCATE, TAG_SHARD_SEND,
     TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
     TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ, TAG_TRANSFER_RELEASE,
     TAG_TRANSFER_ROLLBACK,
@@ -99,6 +100,47 @@ pub(crate) async fn run_peer_message_loop(
     );
 }
 
+/// Whether a wire tag may only be handled for an AUTHENTICATED, same-network
+/// peer.
+///
+/// This is the single source of truth for the dispatch auth gate — extracted so
+/// the security boundary is a testable predicate rather than an inline
+/// `matches!` no test can reach. A tag that returns `true` here is refused for
+/// any peer not in the [`AuthenticatedPeers`] map (see [`dispatch_message`]):
+/// requiring auth ⟹ an unauthenticated connection never reaches the handler.
+///
+/// Block announcements ARE gated (defense-in-depth, P1): although each block is
+/// independently validated by BLAKE3 content integrity, per-entry `proof_hash`,
+/// signed-to-content binding, and `state_proof.validate()`, the announcing peer
+/// must also have passed the bilateral PoS handshake. Shard access, sync,
+/// distributed-CA and cross-network transfer operations are gated for the same
+/// reason.
+pub fn message_requires_auth(tag: u8) -> bool {
+    matches!(
+        tag,
+        TAG_SHARD_SEND | TAG_SHARD_FETCH
+            | TAG_BLOCK_ANNOUNCE
+            | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
+            | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
+            | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
+            | TAG_TRANSFER_RELEASE | TAG_TRANSFER_ROLLBACK
+            // S3.4: an attestation is a third party's statement about an asset
+            // we hold, cached in a BOUNDED pool and eventually sealed on-chain
+            // by the owner. Same standing as a block announcement: each one is
+            // independently FALCON-verified, AND the submitting peer must have
+            // passed the bilateral PoS handshake for this network.
+            | TAG_MIRROR_ATTEST
+            // D3: a presented asset chain is a peer offering an asset's verified
+            // sub-chain for adoption into our off-spine received store. Its
+            // internal lineage and every signer are FALCON-verified inside
+            // `accept_asset_chain`, AND — because the store is now network-fed —
+            // an UNAUTHENTICATED peer must never reach the accept path. This
+            // gate is the only thing standing between an anonymous connection
+            // and the received store; it is not optional.
+            | TAG_ASSET_CHAIN
+    )
+}
+
 /// Route a single message payload to the appropriate handler.
 ///
 /// Asset-level operations (shard send/fetch, sync, block-fetch) AND block
@@ -118,28 +160,7 @@ pub(crate) async fn dispatch_message(
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
     // Gate asset-level operations on peer authentication + network scope.
-    // Block announcements ARE gated here (defense-in-depth, P1): although each
-    // block is independently validated by BLAKE3 content integrity, per-entry
-    // proof_hash, signed-to-content binding, and state_proof.validate(), the
-    // announcing peer must also be authenticated for the network scope — a
-    // mirror is only accepted from a peer that passed the bilateral PoS
-    // handshake. Shard access and sync operations remain gated as before.
-    let needs_auth = matches!(
-        tag,
-        TAG_SHARD_SEND | TAG_SHARD_FETCH
-            | TAG_BLOCK_ANNOUNCE
-            | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
-            | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
-            | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
-            | TAG_TRANSFER_RELEASE | TAG_TRANSFER_ROLLBACK
-            // S3.4: an attestation is a third party's statement about an asset
-            // we hold, cached in a BOUNDED pool and eventually sealed on-chain
-            // by the owner. Same standing as a block announcement: each one is
-            // independently FALCON-verified, AND the submitting peer must have
-            // passed the bilateral PoS handshake for this network.
-            | TAG_MIRROR_ATTEST
-    );
-    if needs_auth
+    if message_requires_auth(tag)
         && !peer_auth::verify_peer_access(
             &ctx.authenticated_peers,
             peer_node_id,
@@ -185,6 +206,14 @@ pub(crate) async fn dispatch_message(
             // S3.4: a mirror's signed "I hold and validated this" statement.
             // Fire-and-forget; the handler owns every rejection path.
             handle_mirror_attestation(data, peer_node_id, ctx).await;
+        }
+        TAG_ASSET_CHAIN => {
+            // D3: a peer presents an asset's verified sub-chain for adoption.
+            // Fire-and-forget; `accept_asset_chain` owns every verification and
+            // every rejection path. Only reachable for an authenticated peer
+            // (gated above), and it can never produce a spine block — there is
+            // no `Block` in a `PresentedAssetChain`.
+            handle_asset_chain(data, peer_node_id, ctx).await;
         }
         TAG_SHARD_LOCATE => {
             // A2 upstream tracker fallback: answer "who has content_hash X?"

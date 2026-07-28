@@ -14,7 +14,14 @@ use crate::blockchain::lineage::{AssetLineage, LineageBreak};
 ///
 /// Deliberately NOT a `Block` and deliberately not convertible into one. This
 /// is the whole structural separation from the node's block-accept path — there is no `Block` here, so nothing here can reach `insert_block`.
-#[derive(Clone, Debug, PartialEq)]
+///
+/// `Serialize`/`Deserialize` are the wire face (D3): a peer presents this over
+/// STOQ via [`network::asset_chain_wire`](crate::network::asset_chain_wire), and
+/// the receive handler feeds a decoded value straight into
+/// [`NodeBlockchain::accept_asset_chain`](crate::blockchain::NodeBlockchain::accept_asset_chain).
+/// Serializing this carries ENTRIES only — there is still no `Block` in it, so
+/// no wire path can produce one.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PresentedAssetChain {
     /// `hA` — the asset this chain claims to be the history of.
     pub asset_hash: [u8; 32],
