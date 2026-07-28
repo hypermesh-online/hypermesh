@@ -16,6 +16,8 @@
 //! - [`capacity`] -- Per-node capacity metrics (bytes served, compute, uptime).
 //! - [`metrics_source`] -- Real system metrics collection (MetricsSource trait).
 //! - [`ingestion`] -- MetricsIngestionPipeline for processing MetricsFrame payloads.
+//! - [`placement`] -- The identity/location boundary (`PlacementLease`): durable
+//!   identity vs elastic, demand-driven coordinate (VISION.md §5.5).
 //! - [`swarm_analytics`] -- Shard popularity, replication triggers, dispersion (R12).
 //! - [`min_spec`] -- Minimum-spec performance profiling (R13).
 //! - [`caesar_tracker`] -- Caesar in-transit/holding amount tracking.
@@ -33,6 +35,7 @@ pub mod metrics_source;
 pub mod min_spec;
 pub mod node_metrics;
 pub mod organic_detection;
+pub mod placement;
 pub mod receipt;
 pub mod routing_intel;
 pub mod sharding;
@@ -61,6 +64,7 @@ pub use node_metrics::{
 pub use organic_detection::{
     ClassifierConfig, TrafficClassification, TrafficClassifier, TrafficPattern,
 };
+pub use placement::PlacementLease;
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, PathAdvisor, PathPolicyRecommendation,

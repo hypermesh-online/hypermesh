@@ -4,8 +4,17 @@
 
 //! Matrix coordinate types and distance calculations
 //!
-//! Re-exports the canonical `MatrixCoordinate` from hypermesh_lib and provides
-//! BlockMatrix-specific extension methods via `MatrixCoordinateExt` trait.
+//! Defines [`MatrixCoordinate`], BlockMatrix's `i64`-precision (x,y,z) cell type
+//! for exact integer matrix maths — distinct from `hypermesh_lib::MatrixPosition`
+//! (`f64`). Provides Euclidean/Manhattan/Chebyshev distance helpers and
+//! [`MatrixCoordinate::derive_cell`], which delegates to the single canonical
+//! construction in [`base::derive_cell`] so cell derivation cannot drift between
+//! the Substrate and BlockMatrix.
+//!
+//! NOTE: the derived cell is an identity fingerprint (a deterministic content
+//! derivation), NOT an authoritative physical location. Where an asset actually
+//! lives and replicates is a demand-driven NGauge placement decision
+//! (`ngauge::placement::PlacementLease`), not this hash. See VISION.md §5.5.
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -142,6 +151,12 @@ impl MatrixCoordinate {
     /// matrix coords as `i16` big-endian (bytes 4-9). `i16` axes are always inside
     /// [`MatrixCoordinate`] bounds, so `new()` cannot fail; the fallback to origin
     /// is defensive and never taken.
+    ///
+    /// This cell is an identity fingerprint, NOT an authoritative physical
+    /// location. It is a deterministic content/identity derivation; where the
+    /// asset actually lives and replicates is a demand-driven NGauge placement
+    /// decision (`ngauge::placement::PlacementLease`), not this hash. See
+    /// VISION.md §5.5.
     pub fn derive_cell(device_node_id: &str) -> MatrixCoordinate {
         let (x, y, z) = base::derive_cell(device_node_id);
         MatrixCoordinate::new(x as i64, y as i64, z as i64)
