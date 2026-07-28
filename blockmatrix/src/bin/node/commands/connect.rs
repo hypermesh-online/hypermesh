@@ -736,12 +736,22 @@ async fn start_network(
         let feed_tracker = swarm_demand_tracker.clone();
         let feed_analytics = ngauge_analytics.clone();
         let feed_position = bridge_position;
+        let feed_network = network_clone.clone();
         tokio::spawn(async move {
             let interval = std::time::Duration::from_secs(10);
             loop {
                 tokio::time::sleep(interval).await;
                 // Snapshot demand data (async lock).
                 let snapshot = feed_tracker.snapshot().await;
+                // P3: build a proximity locality provider from the live peer
+                // RTT (QUIC-measured), so demand is recorded at a
+                // proximity-real coordinate instead of this node's random
+                // identity cell. Cold start (no measured peer) falls back to
+                // `feed_position` (our derive_cell coordinate) — deterministic,
+                // never a fabricated signal (VISION §5.5).
+                let locality = blockmatrix::network::locality::provider_from_nodes(
+                    &feed_network.get_connected_nodes().await,
+                );
                 // Feed into analytics (sync lock, no await while held).
                 match feed_analytics.lock() {
                     Ok(mut analytics) => {
@@ -750,13 +760,19 @@ async fn start_network(
                                 let consumer_id = hypermesh_lib::NodeId::from_public_key(
                                     requester_id.as_bytes(),
                                 );
+                                // P3: proximity-derived placement coordinate for
+                                // the requesting peer; fall back to our own
+                                // coordinate when unmeasured (cold start).
+                                let consumer_pos = locality
+                                    .coordinate_for(requester_id)
+                                    .unwrap_or(feed_position);
                                 // P2: worlds seam — the single implicit world
                                 // (GLOBAL_WORLD) until worlds form (VISION §5.5).
                                 analytics.record_request_in_world(
                                     hypermesh_lib::GLOBAL_WORLD,
                                     *shard_id,
                                     consumer_id,
-                                    feed_position,
+                                    consumer_pos,
                                     entry.last_request_us,
                                 );
                             }
@@ -928,22 +944,30 @@ async fn start_network(
                     // Snapshot connected-peer coordinates once per cycle so the
                     // DispersionAdvisor can rank fetch sources by matrix
                     // topology instead of taking candidates[0] blindly.
+                    //
+                    // P3: rank by PROXIMITY, not by the random identity cell.
+                    // Each peer's coordinate comes from its measured QUIC RTT
+                    // (proximity-real); only when a peer has no live measurement
+                    // do we fall back to its `derive_cell` coordinate, so the
+                    // ranking degrades deterministically rather than reverting to
+                    // meaningless hash distance (VISION §5.5).
+                    let connected = rp_network.get_connected_nodes().await;
+                    let locality =
+                        blockmatrix::network::locality::provider_from_nodes(&connected);
                     let peer_coords: std::collections::HashMap<
                         String,
                         hypermesh_lib::MatrixPosition,
-                    > = rp_network
-                        .get_connected_nodes()
-                        .await
+                    > = connected
                         .into_iter()
                         .map(|n| {
-                            (
-                                n.node_id,
+                            let pos = locality.coordinate_for(&n.node_id).unwrap_or(
                                 hypermesh_lib::MatrixPosition {
                                     x: n.coordinate.x as f64,
                                     y: n.coordinate.y as f64,
                                     z: n.coordinate.z as f64,
                                 },
-                            )
+                            );
+                            (n.node_id, pos)
                         })
                         .collect();
 

@@ -18,6 +18,7 @@ pub mod discovery;
 pub mod gossip;
 pub mod hash_bucket;
 pub mod isolation;
+pub mod locality;
 pub mod message_handlers;
 pub mod metrics_reporter;
 pub mod multi_network;

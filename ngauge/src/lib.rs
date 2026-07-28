@@ -64,7 +64,7 @@ pub use node_metrics::{
 pub use organic_detection::{
     ClassifierConfig, TrafficClassification, TrafficClassifier, TrafficPattern,
 };
-pub use placement::PlacementLease;
+pub use placement::{LocalityProvider, PeerProximity, PlacementLease};
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, PathAdvisor, PathPolicyRecommendation,
