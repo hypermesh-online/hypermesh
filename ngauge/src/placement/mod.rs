@@ -20,5 +20,5 @@ pub mod world;
 pub use lease::PlacementLease;
 pub use locality::{LocalityProvider, PeerProximity};
 pub use world::{
-    WorldAction, WorldFormation, WorldFormationConfig, WorldManager, WorldMerge,
+    WorldAction, WorldFormation, WorldFormationConfig, WorldFormationPlan, WorldManager, WorldMerge,
 };

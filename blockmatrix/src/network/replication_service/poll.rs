@@ -43,28 +43,27 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     } else {
         crate::network::trust::NetworkType::P2P
     };
-    let rp_world_gate = crate::network::isolation::WorldIsolationGate::mount(
-        rp_home_world,
-        rp_world_type,
-    )
-    .await?;
-
-    // P6: the WorldManager is the authority on the shard→world mapping —
-    // the REAL source the isolation gate is fed, replacing the
-    // home-world constant P5 used. It is rooted at the node's home world
-    // (GLOBAL_WORLD until a world forms), and as emergent worlds form it
-    // migrates hot shards down into child worlds it simultaneously joins
-    // (so a shard's world is always a world its holder belongs to — the
-    // gate keeps accepting legitimate same-world traffic). It is also
-    // NGauge's first live consumer of CollectiveIntelligence insights.
+    // P6/hardening: the WorldManager (shard→world authority) and the
+    // WorldIsolationGate (the fetch gate's admitted-worlds view) are the
+    // two membership sets that must never disagree about a held shard's
+    // world. They are owned together by a single `WorldCoordinator` — the
+    // one path that mutates both, in the order that closes the desync
+    // window (admit-before-migrate on form, remap-before-revoke on merge).
     //
-    // On the live single-world node no child has formed, so `world_of`
-    // returns GLOBAL_WORLD for every shard and the gate check below is
-    // the same strict no-op as P5 — real source, zero behavioural change
-    // until a world actually forms.
-    let rp_world_manager = std::sync::Arc::new(std::sync::Mutex::new(
-        ngauge::WorldManager::new(rp_home_world),
-    ));
+    // The coordinator roots the manager at the node's home world
+    // (GLOBAL_WORLD until a world forms) and mounts the gate for it. NO
+    // formation is fired here — nothing on the live path calls
+    // `form`/`merge` — so `world_of` returns GLOBAL_WORLD for every shard
+    // and the `check_fetch` below is the same strict P5 no-op: the
+    // coordinator is the single owner of both sets, with zero behavioural
+    // change until a world is deliberately (and separately) formed.
+    let rp_world = std::sync::Arc::new(
+        crate::network::world_coordinator::WorldCoordinator::mount(
+            rp_home_world,
+            rp_world_type,
+        )
+        .await?,
+    );
 
     tokio::spawn(async move {
         let mut interval =
@@ -173,23 +172,16 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                     target_node_id.as_bytes(),
                 );
 
-                // P6: consult the mounted world-isolation gate before
-                // fetching, fed the shard's TRUE world from the
-                // WorldManager (not the home-world constant P5 used).
-                // `world_of` returns GLOBAL_WORLD until a world forms
-                // (a strict no-op on the live single-world node); once a
-                // shard has migrated into an emergent child world, the
-                // gate accepts it only if this node is a member of that
-                // world (it holds the migrated chunk) and rejects a
-                // genuine foreign-world shard before any transfer.
-                let shard_world = rp_world_manager
-                    .lock()
-                    .map(|wm| wm.world_of(&signal.shard_id))
-                    .unwrap_or(rp_home_world);
-                if let Err(e) = rp_world_gate
-                    .check_fetch(shard_world, &signal.shard_id)
-                    .await
-                {
+                // P6: consult the world-membership coordinator before
+                // fetching. It resolves the shard's TRUE world from the
+                // WorldManager and checks the isolation gate as one call —
+                // `world_of` returns GLOBAL_WORLD until a world forms (a
+                // strict no-op on the live single-world node); once a shard
+                // has migrated into an emergent child world, the gate
+                // accepts it only if this node is a member of that world
+                // (it holds the migrated chunk) and rejects a genuine
+                // foreign-world shard before any transfer.
+                if let Err(e) = rp_world.check_fetch(&signal.shard_id).await {
                     debug!("replication-poll: world gate: {e}");
                     continue;
                 }

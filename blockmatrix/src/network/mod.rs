@@ -42,6 +42,7 @@ pub mod swarm_provider;
 pub mod sync_dispatch;
 pub mod trust;
 pub mod validation;
+pub mod world_coordinator;
 
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -876,6 +877,7 @@ use message_handlers::run_peer_message_loop;
 
 // Re-export MetricsReporter at the same path for backwards compatibility.
 pub use metrics_reporter::MetricsReporter;
+pub use world_coordinator::WorldCoordinator;
 
 #[cfg(test)]
 mod tests {
