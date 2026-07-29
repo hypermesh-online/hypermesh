@@ -37,7 +37,7 @@
 //! let state_proof = DefaultStateAuthenticator::for_testing();
 //!
 //! let result = distribute_shards_pos_aware(
-//!     shards,
+//!     &shards,
 //!     "asset-1",
 //!     "PrivateNetwork",
 //!     &nodes,
@@ -150,7 +150,7 @@ pub struct DistributionResult {
 ///
 /// List of shard placements with matrix coordinates
 pub async fn distribute_shards_pos_aware<C>(
-    shards: Vec<Shard>,
+    shards: &[Shard],
     asset_id: &str,
     asset_privacy_level: &str,
     all_nodes: &[NodeInfo],
@@ -161,7 +161,7 @@ where
 {
     // Step 1: Query PoS validation for eligible nodes
     let eligible_nodes =
-        get_eligible_nodes(asset_id, asset_privacy_level, &shards, all_nodes, state_proof).await?;
+        get_eligible_nodes(asset_id, asset_privacy_level, shards, all_nodes, state_proof).await?;
 
     if eligible_nodes.is_empty() {
         return Err(AssetError::ValidationError {
@@ -208,7 +208,7 @@ mod tests {
         let state_proof = DefaultStateAuthenticator::for_testing();
 
         let result =
-            distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
+            distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
                 .await;
 
         assert!(result.is_ok());

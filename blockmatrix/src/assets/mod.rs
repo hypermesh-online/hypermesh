@@ -43,8 +43,7 @@ pub use matrix_blockchain::{
 };
 
 pub use pipeline::{
-    AssetPipeline, Compressor, Encryptor, MatrixDistributor, PipelineConfig, PipelineStats,
-    ProcessedAsset, Sharder,
+    AssetPipeline, Compressor, Encryptor, PipelineConfig, PipelineStats, ProcessedAsset, Sharder,
 };
 
 pub use storage::{

@@ -74,7 +74,7 @@ pub struct OctantDistribution {
 ///
 /// Octant distribution with placement coordinates
 pub fn distribute_across_octants(
-    shards: Vec<Shard>,
+    shards: &[Shard],
     eligible_nodes: &[NodeInfo],
 ) -> AssetResult<DistributionResult> {
     if eligible_nodes.is_empty() {
@@ -97,7 +97,7 @@ pub fn distribute_across_octants(
 
     // Place shards in assigned octants
     let placements =
-        place_shards_in_octants(&shards, &shard_octants, &octant_nodes, eligible_nodes)?;
+        place_shards_in_octants(shards, &shard_octants, &octant_nodes, eligible_nodes)?;
 
     // Calculate statistics
     let stats = calculate_distribution_stats(&placements);
@@ -374,7 +374,7 @@ mod tests {
             create_test_shard(3),
         ];
 
-        let result = distribute_across_octants(shards, &nodes).expect("test: expected result");
+        let result = distribute_across_octants(&shards, &nodes).expect("test: expected result");
 
         assert_eq!(result.placements.len(), 4);
         assert!(result.quality_score > 0.0);
@@ -387,7 +387,7 @@ mod tests {
         let nodes = create_test_nodes();
         let shards: Vec<_> = (0..10).map(create_test_shard).collect();
 
-        let result = distribute_across_octants(shards, &nodes).expect("test: expected result");
+        let result = distribute_across_octants(&shards, &nodes).expect("test: expected result");
 
         // Verify golden ratio spacing in distances
         let distances: Vec<f64> = result
@@ -406,14 +406,14 @@ mod tests {
     #[test]
     fn test_empty_nodes_error() {
         let shards = vec![create_test_shard(0)];
-        let result = distribute_across_octants(shards, &[]);
+        let result = distribute_across_octants(&shards, &[]);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_empty_shards_error() {
         let nodes = create_test_nodes();
-        let result = distribute_across_octants(vec![], &nodes);
+        let result = distribute_across_octants(&[], &nodes);
         assert!(result.is_err());
     }
 }

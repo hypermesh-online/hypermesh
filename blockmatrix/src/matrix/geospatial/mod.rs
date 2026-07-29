@@ -28,11 +28,6 @@
 //! Groups nodes using K-means, DBSCAN, or hierarchical algorithms.
 //! Provides metrics for cluster quality and supports dynamic updates.
 //!
-//! ## Load Balancing (`load_balancing`)
-//! Distributes requests considering geographic proximity, zone boundaries,
-//! and network latency. Supports multiple strategies from simple round-robin
-//! to complex latency-aware distribution.
-//!
 //! ## Network Topology (`topology`)
 //! Manages the complete network structure with GPS-aware node positioning,
 //! connection tracking, and integration with the blockchain layer.
@@ -57,20 +52,10 @@
 //! clustering.kmeans(&nodes, 5, 100); // 5 clusters, 100 iterations
 //! let metrics = clustering.calculate_metrics();
 //! ```
-//!
-//! ## Load Balancing with Geography
-//! ```ignore
-//! // Requires pre-existing `source: &MatrixCoordinate`.
-//! use blockmatrix::matrix::geospatial::{GeographicLoadBalancer, LoadBalancingStrategy};
-//!
-//! let mut balancer = GeographicLoadBalancer::new();
-//! let target = balancer.distribute(&source, LoadBalancingStrategy::NearestNeighbor);
-//! ```
 
 pub mod clustering;
 pub mod converter;
 pub mod hierarchy;
-pub mod load_balancing;
 pub mod topology;
 
 // Re-export main types
@@ -79,10 +64,6 @@ pub use converter::{GpsConverter, GpsCoordinate, GpsError, ScaleResolution};
 pub use hierarchy::{GeographicBounds, GeographicHierarchy, GeographicLevel, GeographicZone};
 
 pub use clustering::{Cluster, ClusterMetrics, ClusteringAlgorithm, GeographicClustering};
-
-pub use load_balancing::{
-    GeographicLoadBalancer, LoadBalancingStats, LoadBalancingStrategy, NodeLoad, ZoneLoadStats,
-};
 
 pub use topology::{
     GeographicDensity, NetworkTopology, TopologyEdge, TopologyNode, TopologyQueryResult,
@@ -133,25 +114,7 @@ mod integration_tests {
         let clusters = clustering.get_clusters();
         assert_eq!(clusters.len(), 2);
 
-        // 4. Load Balancing
-        let mut balancer = GeographicLoadBalancer::new();
-
-        for (name, coord) in &matrix_coords {
-            let mut node = NodeLoad::new(*coord, 100);
-            if name == "NYC" || name == "Chicago" {
-                node.zone_id = Some("east".to_string());
-            } else {
-                node.zone_id = Some("west".to_string());
-            }
-            balancer.register_node(node);
-        }
-
-        // Request from NYC should prefer east coast
-        let nyc_coord = matrix_coords[0].1;
-        let target = balancer.distribute(&nyc_coord, LoadBalancingStrategy::NearestNeighbor);
-        assert!(target.is_some());
-
-        // 5. Network Topology
+        // 4. Network Topology
         let mut topology = NetworkTopology::new(converter);
 
         for (name, coord) in &matrix_coords {
@@ -278,47 +241,6 @@ mod integration_tests {
     }
 
     #[test]
-    fn test_load_balancing_strategies() {
-        let mut balancer = GeographicLoadBalancer::new();
-
-        // Create nodes with different characteristics
-        let mut node1 = NodeLoad::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"), 100);
-        node1.avg_response_time = 10.0;
-        node1.zone_id = Some("zone_a".to_string());
-
-        let mut node2 = NodeLoad::new(MatrixCoordinate::new(50, 0, 0).expect("test: valid coordinate"), 100);
-        node2.avg_response_time = 100.0;
-        node2.zone_id = Some("zone_b".to_string());
-
-        let mut node3 = NodeLoad::new(MatrixCoordinate::new(0, 50, 0).expect("test: valid coordinate"), 200);
-        node3.avg_response_time = 50.0;
-        node3.zone_id = Some("zone_a".to_string());
-
-        balancer.register_node(node1);
-        balancer.register_node(node2);
-        balancer.register_node(node3);
-
-        let source = MatrixCoordinate::new(5, 5, 0).expect("test: valid coordinate");
-
-        // Test different strategies
-        let strategies = vec![
-            LoadBalancingStrategy::RoundRobin,
-            LoadBalancingStrategy::NearestNeighbor,
-            LoadBalancingStrategy::LatencyAware,
-            LoadBalancingStrategy::WeightedCapacity,
-        ];
-
-        for strategy in strategies {
-            let target = balancer.distribute(&source, strategy);
-            assert!(target.is_some(), "Strategy {strategy:?} failed");
-        }
-
-        let stats = balancer.get_stats();
-        assert_eq!(stats.successful_distributions, 4);
-        assert_eq!(stats.failed_distributions, 0);
-    }
-
-    #[test]
     fn test_topology_blockchain_integration() {
         let mut topology = NetworkTopology::default();
 
@@ -417,34 +339,6 @@ mod performance_tests {
             elapsed.as_millis() < 100,
             "Clustering 1000 nodes took {}ms, expected < 100ms",
             elapsed.as_millis()
-        );
-    }
-
-    #[test]
-    fn test_load_balancing_performance() {
-        let mut balancer = GeographicLoadBalancer::new();
-
-        // Register 100 nodes
-        for i in 0..100 {
-            let coord = MatrixCoordinate::new(i * 10, 0, 0).expect("test: valid coordinate");
-            let node = NodeLoad::new(coord, 100);
-            balancer.register_node(node);
-        }
-
-        let source = MatrixCoordinate::origin();
-        let start = Instant::now();
-
-        // Perform 1000 distributions
-        for _ in 0..1000 {
-            let _ = balancer.distribute(&source, LoadBalancingStrategy::NearestNeighbor);
-        }
-
-        let elapsed = start.elapsed();
-        let per_distribution = elapsed.as_micros() / 1000;
-
-        assert!(
-            per_distribution < 100,
-            "Distribution took {per_distribution}μs, expected < 100μs"
         );
     }
 }

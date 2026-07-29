@@ -39,8 +39,7 @@ pub mod streaming_pipeline;
 // Re-exports
 pub use compression::{CompressionAlgorithm, CompressionConfig, CompressionStats, Compressor};
 pub use distribution::{
-    DistributedAsset, DistributionConfig, DistributionStats, MatrixConstraints, MatrixDistributor,
-    ShardPlacement,
+    DistributedAsset, DistributionConfig, DistributionStats, MatrixConstraints, ShardPlacement,
 };
 pub use encryption::{
     AesKey, EncryptedData, EncryptionConfig, EncryptionStats, Encryptor, KyberEncryptionResult,

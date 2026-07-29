@@ -171,7 +171,7 @@ async fn test_car_purchase_scenario_bank_loan_document() {
 
     // Distribute with PrivateNetwork privacy level
     let result = distribute_shards_pos_aware(
-        shards,
+        &shards,
         "bank-loan-doc",
         "PrivateNetwork",
         &nodes,
@@ -207,7 +207,7 @@ async fn test_car_purchase_scenario_dealer_invoice() {
 
     // Distribute with PrivateNetwork privacy level
     let result = distribute_shards_pos_aware(
-        shards,
+        &shards,
         "dealer-invoice",
         "PrivateNetwork",
         &nodes,
@@ -248,7 +248,7 @@ async fn test_car_purchase_scenario_dmv_title() {
 
     // Distribute with PublicNetwork privacy level
     let result =
-        distribute_shards_pos_aware(shards, "dmv-title", "PublicNetwork", &nodes, &state_proof)
+        distribute_shards_pos_aware(&shards, "dmv-title", "PublicNetwork", &nodes, &state_proof)
             .await
             .unwrap();
 
@@ -312,7 +312,7 @@ async fn test_car_purchase_scenario_credit_report() {
 
     // Distribute with PrivateNetwork privacy level (for bank network)
     let result = distribute_shards_pos_aware(
-        shards,
+        &shards,
         "credit-report",
         "PrivateNetwork",
         &granted_nodes,
@@ -347,7 +347,7 @@ async fn test_cross_boundary_violation_prevention() {
     let state_proof = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
-        shards,
+        &shards,
         "sensitive-data",
         "PrivateNetwork",
         &nodes,
@@ -384,7 +384,7 @@ async fn test_octant_distribution_quality() {
     let state_proof = MockStateAuthenticator::new(true);
 
     let result =
-        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
+        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
             .await
             .unwrap();
 
@@ -419,7 +419,7 @@ async fn test_golden_ratio_spacing() {
     let state_proof = MockStateAuthenticator::new(true);
 
     let result =
-        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
+        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
             .await
             .unwrap();
 
@@ -456,7 +456,7 @@ async fn test_pos_validation_integration() {
     let state_proof = MockStateAuthenticator::new(true);
 
     let result =
-        distribute_shards_pos_aware(shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
+        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
             .await;
 
     assert!(result.is_ok(), "PoS validation failed");
@@ -467,7 +467,7 @@ async fn test_pos_validation_integration() {
     let (shards2, _) = sharder2.shard(&data).unwrap();
 
     let result2 = distribute_shards_pos_aware(
-        shards2,
+        &shards2,
         "test-asset",
         "PrivateNetwork",
         &nodes,
@@ -495,7 +495,7 @@ async fn test_distribution_statistics() {
     let state_proof = MockStateAuthenticator::new(true);
 
     let result = distribute_shards_pos_aware(
-        shards.clone(),
+        &shards,
         "test-asset",
         "PrivateNetwork",
         &nodes,

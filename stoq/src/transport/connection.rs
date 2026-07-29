@@ -267,6 +267,19 @@ impl Connection {
         format!("{:?}", self.inner.stable_id())
     }
 
+    /// Current best estimate of round-trip time to the peer.
+    ///
+    /// This is QUIC's continuously-measured RTT (from ACK timing), not a
+    /// placeholder — it is a real proximity signal to this peer. It is the
+    /// measurement NGauge's placement layer consumes to make matrix distance
+    /// mean something physical (`ngauge::placement::LocalityProvider`), instead
+    /// of clustering over the identity-derived (uniform-random) cell. RTT is a
+    /// *proximity metric for placement only* — never a proof field and never an
+    /// admission gate (VISION.md §6, §5.5).
+    pub fn rtt(&self) -> std::time::Duration {
+        self.inner.rtt()
+    }
+
     /// Accept a bidirectional stream
     pub async fn accept_bi(&self) -> Result<(quinn::SendStream, quinn::RecvStream)> {
         self.update_activity();

@@ -50,6 +50,18 @@ const ADDRESS_DOMAIN: &[u8] = b"hypermesh-node-address-v1";
 /// derived cell prefix (bytes 4-9 of the address encode `i16` big-endian).
 ///
 /// This is the single canonical construction: `blockmatrix` delegates to it.
+///
+/// ## This cell is an identity fingerprint, NOT an authoritative location
+///
+/// The cell this returns — and the cell packed into [`AssetAddress`] — is a
+/// deterministic content/identity derivation (a uniform-random point in the
+/// matrix, with no locality). It answers *what an asset IS* (a durable,
+/// peer-verifiable identity), **not** *where it currently lives*. Where an asset
+/// actually resides and replicates is a demand-driven NGauge placement decision
+/// (`ngauge::placement::PlacementLease`), elastic and re-issued as load shifts —
+/// never this hash. Do not read this cell as a physical or authoritative
+/// location. See VISION.md §5.5 (identity is durable; location is elastic and
+/// NGauge-owned).
 pub fn derive_cell(device_node_id: &str) -> (i16, i16, i16) {
     let mut hasher = blake3::Hasher::new();
     hasher.update(CELL_DOMAIN);

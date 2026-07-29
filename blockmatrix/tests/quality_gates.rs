@@ -25,7 +25,7 @@ use blockmatrix::assets::core::{
 };
 use blockmatrix::network::{
     isolation::{DefaultIsolationManager, IsolationManager},
-    multi_network::{MultiNetworkCoordinator, NetworkConfig},
+    multi_network::{NetworkConnectionCoordinator, NetworkConfig},
     trust::{
         AnonymousNetworkHandler, Certificate, EphemeralKey, FederatedNetworkHandler,
         NetworkConfig as TrustNetworkConfig, NetworkHandler, NetworkType, P2PNetworkHandler,
@@ -70,7 +70,7 @@ async fn qg1_node_starts_without_network() -> Result<()> {
 
     // Initialize coordinator without any network connections
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Verify coordinator is ready without external dependencies
     let active = coordinator.active_networks().await;
@@ -129,10 +129,10 @@ async fn qg1_unique_genesis_block_created() -> Result<()> {
 
     // Create two independent nodes - each should have unique genesis
     let isolation1 = Arc::new(DefaultIsolationManager::new());
-    let _coordinator1 = MultiNetworkCoordinator::new(isolation1.clone());
+    let _coordinator1 = NetworkConnectionCoordinator::new(isolation1.clone());
 
     let isolation2 = Arc::new(DefaultIsolationManager::new());
-    let _coordinator2 = MultiNetworkCoordinator::new(isolation2.clone());
+    let _coordinator2 = NetworkConnectionCoordinator::new(isolation2.clone());
 
     // Each coordinator represents a unique node with unique genesis
     // (In full implementation, would verify actual blockchain genesis blocks)
@@ -147,7 +147,7 @@ async fn qg1_no_external_dependencies_required() -> Result<()> {
 
     // Bootstrap without network, without trust.hypermesh.online, without anything external
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Should be fully operational in private mode
     let stats = coordinator.get_network_stats().await;
@@ -169,7 +169,7 @@ async fn qg2_anonymous_never_leaks_identity() -> Result<()> {
     info!("QG2: Testing anonymous connections never leak identity");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join anonymous network
     let anon_id = coordinator
@@ -197,7 +197,7 @@ async fn qg2_p2p_peer_list_isolation() -> Result<()> {
     info!("QG2: Testing P2P connections don't share peer lists");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join two P2P networks with different peer lists
     let p2p1_id = coordinator
@@ -230,7 +230,7 @@ async fn qg2_federated_network_isolation() -> Result<()> {
     info!("QG2: Testing federated networks are isolated from each other");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join two federated networks with different gateways
     let fed1_id = coordinator
@@ -267,7 +267,7 @@ async fn qg2_public_network_can_be_disabled() -> Result<()> {
     info!("QG2: Testing public network can be completely disabled");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join only anonymous, P2P, and federated (no public)
     coordinator
@@ -311,7 +311,7 @@ async fn qg3_all_four_networks_simultaneously() -> Result<()> {
     info!("QG3: Testing single node connected to all 4 network types simultaneously");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join all 4 network types
     let _anon_id = coordinator
@@ -507,7 +507,7 @@ async fn qg5_user_can_disable_public() -> Result<()> {
     info!("QG5: Testing user can disable public network entirely");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // User chooses to ONLY use private networks (no public)
     coordinator
@@ -538,7 +538,7 @@ async fn qg5_user_specifies_federation_gateway() -> Result<()> {
     info!("QG5: Testing user specifies federation gateway URL");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // User specifies custom federation gateway
     let custom_gateway = "gateway.mycompany.internal".to_string();
@@ -569,7 +569,7 @@ async fn qg5_user_controls_asset_sharing() -> Result<()> {
     info!("QG5: Testing user controls asset sharing per network");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join multiple networks
     let anon_id = coordinator
@@ -616,7 +616,7 @@ async fn qg6_no_network_transitions() -> Result<()> {
     info!("QG6: Testing networks CANNOT morph between types (CRITICAL)");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join anonymous network
     let anon_id = coordinator
@@ -661,7 +661,7 @@ async fn qg6_independent_connect() -> Result<()> {
     info!("QG6: Testing can connect to multiple networks independently");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Connect to networks in any order
     let _fed_id = coordinator
@@ -697,7 +697,7 @@ async fn qg6_independent_disconnect() -> Result<()> {
     info!("QG6: Testing can disconnect from networks independently");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Connect to 3 networks
     let anon_id = coordinator
@@ -868,7 +868,7 @@ async fn qg8_assets_truly_anonymous() -> Result<()> {
     info!("QG8: Testing assets shared to Anonymous are truly anonymous");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join anonymous network
     let anon_id = coordinator
@@ -901,7 +901,7 @@ async fn qg8_p2p_assets_peer_specific() -> Result<()> {
     info!("QG8: Testing P2P assets only visible to specific peer");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join P2P network
     let p2p_id = coordinator
@@ -946,7 +946,7 @@ async fn qg8_federated_assets_contained() -> Result<()> {
     info!("QG8: Testing federated assets contained within federation");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join federated network
     let fed_id = coordinator
@@ -999,7 +999,7 @@ async fn qg8_public_assets_discoverable() -> Result<()> {
     info!("QG8: Testing public assets are globally discoverable (STOQ + PoS validated)");
 
     let isolation = Arc::new(DefaultIsolationManager::new());
-    let mut coordinator = MultiNetworkCoordinator::new(isolation.clone());
+    let mut coordinator = NetworkConnectionCoordinator::new(isolation.clone());
 
     // Join all network types
     let anon_id = coordinator

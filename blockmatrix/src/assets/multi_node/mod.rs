@@ -68,7 +68,7 @@ pub use multi_network_coordinator::{
 };
 pub use network_membership::{
     ApprovalProcess, JoinRequirements, MembershipStatus, MultiNetworkMembership,
-    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkMembership, NetworkRole, PrivacyMode,
+    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkRole, ParticipationMembership, PrivacyMode,
     TrustChainClient,
 };
 

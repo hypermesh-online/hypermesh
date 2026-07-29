@@ -11,7 +11,7 @@ use blockmatrix::matrix::{
     coordinate::MatrixCoordinate,
     tensor::{
         calculate_load_balanced_routes, calculate_orthogonal_routes, calculate_routing_path,
-        calculate_routing_vector, find_aligned_nodes, score_route_quality, Matrix3x3, PathFinder,
+        calculate_routing_vector, find_aligned_nodes, score_route_quality,
     },
 };
 
@@ -115,77 +115,6 @@ fn main() {
     let quality = score_route_quality(&routing_path, ideal_hop);
     println!("Route quality score: {quality:.2}/100");
     println!("  (Based on hop distance, direction changes, efficiency)\n");
-
-    // Step 7: A* Pathfinding demonstration
-    println!("Step 7: A* Pathfinding");
-    println!("=======================");
-
-    // Simple neighbors function for demo
-    fn simple_neighbors(coord: &MatrixCoordinate) -> Vec<MatrixCoordinate> {
-        let mut neighbors = Vec::new();
-        let step = 10; // Larger steps for demo
-
-        for dx in [-step, 0, step].iter() {
-            for dy in [-step, 0, step].iter() {
-                for dz in [-step, 0, step].iter() {
-                    if *dx == 0 && *dy == 0 && *dz == 0 {
-                        continue;
-                    }
-
-                    if let Ok(neighbor) =
-                        MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz)
-                    {
-                        // Only allow forward progress (simplified for demo)
-                        if neighbor.x >= coord.x && neighbor.y >= coord.y {
-                            neighbors.push(neighbor);
-                        }
-                    }
-                }
-            }
-        }
-        neighbors
-    }
-
-    let finder = PathFinder::new();
-    let small_dest = MatrixCoordinate::new(30, 20, 10).expect("Valid");
-
-    match finder.find_path(&source, &small_dest, simple_neighbors) {
-        Ok(path) => {
-            println!("A* path found with {} nodes:", path.len());
-            for (i, node) in path.iter().enumerate() {
-                println!("  Node {}: ({}, {}, {})", i, node.x, node.y, node.z);
-            }
-        }
-        Err(e) => {
-            println!("Path finding failed: {e}");
-        }
-    }
-    println!();
-
-    // Step 8: Matrix transformations for coordinate system changes
-    println!("Step 8: Matrix Transformations");
-    println!("===============================");
-
-    // Rotate routing direction around Z axis by 45 degrees
-    let rotation = Matrix3x3::rotation_z(std::f64::consts::PI / 4.0);
-    let rotated_direction = rotation.transform_vector(&direction);
-
-    println!(
-        "Original direction: ({:.3}, {:.3}, {:.3})",
-        direction.x, direction.y, direction.z
-    );
-    println!(
-        "Rotated 45° around Z: ({:.3}, {:.3}, {:.3})",
-        rotated_direction.x, rotated_direction.y, rotated_direction.z
-    );
-
-    // Scale the direction for different hop sizes
-    let scale_matrix = Matrix3x3::scaling(2.0, 2.0, 1.0);
-    let scaled = scale_matrix.transform_vector(&direction);
-    println!(
-        "Scaled (2x in X,Y): ({:.3}, {:.3}, {:.3})",
-        scaled.x, scaled.y, scaled.z
-    );
 
     println!("\n=== Example Complete ===");
 }

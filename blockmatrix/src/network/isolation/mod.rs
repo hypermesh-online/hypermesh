@@ -26,10 +26,12 @@ use super::trust::NetworkType;
 pub use hypermesh_lib::NetworkId;
 
 pub mod default;
+pub mod world_gate;
 #[cfg(test)]
 mod tests;
 
 pub use default::DefaultIsolationManager;
+pub use world_gate::WorldIsolationGate;
 
 /// Packet identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

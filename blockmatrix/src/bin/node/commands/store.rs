@@ -147,6 +147,17 @@ pub async fn run_store(
     }
 
     if let Some(ctx) = dist_ctx {
+        // P4: place through the single placement authority — real PoS-eligible
+        // peers at proximity coordinates — over the same peer snapshot used to
+        // send. Cold start (no peers) → empty placements → all kept local.
+        let peers = ctx.network.get_connected_nodes().await;
+        let placements = blockmatrix::network::placement::place_shards(
+            &peers,
+            &processed.shards,
+            &asset_id,
+            privacy_mode,
+        )
+        .await;
         let shard_pairs: Vec<(ContentHash, Vec<u8>)> = processed
             .shards
             .iter()
@@ -155,8 +166,7 @@ pub async fn run_store(
                 (ContentHash(hash_bytes), s.data.clone())
             })
             .collect();
-        distribute_shards_to_network(ctx, &shard_pairs, &processed.distributed.placements)
-            .await;
+        distribute_shards_to_network(ctx, &shard_pairs, &placements, &peers).await;
     } else {
         debug!("Standalone store: no network available for shard distribution");
     }
@@ -381,15 +391,15 @@ async fn fetch_shard_from_network(hash_hex: &str, expected_hash: &[u8]) -> Resul
 async fn distribute_shards_to_network(
     ctx: &ShardDistributionCtx,
     shard_pairs: &[(ContentHash, Vec<u8>)],
-    placements: &[blockmatrix::assets::pipeline::distribution::ShardPlacement],
+    placements: &[blockmatrix::distribution::ShardPlacement],
+    peers: &[blockmatrix::network::NetworkNode],
 ) {
     use blockmatrix::network::shard_distribution::distribute_to_peers;
 
-    let connected_nodes = ctx.network.get_connected_nodes().await;
     let result = distribute_to_peers(
         shard_pairs,
         placements,
-        &connected_nodes,
+        peers,
         ctx.shard_transport.as_ref(),
     )
     .await;

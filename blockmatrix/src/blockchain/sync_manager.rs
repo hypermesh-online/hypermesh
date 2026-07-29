@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::bootstrap::PrivacyMode;
-use hypermesh_lib::BlockchainScope;
+use hypermesh_lib::{BlockchainScope, NetworkId};
 
 // Re-export extracted types so the public API is unchanged.
 pub use super::sync_protocol::{NodeBlockchainBlockProvider, PropagationStrategyConfig, SyncMessage};
@@ -113,6 +113,15 @@ pub struct NetworkMembership {
     pub joined_at: u64,
     /// Timestamp of the last successful sync, if any
     pub last_sync: Option<u64>,
+    /// The outer world this membership nests inside, if any (VISION.md §5.5).
+    ///
+    /// `None` for a top-level / operator-declared (**pinned**) network — it has
+    /// no outer boundary, so world formation may partition WITHIN it but never
+    /// split above it. `Some(parent)` for a nested world (an emergent inner
+    /// world, or a declared sub-network), resolved by walking the parent chain —
+    /// the same nesting model DNS domains use (`dns/domain.rs`), one primitive
+    /// at every scale.
+    pub parent_network_id: Option<NetworkId>,
 }
 
 /// Tracks the synchronization state for a specific network
@@ -228,11 +237,27 @@ impl SyncManager {
         &self.config
     }
 
-    /// Join a Network scope chain
+    /// Join a Network scope chain as a **top-level (pinned) network** — an
+    /// operator-declared boundary with no outer world (`parent_network_id =
+    /// None`). World formation may partition within it but never split above it.
     pub fn join_network(
         &mut self,
         network_id: String,
         privacy_mode: PrivacyMode,
+        now_unix_secs: u64,
+    ) -> Result<(), String> {
+        self.join_network_nested(network_id, privacy_mode, None, now_unix_secs)
+    }
+
+    /// Join a Network scope chain, optionally nested under `parent_network_id`
+    /// (VISION.md §5.5). A `Some(parent)` membership is a nested world — an
+    /// emergent inner world or a declared sub-network — resolvable by walking
+    /// the parent chain. `None` is a top-level boundary.
+    pub fn join_network_nested(
+        &mut self,
+        network_id: String,
+        privacy_mode: PrivacyMode,
+        parent_network_id: Option<NetworkId>,
         now_unix_secs: u64,
     ) -> Result<(), String> {
         if self.network_memberships.contains_key(&network_id) {
@@ -252,11 +277,13 @@ impl SyncManager {
             privacy_mode,
             joined_at: now_unix_secs,
             last_sync: None,
+            parent_network_id,
         };
 
         info!(
             network = %network_id,
             privacy = %privacy_mode,
+            nested = parent_network_id.is_some(),
             "Joined network"
         );
 

@@ -9,7 +9,7 @@
 use crate::assets::pipeline::{
     AesKey, Asset, CompressionConfig, CompressionStats, Compressor, DistributedAsset,
     DistributionConfig, DistributionStats, EncryptedData, EncryptionConfig, EncryptionStats,
-    Encryptor, KyberEncryptionResult, MatrixDistributor, PipelineResult, Shard, Sharder,
+    Encryptor, KyberEncryptionResult, PipelineResult, Shard, Sharder,
     ShardingConfig, ShardingStats,
 };
 use serde::{Deserialize, Serialize};
@@ -144,12 +144,19 @@ impl PipelineStats {
 }
 
 /// Asset processing pipeline
+///
+/// Produces content-addressed shards (Compress → Encrypt → Shard). It does
+/// NOT decide placement: WHERE shards live requires the live PoS-eligible peer
+/// set and their proximity coordinates, which the pipeline (a pure, offline
+/// transform) does not have. Placement is the store path's concern — see
+/// [`crate::network::placement`] and the single placement authority
+/// [`crate::distribution::distribute_shards_pos_aware`]. `ProcessedAsset`
+/// therefore carries an always-empty `DistributedAsset` (P4).
 pub struct AssetPipeline {
     config: PipelineConfig,
     compressor: Compressor,
     encryptor: Encryptor,
     sharder: Sharder,
-    distributor: MatrixDistributor,
 }
 
 impl AssetPipeline {
@@ -158,14 +165,12 @@ impl AssetPipeline {
         let compressor = Compressor::new(config.compression.clone());
         let encryptor = Encryptor::new(config.encryption.clone());
         let sharder = Sharder::new(config.sharding.clone())?;
-        let distributor = MatrixDistributor::new(config.distribution.clone());
 
         Ok(Self {
             config,
             compressor,
             encryptor,
             sharder,
-            distributor,
         })
     }
 
@@ -367,35 +372,26 @@ impl AssetPipeline {
             sharding_stats.parity_shards
         );
 
-        // Stage 7: Distribute (tensor-based)
-        // Place shards at optimal matrix positions
-        let (distributed, distribution_stats) = if self.config.stages_enabled.distribution {
-            tracing::debug!("Stage 7: Distribute");
-            self.distributor
-                .distribute(asset.id.clone(), shards.len())?
-        } else {
-            // No distribution - return empty stats
-            let metadata = crate::assets::pipeline::distribution::DistributionMetadata {
+        // Stage 7: Distribute — placement is NOT computed here.
+        //
+        // P4: the pipeline no longer fabricates matrix positions. Placement
+        // (WHERE) requires the live PoS-eligible peer set + proximity
+        // coordinates, which only the store path has. The carrier is filled
+        // empty; the store path computes real placements via
+        // `crate::network::placement::place_shards` →
+        // `crate::distribution::distribute_shards_pos_aware`.
+        let distributed = DistributedAsset {
+            asset_id: asset.id.clone(),
+            placements: vec![],
+            metadata: crate::assets::pipeline::distribution::DistributionMetadata {
                 total_shards: shards.len(),
-                networks_used: 1,
+                networks_used: 0,
                 avg_shard_distance: 0.0,
                 quality_score: 0.0,
                 distributed_at: chrono::Utc::now().timestamp(),
-            };
-            let distributed = DistributedAsset {
-                asset_id: asset.id.clone(),
-                placements: vec![],
-                metadata,
-            };
-            (distributed, DistributionStats::default())
+            },
         };
-
-        tracing::info!(
-            "Distributed: {} shards across {} networks (quality: {:.1})",
-            distribution_stats.shards_distributed,
-            distribution_stats.networks_used,
-            distribution_stats.quality_score
-        );
+        let distribution_stats = DistributionStats::default();
 
         // Calculate total statistics
         let total_duration_ms = start.elapsed().as_millis() as u64;
@@ -530,11 +526,6 @@ impl AssetPipeline {
     pub fn config(&self) -> &PipelineConfig {
         &self.config
     }
-
-    /// Get mutable reference to distributor (for node registration)
-    pub fn distributor_mut(&mut self) -> &mut MatrixDistributor {
-        &mut self.distributor
-    }
 }
 
 #[cfg(test)]
@@ -663,11 +654,19 @@ mod tests {
         // Verify all stats are populated
         assert_eq!(processed.stats.original_size, 100000);
         assert!(processed.stats.final_size > 0);
-        assert!(processed.stats.total_duration_ms > 0);
+        // total_duration_ms is a wall-clock measurement: a small asset through
+        // Compress→Encrypt→Shard can complete in under a millisecond, so 0 is a
+        // valid reading. Assert throughput is a finite, non-negative number
+        // instead of a fragile `> 0` on the millisecond clock.
+        assert!(processed.stats.total_throughput_mbps.is_finite());
+        assert!(processed.stats.total_throughput_mbps >= 0.0);
         assert!(processed.stats.compression.ratio > 0.0);
         assert!(processed.stats.encryption.encrypted_size > 0);
         assert!(processed.stats.sharding.data_shards > 0);
-        assert!(processed.stats.distribution.shards_distributed > 0);
+        // P4: the pipeline no longer computes placement, so distribution stats
+        // are empty here — placement is the store path's concern.
+        assert_eq!(processed.stats.distribution.shards_distributed, 0);
+        assert!(processed.distributed.placements.is_empty());
     }
 
     #[tokio::test]

@@ -128,8 +128,8 @@ pub enum SchedulingStrategy {
     RoundRobin,
 }
 
-/// Trait for BlockMatrix's TransactionRouter to optionally consume routing
-/// weight adjustments from ngauge.
+/// Trait for a BlockMatrix router to optionally consume routing weight
+/// adjustments from ngauge.
 pub trait RoutingAdvisor {
     /// Compute routing weight adjustments for candidate relay nodes.
     fn compute_weight_adjustments(

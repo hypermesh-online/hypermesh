@@ -9,9 +9,9 @@
 
 use blockmatrix::assets::pipeline::{
     orchestrator::AssetPipeline, Asset, PipelineInputMetadata, CompressionAlgorithm, CompressionConfig,
-    DistributionConfig, EncryptionConfig, Encryptor, MatrixDistributor, PipelineConfig,
-    ShardingConfig,
+    EncryptionConfig, Encryptor, PipelineConfig, ShardingConfig,
 };
+use blockmatrix::distribution::{distribute_across_octants, NodeInfo};
 use blockmatrix::matrix::MatrixCoordinate;
 use std::time::Instant;
 
@@ -202,79 +202,59 @@ fn test_shard_recovery_scenarios() {
 fn test_matrix_aware_distribution() {
     use blockmatrix::assets::pipeline::Sharder;
 
-    let dist_config = DistributionConfig::default();
-    let mut distributor = MatrixDistributor::new(dist_config);
-
-    // Register some nodes at various matrix positions
+    // P4: placement goes through the REAL authority (octant optimizer over a
+    // pool of eligible nodes), NOT synthetic golden-ratio geometry. Build a
+    // pool of nodes spread across octants and place real shards on them.
+    let mut nodes = Vec::new();
     for i in 0..100 {
-        let x = (i % 10) as i64;
-        let y = ((i / 10) % 10) as i64;
-        let z = (i / 100) as i64;
+        // Spread across all 8 octants by sign so the octant optimizer has
+        // candidates everywhere.
+        let sx = if i % 2 == 0 { 1 } else { -1 };
+        let sy = if (i / 2) % 2 == 0 { 1 } else { -1 };
+        let sz = if (i / 4) % 2 == 0 { 1 } else { -1 };
+        let x = sx * (1 + (i % 10) as i64);
+        let y = sy * (1 + ((i / 10) % 10) as i64);
+        let z = sz * (1 + (i % 5) as i64);
         let position = MatrixCoordinate::new(x, y, z).unwrap();
-        distributor.register_node(format!("node-{i}"), position);
+        nodes.push(NodeInfo::new(
+            format!("node-{i}"),
+            position,
+            "FullPublic".to_string(),
+            0,
+            "network-1".to_string(),
+        ));
     }
 
-    // Create shards
+    // Create real shards
     let sharder = Sharder::default().unwrap();
     let test_data = vec![0xFF; 10240];
     let (shards, _) = sharder.shard(&test_data).unwrap();
 
-    // Find optimal positions for shards
-    let optimal_positions = distributor.find_optimal_positions(shards.len()).unwrap();
-
     println!("\n=== Matrix-Aware Distribution Test ===");
     println!("Shards to distribute: {}", shards.len());
-    println!("Positions found: {}", optimal_positions.len());
+    println!("Eligible nodes: {}", nodes.len());
 
-    assert_eq!(optimal_positions.len(), shards.len());
+    // Place through the octant optimizer (the real executor).
+    let result = distribute_across_octants(&shards, &nodes).unwrap();
 
-    // Create placements from positions
-    let mut placements = Vec::new();
-    for (i, pos) in optimal_positions.iter().enumerate() {
-        placements.push(blockmatrix::assets::pipeline::ShardPlacement {
-            shard_index: i,
-            position: *pos,
-            network_id: "default".to_string(),
-            node_id: Some(format!("node-{i}")),
-            distance_from_origin: pos.euclidean_distance(&MatrixCoordinate::origin()),
-            routing_path: vec![MatrixCoordinate::origin(), *pos],
-        });
-    }
+    assert_eq!(result.placements.len(), shards.len());
+    println!("Positions placed: {}", result.placements.len());
+    println!("Octants used: {}", result.octants_used);
+    println!("Quality score: {:.1}", result.quality_score);
 
-    // Calculate statistics
-    let mut min_distance = f64::MAX;
-    let mut max_distance = 0.0f64;
-    let mut total_distance = 0.0;
-    let mut count = 0;
-
-    for i in 0..placements.len() {
-        for j in i + 1..placements.len() {
-            let dist = placements[i].distance_to(&placements[j]);
-            min_distance = min_distance.min(dist);
-            max_distance = max_distance.max(dist);
-            total_distance += dist;
-            count += 1;
-        }
-    }
-
-    let avg_distance = if count > 0 {
-        total_distance / count as f64
-    } else {
-        0.0
-    };
-
-    println!("Average distance between shards: {avg_distance:.2}");
-    println!("Min distance: {min_distance:.2}");
-    println!("Max distance: {max_distance:.2}");
-
-    // Verify placements - positions are valid matrix coordinates
-    for placement in &placements {
-        // MatrixCoordinate is validated at construction time
-        // so all positions are guaranteed to be valid
+    // Every placement must land on a REAL node from the pool — never a
+    // fabricated coordinate.
+    let real: std::collections::HashSet<(i64, i64, i64)> =
+        nodes.iter().map(|n| (n.position.x, n.position.y, n.position.z)).collect();
+    for placement in &result.placements {
         assert!(placement.distance_from_origin >= 0.0);
+        assert!(
+            real.contains(&(placement.position.x, placement.position.y, placement.position.z)),
+            "placement must sit on a real pool node, not synthetic geometry",
+        );
     }
 
-    println!("✓ All shards placed in matrix topology");
+    println!("✓ All shards placed on real eligible nodes");
 }
 
 #[tokio::test]
@@ -485,33 +465,39 @@ fn test_integration_with_phase1_tensor_ops() {
     println!("Node position 2: {pos2:?}");
     println!("Distance: {distance:.2}");
 
-    // Create and distribute shards
-    let dist_config = DistributionConfig::default();
-    let mut distributor = MatrixDistributor::new(dist_config);
-
-    // Register nodes at matrix positions
+    // Create and distribute shards through the real placement authority.
+    let mut nodes = Vec::new();
     for i in 0..100 {
-        let x = (i % 10) as i64;
-        let y = ((i / 10) % 10) as i64;
-        let z = 0i64;
+        let sx = if i % 2 == 0 { 1 } else { -1 };
+        let sy = if (i / 2) % 2 == 0 { 1 } else { -1 };
+        let sz = if (i / 4) % 2 == 0 { 1 } else { -1 };
+        let x = sx * (1 + (i % 10) as i64);
+        let y = sy * (1 + ((i / 10) % 10) as i64);
+        let z = sz * (1 + (i % 5) as i64);
         let position = MatrixCoordinate::new(x, y, z).unwrap();
-        distributor.register_node(format!("node-{i}"), position);
+        nodes.push(NodeInfo::new(
+            format!("node-{i}"),
+            position,
+            "FullPublic".to_string(),
+            0,
+            "network-1".to_string(),
+        ));
     }
 
     let sharder = Sharder::default().unwrap();
     let test_data = vec![0xCA; 10240];
     let (shards, _) = sharder.shard(&test_data).unwrap();
 
-    // Find optimal positions using matrix operations
-    let positions = distributor.find_optimal_positions(shards.len()).unwrap();
+    // Place using matrix/octant operations over the eligible pool.
+    let result = distribute_across_octants(&shards, &nodes).unwrap();
 
     println!("\nDistribution using tensor operations:");
     println!("  Shards to place: {}", shards.len());
-    println!("  Positions found: {}", positions.len());
+    println!("  Positions placed: {}", result.placements.len());
     println!("  Using matrix coordinate system: ✓");
     println!("  Distance calculations: ✓");
 
-    assert_eq!(positions.len(), shards.len());
+    assert_eq!(result.placements.len(), shards.len());
     println!("✓ Successfully integrated with Phase 1 tensor operations");
 }
 
