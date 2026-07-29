@@ -4,7 +4,5 @@
 
 //! Comprehensive tests for tensor operations module
 
-mod matrix_tests;
-mod path_tests;
 mod routing_tests;
 mod vector_tests;

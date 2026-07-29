@@ -12,9 +12,8 @@
 //! # Components
 //!
 //! - **Vector Operations**: 3D vector mathematics for direction and alignment
-//! - **Matrix Operations**: 3x3 matrix transformations and rotations
-//! - **Routing Algorithms**: Topology-aware routing calculations
-//! - **Path Finding**: A* and other pathfinding algorithms
+//! - **Routing Algorithms**: Topology-aware routing calculations (the live
+//!   consumer: CLI/IPC topology inspection)
 //!
 //! # Example
 //!
@@ -29,24 +28,13 @@
 //! assert!(direction.magnitude() > 0.0);
 //! ```
 
-pub mod matrix_ops;
-pub mod path_finding;
 pub mod routing;
-pub mod transaction_routing;
 pub mod vector;
 
 // Re-export main types and functions
-pub use matrix_ops::Matrix3x3;
-pub use path_finding::{
-    bidirectional_search, calculate_path_cost, optimize_path, PathError, PathFinder,
-};
 pub use routing::{
     calculate_load_balanced_routes, calculate_orthogonal_routes, calculate_routing_path,
     calculate_routing_vector, find_aligned_nodes, routing_similarity, score_route_quality,
-};
-pub use transaction_routing::{
-    RouteHop, RoutingError, RoutingStatistics, ScopeTransition, TransactionRoute,
-    TransactionRouter, TransactionRoutingConfig,
 };
 pub use vector::{TensorError, Vector3D};
 

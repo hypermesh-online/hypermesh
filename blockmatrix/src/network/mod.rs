@@ -11,6 +11,7 @@ pub mod asset_chain_wire;
 pub mod attestation_wire;
 pub mod blockchain_integration;
 pub mod ca_enrollment;
+pub mod chunk;
 pub mod cluster;
 pub mod consumer_provider;
 pub mod config;

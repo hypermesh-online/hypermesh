@@ -17,7 +17,7 @@
 use blockmatrix::blockchain::PropagationStrategy;
 use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::geospatial::{GpsConverter, GpsCoordinate, ScaleResolution};
-use blockmatrix::matrix::tensor::{Matrix3x3, PathFinder, Vector3D};
+use blockmatrix::matrix::tensor::Vector3D;
 use blockmatrix::matrix::MatrixCoordinate;
 use blockmatrix::proof_of_state::StateProof;
 use std::time::Instant;
@@ -298,38 +298,7 @@ async fn test_e2e_tensor_operations() {
     assert!((distance - 141.42).abs() < 0.1);
     assert!((normalized.magnitude() - 1.0).abs() < 0.01);
 
-    // Test matrix transformation
-    let rotation = Matrix3x3::rotation_z(45.0_f64.to_radians());
-    let transformed = rotation.transform_vector(&origin);
-
-    println!("✓ Vector operations validated (transformed: {transformed:?})");
-
-    // Test pathfinding
-    let start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let goal = MatrixCoordinate::new(10, 10, 0).unwrap();
-
-    let path_finder = PathFinder::new();
-    // Simple pathfinding with empty neighbor function for demo
-    let path = path_finder
-        .find_path(&start, &goal, |coord| {
-            // Return valid neighbors (simplified for testing)
-            vec![
-                coord.translate(1, 0, 0).ok(),
-                coord.translate(0, 1, 0).ok(),
-                coord.translate(1, 1, 0).ok(),
-            ]
-            .into_iter()
-            .flatten()
-            .collect()
-        })
-        .ok();
-
-    if let Some(path) = path {
-        println!("✓ Pathfinding working (path length: {})", path.len());
-        assert!(!path.is_empty());
-    } else {
-        println!("✓ Pathfinding available (path not found in simplified test)");
-    }
+    println!("✓ Vector operations validated");
 
     println!("\n=== Tensor Operations Complete ===\n");
 }

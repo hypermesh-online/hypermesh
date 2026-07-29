@@ -2,22 +2,19 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Integration tests proving cross-scope proxy routing, tensor transaction
-//! routing, and CLI features work together consistently.
+//! Integration tests proving cross-scope proxy routing and CLI tensor features
+//! work together consistently.
 //!
-//! Three subsystems are exercised:
+//! Two subsystems are exercised:
 //! - `ScopeAwareRouter` (proxy/scope_routing) -- cross-scope gateway resolution
-//! - `TransactionRouter` (tensor/transaction_routing) -- cost-aware tensor paths
-//! - `CommandExecutor` (cli) -- user-facing commands wiring into the above
+//! - `CommandExecutor` (cli) -- user-facing commands, including the live tensor
+//!   routing path (`calculate_routing_path`) behind `topology show-path`
 
 use blockmatrix::assets::proxy::scope_routing::{ScopeAwareRouter, ScopeRoutingConfig};
 use blockmatrix::cli::commands::{AssetCommand, CliCommand, NodeCommand, TopologyCommand};
 use blockmatrix::cli::executor::CommandExecutor;
 use blockmatrix::cli::output::{CliError, CliOutput};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::matrix::tensor::transaction_routing::{
-    TransactionRouter, TransactionRoutingConfig,
-};
 use hypermesh_lib::BlockchainScope;
 
 // ---------------------------------------------------------------------------
@@ -39,17 +36,6 @@ fn scope_router_with_gateway(gw_id: &str, gw_pos: MatrixCoordinate) -> ScopeAwar
     router
 }
 
-/// Build a TransactionRouter pre-loaded with a relay node in the target scope.
-fn tx_router_with_relay(
-    relay_id: &str,
-    relay_pos: MatrixCoordinate,
-    scope: BlockchainScope,
-) -> TransactionRouter {
-    let mut router = TransactionRouter::new(TransactionRoutingConfig::default());
-    router.register_node(relay_id, relay_pos, scope);
-    router
-}
-
 /// Extract text from CliOutput::Text, panicking with a descriptive message
 /// if the variant is wrong.
 fn extract_text(output: CliOutput) -> String {
@@ -68,18 +54,15 @@ fn extract_table_row_count(output: CliOutput) -> usize {
 }
 
 // ===========================================================================
-// 1. Proxy + Tensor Integration (3 tests)
+// 1. Proxy same/cross-scope resolution (2 tests)
 // ===========================================================================
 
-/// Cross-scope route via ScopeAwareRouter uses a gateway node, and the same
-/// gateway position is reachable via TransactionRouter with consistent cost.
+/// Cross-scope route via ScopeAwareRouter uses a registered gateway node.
 #[test]
-fn proxy_tensor_cross_scope_route_uses_gateway() {
+fn proxy_cross_scope_route_uses_gateway() {
     let gw_pos = coord(50, 50, 0);
     let source = coord(0, 0, 0);
-    let dest = coord(100, 100, 0);
 
-    // -- Proxy layer: resolve cross-scope route --
     let mut scope_router = scope_router_with_gateway("gw-1", gw_pos);
     let scope_route = scope_router
         .resolve_route(
@@ -93,82 +76,18 @@ fn proxy_tensor_cross_scope_route_uses_gateway() {
     assert_eq!(scope_route.gateway_node.as_deref(), Some("gw-1"));
     assert!(scope_route.requires_encryption);
     assert_eq!(scope_route.path.len(), 2); // source + gateway
-
-    // -- Tensor layer: route through the same gateway position --
-    let mut tx_router = tx_router_with_relay("relay-gw", gw_pos, BlockchainScope::Network);
-    let tx_route = tx_router
-        .route_transaction(
-            &source,
-            &dest,
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-        )
-        .expect("test: tensor cross-scope route");
-
-    // The relay selected by the tensor router should sit at the gateway position.
-    let relay_hop = &tx_route.hops[1];
-    assert_eq!(relay_hop.position, gw_pos);
-    assert!(!tx_route.scope_transitions.is_empty());
-
-    // Cross-scope cost includes the penalty
-    let cost = tx_router.calculate_route_cost(&tx_route);
-    assert!(
-        cost > 0.0,
-        "test: cross-scope cost should be positive, got {cost}"
+    assert_eq!(
+        scope_route.path.last().copied(),
+        Some(gw_pos),
+        "test: proxy path ends at the gateway position"
     );
 }
 
-/// Nodes registered in both routers produce consistent cross-scope routing:
-/// both agree that a gateway/relay is needed and use the same position.
+/// Same-scope routing needs no gateway and no encryption.
 #[test]
-fn proxy_tensor_cross_scope_consistency() {
-    let gw_pos = coord(30, 30, 0);
-    let source = coord(0, 0, 0);
-
-    // Register gateway in proxy router
-    let mut scope_router = scope_router_with_gateway("gw-shared", gw_pos);
-    // Register same node as relay in tensor router
-    let mut tx_router = tx_router_with_relay("gw-shared", gw_pos, BlockchainScope::Network);
-
-    // Proxy route
-    let proxy_route = scope_router
-        .resolve_route(
-            "a1",
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-            &source,
-        )
-        .expect("test: proxy route");
-
-    // Tensor route
-    let tensor_route = tx_router
-        .route_transaction(
-            &source,
-            &coord(60, 60, 0),
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-        )
-        .expect("test: tensor route");
-
-    // Both identify the gateway/relay at the same position
-    let proxy_gw_pos = proxy_route
-        .path
-        .last()
-        .copied()
-        .expect("test: proxy path should have gateway");
-    let tensor_relay_pos = tensor_route.hops[1].position;
-
-    assert_eq!(proxy_gw_pos, tensor_relay_pos);
-    assert_eq!(proxy_gw_pos, gw_pos);
-}
-
-/// Same-scope routing agrees across both systems: no gateway, no scope
-/// transitions, direct path.
-#[test]
-fn proxy_tensor_same_scope_direct_path() {
+fn proxy_same_scope_direct_path() {
     let source = coord(10, 10, 0);
 
-    // Proxy: same-scope Device -> Device
     let mut scope_router = ScopeAwareRouter::new(ScopeRoutingConfig::default());
     let proxy_route = scope_router
         .resolve_route(
@@ -181,22 +100,6 @@ fn proxy_tensor_same_scope_direct_path() {
 
     assert!(proxy_route.gateway_node.is_none());
     assert!(!proxy_route.requires_encryption);
-
-    // Tensor: same-scope Device -> Device
-    let mut tx_router = TransactionRouter::new(TransactionRoutingConfig::default());
-    let tensor_route = tx_router
-        .route_transaction(
-            &source,
-            &coord(20, 20, 0),
-            BlockchainScope::Device,
-            BlockchainScope::Device,
-        )
-        .expect("test: tensor same-scope");
-
-    assert!(tensor_route.scope_transitions.is_empty());
-    // Same-scope discount applied
-    let config = TransactionRoutingConfig::default();
-    assert!(config.prefer_same_scope);
 }
 
 // ===========================================================================
@@ -398,8 +301,8 @@ fn cli_invalid_scope_graceful_error() {
 // 4. Full Stack Integration (2 tests)
 // ===========================================================================
 
-/// Complete flow: register nodes via CLI, route via tensor, resolve via proxy,
-/// and verify all paths are internally consistent.
+/// Complete flow: register nodes via CLI, resolve via proxy, and verify the
+/// CLI routing cost is internally consistent with the resolved gateway.
 #[test]
 fn full_stack_register_route_resolve() {
     let mut cli = CommandExecutor::new();
@@ -436,24 +339,8 @@ fn full_stack_register_route_resolve() {
     );
     assert!(info.contains("Total nodes: 3"));
 
-    // Step 3: Tensor routing (Device -> Network)
+    // Step 3: Proxy routing resolves a gateway at the registered position
     let gw_pos = coord(50, 50, 0);
-    let mut tx_router = TransactionRouter::new(TransactionRoutingConfig::default());
-    tx_router.register_node("relay", gw_pos, BlockchainScope::Network);
-
-    let tensor_route = tx_router
-        .route_transaction(
-            &coord(0, 0, 0),
-            &coord(100, 100, 0),
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-        )
-        .expect("test: tensor route");
-
-    assert_eq!(tensor_route.scope_transitions.len(), 1);
-    let relay_pos = tensor_route.hops[1].position;
-
-    // Step 4: Proxy routing uses the same gateway position
     let mut scope_router = scope_router_with_gateway("gw-cli", gw_pos);
     let proxy_route = scope_router
         .resolve_route(
@@ -470,11 +357,10 @@ fn full_stack_register_route_resolve() {
         .copied()
         .expect("test: proxy path should end at gateway");
 
-    // All three subsystems agree on the gateway position
-    assert_eq!(relay_pos, gw_pos);
+    // CLI-registered topology and proxy resolution agree on the gateway position
     assert_eq!(proxy_gw_pos, gw_pos);
 
-    // Step 5: CLI routing cost confirms distance is non-zero
+    // Step 4: CLI routing cost confirms distance is non-zero
     let cost_text = extract_text(
         cli.execute(CliCommand::Topology(TopologyCommand::RoutingCost {
             from_x: 0,
@@ -489,12 +375,11 @@ fn full_stack_register_route_resolve() {
     assert!(cost_text.contains("Euclidean distance"));
 }
 
-/// Multi-scope topology with 10+ nodes -- CLI, tensor, and proxy all
-/// observe the same topology characteristics.
+/// Multi-scope topology with 10+ nodes -- CLI and proxy observe the same
+/// topology characteristics.
 #[test]
 fn full_stack_multi_scope_topology() {
     let mut cli = CommandExecutor::new();
-    let mut tx_router = TransactionRouter::new(TransactionRoutingConfig::default());
     let mut scope_router = ScopeAwareRouter::new(ScopeRoutingConfig::default());
 
     // Register 6 Device nodes
@@ -508,8 +393,6 @@ fn full_stack_multi_scope_topology() {
             scope: BlockchainScope::Device,
         }))
         .expect("test: register device node");
-
-        tx_router.register_node(&format!("dev-{i}"), coord(x, y, 0), BlockchainScope::Device);
     }
 
     // Register 6 Network nodes (some also serve as gateways)
@@ -523,12 +406,6 @@ fn full_stack_multi_scope_topology() {
             scope: BlockchainScope::Network,
         }))
         .expect("test: register network node");
-
-        tx_router.register_node(
-            &format!("net-{i}"),
-            coord(x, y, 0),
-            BlockchainScope::Network,
-        );
 
         // Register first two as scope-bridging gateways
         if i < 2 {
@@ -548,34 +425,6 @@ fn full_stack_multi_scope_topology() {
     assert!(
         info.contains("Total nodes: 12"),
         "test: expected 12 nodes, got:\n{info}"
-    );
-
-    // Tensor: Device -> Network cross-scope route succeeds
-    let tensor_route = tx_router
-        .route_transaction(
-            &coord(0, 0, 0),
-            &coord(90, 45, 0),
-            BlockchainScope::Device,
-            BlockchainScope::Network,
-        )
-        .expect("test: tensor cross-scope");
-    assert!(!tensor_route.scope_transitions.is_empty());
-
-    // Tensor: same-scope Device route succeeds
-    let same_route = tx_router
-        .route_transaction(
-            &coord(0, 0, 0),
-            &coord(40, 20, 0),
-            BlockchainScope::Device,
-            BlockchainScope::Device,
-        )
-        .expect("test: tensor same-scope");
-    assert!(same_route.scope_transitions.is_empty());
-
-    // Cross-scope cost > same-scope cost (for comparable distances)
-    assert!(
-        tensor_route.total_cost > same_route.total_cost,
-        "test: cross-scope should cost more than same-scope"
     );
 
     // Proxy: cross-scope route goes through a gateway

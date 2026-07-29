@@ -1222,7 +1222,30 @@ fn select_dispersion_source(
         }
     }
 
-    // Fallback: deterministic (smallest node id), never arbitrary.
+    // Fallback: no demand recommendation. Prefer the geometrically central
+    // provider of the shard's demand chunk (VISION §5.5) — the candidate whose
+    // proximity cell (P3) sits nearest the chunk centroid — over an arbitrary
+    // lexical pick. Candidates without a live coordinate are simply absent from
+    // the chunk.
+    let candidate_cells: Vec<(String, blockmatrix::matrix::MatrixCoordinate)> = candidates
+        .iter()
+        .filter_map(|id| {
+            peer_coords.get(id).map(|p| {
+                let cell = blockmatrix::matrix::MatrixCoordinate::new(
+                    p.x.round() as i64,
+                    p.y.round() as i64,
+                    p.z.round() as i64,
+                )
+                .unwrap_or_else(|_| blockmatrix::matrix::MatrixCoordinate::origin());
+                (id.clone(), cell)
+            })
+        })
+        .collect();
+    if let Some(central) = blockmatrix::network::chunk::most_central(&candidate_cells) {
+        return central.clone();
+    }
+
+    // Deterministic last resort (no coordinates at all): smallest node id.
     candidates
         .iter()
         .min()

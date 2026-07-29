@@ -15,7 +15,7 @@
 
 use blockmatrix::integration::{MatrixFoundation, MatrixFoundationConfig};
 use blockmatrix::matrix::geospatial::{GpsConverter, GpsCoordinate, ScaleResolution};
-use blockmatrix::matrix::tensor::{Matrix3x3, PathFinder, Vector3D};
+use blockmatrix::matrix::tensor::Vector3D;
 use blockmatrix::matrix::{find_k_nearest, find_neighbors, find_neighbors_cubic, MatrixCoordinate};
 use blockmatrix::StateProof;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -128,7 +128,6 @@ fn bench_tensor_operations(c: &mut Criterion) {
 
     let v1 = Vector3D::new(1.0, 2.0, 3.0);
     let v2 = Vector3D::new(4.0, 5.0, 6.0);
-    let matrix = Matrix3x3::identity();
 
     group.bench_function("vector_add", |b| b.iter(|| v1.add(black_box(&v2))));
 
@@ -145,38 +144,6 @@ fn bench_tensor_operations(c: &mut Criterion) {
     group.bench_function("vector_magnitude", |b| b.iter(|| v1.magnitude()));
 
     group.bench_function("vector_normalize", |b| b.iter(|| v1.normalize()));
-
-    group.bench_function("matrix_multiply_vector", |b| {
-        b.iter(|| matrix.transform_vector(black_box(&v1)))
-    });
-
-    group.bench_function("matrix_multiply_matrix", |b| {
-        b.iter(|| matrix.multiply(black_box(&matrix)))
-    });
-
-    // A* pathfinding using MatrixCoordinate-based PathFinder
-    let path_start = MatrixCoordinate::new(0, 0, 0).unwrap();
-    let path_goal = MatrixCoordinate::new(10, 10, 0).unwrap();
-    let finder = PathFinder::new();
-
-    group.bench_function("astar_pathfinding", |b| {
-        let grid_neighbors = |coord: &MatrixCoordinate| -> Vec<MatrixCoordinate> {
-            let deltas: [(i64, i64, i64); 4] = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0)];
-            deltas
-                .iter()
-                .filter_map(|(dx, dy, dz)| {
-                    MatrixCoordinate::new(coord.x + dx, coord.y + dy, coord.z + dz).ok()
-                })
-                .collect()
-        };
-        b.iter(|| {
-            finder.find_path(
-                black_box(&path_start),
-                black_box(&path_goal),
-                grid_neighbors,
-            )
-        })
-    });
 
     group.finish();
 }

@@ -20,7 +20,6 @@ use super::block::Block;
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
-use crate::matrix::tensor::routing::calculate_routing_path;
 use crate::network::hash_bucket::SpatialBucketAssigner;
 use crate::network::peer_auth::AuthenticatedPeers;
 use crate::network::reflector_pool::ReflectorPool;
@@ -303,10 +302,7 @@ impl BlockPropagator {
         // For each relay, find nearby nodes
         let mut targets = Vec::new();
         for relay in relay_points {
-            // Use routing to get path vector
-            let _path = calculate_routing_path(&self.node_coordinate, &relay, 3.0);
-
-            // Find nodes close to the path (within distance 2)
+            // Find nodes close to the relay (within distance 2)
             for node in network_nodes {
                 let dist_to_relay = node.euclidean_distance(&relay);
                 if dist_to_relay <= 2.0 && !targets.contains(node) && *node != self.node_coordinate
