@@ -141,6 +141,131 @@ pub fn message_requires_auth(tag: u8) -> bool {
     )
 }
 
+/// The handler that owns a given wire tag.
+///
+/// A pure name for "which arm of the dispatch table runs this tag", extracted
+/// so the tag→handler wiring is a value a test can assert on, rather than an
+/// inline `match` arm no test can reach. [`dispatch_to_handler`] is the single
+/// place that turns one of these back into the actual handler call, so this
+/// enum and that `match` are the only two things that must agree — and
+/// [`route_message`] (which produces these) is exhaustively unit-tested.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Handler {
+    /// Shard send/fetch (fetch additionally F6-authorized). `TAG_SHARD_SEND`
+    /// / `TAG_SHARD_FETCH`.
+    ShardDispatch,
+    /// Block announcement. `TAG_BLOCK_ANNOUNCE`.
+    BlockAnnounce,
+    /// Sync / reflector message. `TAG_SYNC_MESSAGE`.
+    SyncMessage,
+    /// Block fetch request. `TAG_BLOCK_FETCH_REQUEST`.
+    BlockFetchRequest,
+    /// Shard availability announcement. `TAG_SHARD_ANNOUNCE`.
+    ShardAnnounce,
+    /// S3.4 mirror attestation. `TAG_MIRROR_ATTEST` (0x54).
+    MirrorAttestation,
+    /// D3 presented asset chain. `TAG_ASSET_CHAIN` (0x55).
+    AssetChain,
+    /// A2 shard-locate query. `TAG_SHARD_LOCATE`.
+    ShardLocate,
+    /// Share invite. `TAG_SHARE_INVITE`.
+    ShareInvite,
+    /// Direct message. `TAG_DIRECT_MESSAGE`.
+    DirectMessage,
+    /// Cross-network transfer message. `TAG_TRANSFER`.
+    Transfer,
+    /// Distributed-CA key share. `TAG_CA_KEY_SHARE`.
+    CaKeyShare,
+    /// Distributed-CA threshold sign request. `TAG_CA_SIGN_REQUEST`.
+    CaSignRequest,
+    /// Distributed-CA threshold sign response. `TAG_CA_SIGN_RESPONSE`.
+    CaSignResponse,
+    /// Key rotation announcement. `TAG_KEY_ROTATION`.
+    KeyRotation,
+    /// DNS resolution request. `TAG_DNS_RESOLVE`.
+    DnsResolve,
+    /// Phase H.1 rich DNS query. `TAG_DNS_QUERY`.
+    DnsQuery,
+    /// Cross-network transfer lock. `TAG_TRANSFER_LOCK`.
+    TransferLock,
+    /// Cross-network transfer register request. `TAG_TRANSFER_REGISTER_REQ`.
+    TransferRegisterReq,
+    /// Cross-network transfer register ack. `TAG_TRANSFER_REGISTER_ACK`.
+    TransferRegisterAck,
+    /// Cross-network transfer release. `TAG_TRANSFER_RELEASE`.
+    TransferRelease,
+    /// Cross-network transfer rollback. `TAG_TRANSFER_ROLLBACK`.
+    TransferRollback,
+    /// Gossip message (logged, not gated). `TAG_GOSSIP`.
+    Gossip,
+}
+
+/// The routing decision for a wire tag: which handler owns it, that an
+/// unauthenticated peer must be dropped BEFORE any handler, or that no arm
+/// handles the tag.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Route {
+    /// The tag is handled; [`dispatch_to_handler`] runs the named handler.
+    Handler(Handler),
+    /// The tag requires authentication and the peer is not authenticated — the
+    /// message is dropped before the handler runs (see [`message_requires_auth`]).
+    DropUnauthenticated,
+    /// No arm handles this tag.
+    Unknown,
+}
+
+/// The dispatch decision as a pure function of `(tag, is_authenticated)`.
+///
+/// This is the wiring [`dispatch_message`] executes, lifted out of the async
+/// I/O path so it is exhaustively unit-testable WITHOUT a QUIC stream. Two
+/// invariants live here and are proved in-module:
+///
+///  1. **Auth gate.** Every tag for which [`message_requires_auth`] is `true`
+///     routes to [`Route::DropUnauthenticated`] when `is_authenticated` is
+///     `false` — an unauthenticated peer never reaches the handler. Ungated
+///     tags ignore `is_authenticated`.
+///  2. **Tag→handler.** Each handled tag maps to exactly one [`Handler`];
+///     everything else is [`Route::Unknown`].
+///
+/// `dispatch_message` computes `is_authenticated` from the live
+/// [`AuthenticatedPeers`] map (only consulting it for gated tags, preserving
+/// the original short-circuit) and then executes this decision. A future
+/// refactor that misroutes a tag or drops the gate on one fails the unit tests
+/// below without needing a live connection.
+pub(crate) fn route_message(tag: u8, is_authenticated: bool) -> Route {
+    // Gate asset-level operations on peer authentication + network scope.
+    if message_requires_auth(tag) && !is_authenticated {
+        return Route::DropUnauthenticated;
+    }
+
+    match tag {
+        TAG_SHARD_SEND | TAG_SHARD_FETCH => Route::Handler(Handler::ShardDispatch),
+        TAG_BLOCK_ANNOUNCE => Route::Handler(Handler::BlockAnnounce),
+        TAG_SYNC_MESSAGE => Route::Handler(Handler::SyncMessage),
+        TAG_BLOCK_FETCH_REQUEST => Route::Handler(Handler::BlockFetchRequest),
+        TAG_SHARD_ANNOUNCE => Route::Handler(Handler::ShardAnnounce),
+        TAG_MIRROR_ATTEST => Route::Handler(Handler::MirrorAttestation),
+        TAG_ASSET_CHAIN => Route::Handler(Handler::AssetChain),
+        TAG_SHARD_LOCATE => Route::Handler(Handler::ShardLocate),
+        TAG_SHARE_INVITE => Route::Handler(Handler::ShareInvite),
+        TAG_DIRECT_MESSAGE => Route::Handler(Handler::DirectMessage),
+        TAG_TRANSFER => Route::Handler(Handler::Transfer),
+        TAG_CA_KEY_SHARE => Route::Handler(Handler::CaKeyShare),
+        TAG_CA_SIGN_REQUEST => Route::Handler(Handler::CaSignRequest),
+        TAG_CA_SIGN_RESPONSE => Route::Handler(Handler::CaSignResponse),
+        TAG_KEY_ROTATION => Route::Handler(Handler::KeyRotation),
+        TAG_DNS_RESOLVE => Route::Handler(Handler::DnsResolve),
+        TAG_DNS_QUERY => Route::Handler(Handler::DnsQuery),
+        TAG_TRANSFER_LOCK => Route::Handler(Handler::TransferLock),
+        TAG_TRANSFER_REGISTER_REQ => Route::Handler(Handler::TransferRegisterReq),
+        TAG_TRANSFER_REGISTER_ACK => Route::Handler(Handler::TransferRegisterAck),
+        TAG_TRANSFER_RELEASE => Route::Handler(Handler::TransferRelease),
+        TAG_TRANSFER_ROLLBACK => Route::Handler(Handler::TransferRollback),
+        TAG_GOSSIP => Route::Handler(Handler::Gossip),
+        _ => Route::Unknown,
+    }
+}
+
 /// Route a single message payload to the appropriate handler.
 ///
 /// Asset-level operations (shard send/fetch, sync, block-fetch) AND block
@@ -149,6 +274,10 @@ pub fn message_requires_auth(tag: u8) -> bool {
 /// validated by BLAKE3 content integrity, per-entry proof_hash, signed-to-
 /// content binding, and state_proof.validate(). Gossip and unknown tags are
 /// logged but not gated.
+///
+/// The routing decision itself is the pure [`route_message`]; this function
+/// supplies the live authentication state and executes the result. Behavior is
+/// byte-identical to the previous inline gate + match.
 pub(crate) async fn dispatch_message(
     data: &[u8],
     stream: &mut stoq::Stream,
@@ -157,22 +286,50 @@ pub(crate) async fn dispatch_message(
     ctx: &PeerContext,
 ) {
     let tag = data[0];
-    let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
-    // Gate asset-level operations on peer authentication + network scope.
-    if message_requires_auth(tag)
-        && !peer_auth::verify_peer_access(
+    // Consult the auth gate ONLY for tags that demand it — preserving the
+    // original short-circuit in which `verify_peer_access` is never called for
+    // an ungated tag. For ungated tags the value is unused by `route_message`.
+    let is_authenticated = !message_requires_auth(tag)
+        || peer_auth::verify_peer_access(
             &ctx.authenticated_peers,
             peer_node_id,
             &ctx.network_id,
         )
-        .await
-    {
-        return;
-    }
+        .await;
 
-    match tag {
-        TAG_SHARD_SEND | TAG_SHARD_FETCH => {
+    match route_message(tag, is_authenticated) {
+        // Gate rejected: drop silently, exactly as the previous early `return`.
+        // `verify_peer_access` already logged the rejection.
+        Route::DropUnauthenticated => {}
+        Route::Unknown => {
+            let short_id = &peer_node_id[..8.min(peer_node_id.len())];
+            warn!("Unknown message tag 0x{:02x} from peer {}", tag, short_id);
+        }
+        Route::Handler(handler) => {
+            dispatch_to_handler(handler, tag, data, stream, peer_node_id, peer_coord, ctx).await;
+        }
+    }
+}
+
+/// Execute a routed message: the tag→handler dispatch table, keyed on the
+/// [`Handler`] that [`route_message`] chose.
+///
+/// This is the ONE place that turns a [`Handler`] back into a real handler
+/// call; `tag` is still passed because the shard arm distinguishes send from
+/// fetch. Every arm is fire-and-forget or logs its own error, matching the
+/// original inline match byte-for-byte.
+async fn dispatch_to_handler(
+    handler: Handler,
+    tag: u8,
+    data: &[u8],
+    stream: &mut stoq::Stream,
+    peer_node_id: &str,
+    peer_coord: &MatrixCoordinate,
+    ctx: &PeerContext,
+) {
+    match handler {
+        Handler::ShardDispatch => {
             // Record shard fetch demand for ngauge swarm intelligence.
             if tag == TAG_SHARD_FETCH {
                 record_shard_demand(&data, peer_node_id, ctx).await;
@@ -190,24 +347,24 @@ pub(crate) async fn dispatch_message(
             }
             handle_shard_dispatch(&data, stream, ctx).await;
         }
-        TAG_BLOCK_ANNOUNCE => {
+        Handler::BlockAnnounce => {
             handle_block_announce(&data, peer_node_id, ctx).await;
         }
-        TAG_SYNC_MESSAGE => {
+        Handler::SyncMessage => {
             handle_sync_message(&data[1..], stream, peer_node_id, peer_coord, ctx).await;
         }
-        TAG_BLOCK_FETCH_REQUEST => {
+        Handler::BlockFetchRequest => {
             handle_block_fetch_request(&data[1..], stream, peer_node_id, ctx).await;
         }
-        TAG_SHARD_ANNOUNCE => {
+        Handler::ShardAnnounce => {
             handle_shard_announce(data, peer_node_id, ctx).await;
         }
-        TAG_MIRROR_ATTEST => {
+        Handler::MirrorAttestation => {
             // S3.4: a mirror's signed "I hold and validated this" statement.
             // Fire-and-forget; the handler owns every rejection path.
             handle_mirror_attestation(data, peer_node_id, ctx).await;
         }
-        TAG_ASSET_CHAIN => {
+        Handler::AssetChain => {
             // D3: a peer presents an asset's verified sub-chain for adoption.
             // Fire-and-forget; `accept_asset_chain` owns every verification and
             // every rejection path. Only reachable for an authenticated peer
@@ -215,73 +372,71 @@ pub(crate) async fn dispatch_message(
             // no `Block` in a `PresentedAssetChain`.
             handle_asset_chain(data, peer_node_id, ctx).await;
         }
-        TAG_SHARD_LOCATE => {
+        Handler::ShardLocate => {
             // A2 upstream tracker fallback: answer "who has content_hash X?"
             // from our own live-mirror index + local store. This is a LOCATE
             // query (returns provider node_ids), not a data fetch.
             handle_shard_locate(&data, stream, peer_node_id, ctx).await;
         }
-        TAG_SHARE_INVITE => {
+        Handler::ShareInvite => {
             handle_share_invite(data, peer_node_id, ctx).await;
         }
-        TAG_DIRECT_MESSAGE => {
+        Handler::DirectMessage => {
             handle_direct_message(data, peer_node_id, ctx).await;
         }
-        TAG_TRANSFER => {
+        Handler::Transfer => {
             handle_transfer_message(&data[1..], stream, peer_node_id, ctx).await;
         }
-        TAG_CA_KEY_SHARE => {
+        Handler::CaKeyShare => {
             if let Err(e) = handle_ca_key_share(&data, peer_node_id, ctx).await {
                 warn!("Failed to handle CA key share: {e}");
             }
         }
-        TAG_CA_SIGN_REQUEST => {
+        Handler::CaSignRequest => {
             if let Err(e) = handle_ca_sign_request(&data, peer_node_id, ctx).await {
                 warn!("Failed to handle CA sign request: {e}");
             }
         }
-        TAG_CA_SIGN_RESPONSE => {
+        Handler::CaSignResponse => {
             if let Err(e) = handle_ca_sign_response(&data, peer_node_id, ctx).await {
                 warn!("Failed to handle CA sign response: {e}");
             }
         }
-        TAG_KEY_ROTATION => {
+        Handler::KeyRotation => {
             if let Err(e) = handle_key_rotation(data, peer_node_id, ctx).await {
                 warn!("Failed to handle key rotation: {e}");
             }
         }
-        TAG_DNS_RESOLVE => {
+        Handler::DnsResolve => {
             handle_dns_resolve_request(data, stream, peer_node_id, ctx).await;
         }
-        TAG_DNS_QUERY => {
+        Handler::DnsQuery => {
             // Phase H.1: rich DNS query — wire format `[tag][JSON]`.
             // Strip the tag byte; handler parses the rest as JSON.
             handle_dns_query(&data[1..], stream, peer_node_id, ctx).await;
         }
-        TAG_TRANSFER_LOCK => {
+        Handler::TransferLock => {
             handle_transfer_lock(&data[1..], peer_node_id, ctx).await;
         }
-        TAG_TRANSFER_REGISTER_REQ => {
+        Handler::TransferRegisterReq => {
             handle_transfer_register_req(&data[1..], stream, peer_node_id, ctx).await;
         }
-        TAG_TRANSFER_REGISTER_ACK => {
+        Handler::TransferRegisterAck => {
             handle_transfer_register_ack(&data[1..], peer_node_id, ctx).await;
         }
-        TAG_TRANSFER_RELEASE => {
+        Handler::TransferRelease => {
             handle_transfer_release(&data[1..], peer_node_id, ctx).await;
         }
-        TAG_TRANSFER_ROLLBACK => {
+        Handler::TransferRollback => {
             handle_transfer_rollback(&data[1..], peer_node_id, ctx).await;
         }
-        TAG_GOSSIP => {
+        Handler::Gossip => {
+            let short_id = &peer_node_id[..8.min(peer_node_id.len())];
             debug!(
                 "Gossip message from peer {} ({} bytes)",
                 short_id,
                 data.len() - 1,
             );
-        }
-        _ => {
-            warn!("Unknown message tag 0x{:02x} from peer {}", tag, short_id);
         }
     }
 }
@@ -593,4 +748,152 @@ async fn handle_peer_message_connection(
     }
 
     Ok(())
+}
+
+// ── Dispatch-routing unit tests ───────────────────────────────────────
+//
+// These drive the REAL `route_message` — the pure routing decision that
+// `dispatch_message` executes — so the tag→handler wiring and the auth gate
+// are proved BY STRUCTURE, without constructing a QUIC `stream`. The
+// integration suites (`tests/s3_4_*`) prove the codec and the accept gate; this
+// closes the remaining gap: that a framed `TAG_ASSET_CHAIN` / `TAG_MIRROR_ATTEST`
+// from an authenticated peer actually routes to its handler, and that an
+// unauthenticated one is dropped by the auth gate before the handler.
+#[cfg(test)]
+mod route_tests {
+    use super::*;
+
+    /// Every wire tag the dispatcher handles, paired with the handler that owns
+    /// it and whether it is auth-gated. This table is the test's independent
+    /// statement of the wiring; the tests below cross-check it against BOTH
+    /// `route_message` and `message_requires_auth`, so a drift in any of the
+    /// three is caught.
+    const ROUTES: &[(u8, Handler, bool)] = &[
+        (TAG_SHARD_SEND, Handler::ShardDispatch, true),
+        (TAG_SHARD_FETCH, Handler::ShardDispatch, true),
+        (TAG_BLOCK_ANNOUNCE, Handler::BlockAnnounce, true),
+        (TAG_SYNC_MESSAGE, Handler::SyncMessage, true),
+        (TAG_BLOCK_FETCH_REQUEST, Handler::BlockFetchRequest, true),
+        (TAG_SHARD_ANNOUNCE, Handler::ShardAnnounce, false),
+        (TAG_MIRROR_ATTEST, Handler::MirrorAttestation, true),
+        (TAG_ASSET_CHAIN, Handler::AssetChain, true),
+        (TAG_SHARD_LOCATE, Handler::ShardLocate, false),
+        (TAG_SHARE_INVITE, Handler::ShareInvite, false),
+        (TAG_DIRECT_MESSAGE, Handler::DirectMessage, false),
+        (TAG_TRANSFER, Handler::Transfer, false),
+        (TAG_CA_KEY_SHARE, Handler::CaKeyShare, true),
+        (TAG_CA_SIGN_REQUEST, Handler::CaSignRequest, true),
+        (TAG_CA_SIGN_RESPONSE, Handler::CaSignResponse, true),
+        (TAG_KEY_ROTATION, Handler::KeyRotation, false),
+        (TAG_DNS_RESOLVE, Handler::DnsResolve, false),
+        (TAG_DNS_QUERY, Handler::DnsQuery, false),
+        (TAG_TRANSFER_LOCK, Handler::TransferLock, true),
+        (TAG_TRANSFER_REGISTER_REQ, Handler::TransferRegisterReq, true),
+        (TAG_TRANSFER_REGISTER_ACK, Handler::TransferRegisterAck, true),
+        (TAG_TRANSFER_RELEASE, Handler::TransferRelease, true),
+        (TAG_TRANSFER_ROLLBACK, Handler::TransferRollback, true),
+        (TAG_GOSSIP, Handler::Gossip, false),
+    ];
+
+    /// An authenticated peer's framed message reaches the handler that owns its
+    /// tag; the gated flag in the table matches `message_requires_auth` exactly.
+    #[test]
+    fn authenticated_peer_routes_every_tag_to_its_handler() {
+        for &(tag, handler, gated) in ROUTES {
+            assert_eq!(
+                route_message(tag, true),
+                Route::Handler(handler),
+                "tag 0x{tag:02x} must route to {handler:?} for an authenticated peer",
+            );
+            assert_eq!(
+                message_requires_auth(tag),
+                gated,
+                "the gated flag for tag 0x{tag:02x} must match message_requires_auth",
+            );
+        }
+    }
+
+    /// An UNAUTHENTICATED peer is dropped before the handler for every gated
+    /// tag, and still reaches the handler for every ungated tag. This is the
+    /// auth gate proved end-to-end at the routing layer.
+    #[test]
+    fn unauthenticated_peer_is_dropped_for_gated_tags_only() {
+        for &(tag, handler, gated) in ROUTES {
+            let route = route_message(tag, false);
+            if gated {
+                assert_eq!(
+                    route,
+                    Route::DropUnauthenticated,
+                    "gated tag 0x{tag:02x} must be dropped for an unauthenticated peer",
+                );
+            } else {
+                assert_eq!(
+                    route,
+                    Route::Handler(handler),
+                    "ungated tag 0x{tag:02x} must route regardless of authentication",
+                );
+            }
+        }
+    }
+
+    /// The two arms task #51 names — 0x55 asset-chain and 0x54 attestation —
+    /// stated explicitly: authenticated routes to the handler, unauthenticated
+    /// is dropped. Both are the same gap; both are covered.
+    #[test]
+    fn asset_chain_and_attestation_arms_are_wired_and_gated() {
+        assert_eq!(TAG_ASSET_CHAIN, 0x55, "asset-chain tag is 0x55");
+        assert_eq!(TAG_MIRROR_ATTEST, 0x54, "mirror-attestation tag is 0x54");
+
+        assert_eq!(
+            route_message(TAG_ASSET_CHAIN, true),
+            Route::Handler(Handler::AssetChain),
+        );
+        assert_eq!(
+            route_message(TAG_ASSET_CHAIN, false),
+            Route::DropUnauthenticated,
+        );
+        assert_eq!(
+            route_message(TAG_MIRROR_ATTEST, true),
+            Route::Handler(Handler::MirrorAttestation),
+        );
+        assert_eq!(
+            route_message(TAG_MIRROR_ATTEST, false),
+            Route::DropUnauthenticated,
+        );
+    }
+
+    /// Exhaustive over all 256 tag values: the routing table is total and
+    /// consistent. Exactly the tags in `ROUTES` are handled; every other tag is
+    /// `Unknown`. No tag is ever gated by `message_requires_auth` without
+    /// appearing (as gated) in `ROUTES`, so the gate can never guard a tag the
+    /// table does not know about.
+    #[test]
+    fn routing_is_total_and_consistent_over_all_tags() {
+        for tag in 0..=u8::MAX {
+            let known = ROUTES.iter().find(|&&(t, _, _)| t == tag);
+            match known {
+                Some(&(_, handler, gated)) => {
+                    assert_eq!(route_message(tag, true), Route::Handler(handler));
+                    assert_eq!(
+                        route_message(tag, false),
+                        if gated {
+                            Route::DropUnauthenticated
+                        } else {
+                            Route::Handler(handler)
+                        },
+                    );
+                }
+                None => {
+                    // An unknown tag is never auth-gated, so authentication
+                    // state cannot change its verdict.
+                    assert!(
+                        !message_requires_auth(tag),
+                        "tag 0x{tag:02x} is gated but has no route",
+                    );
+                    assert_eq!(route_message(tag, true), Route::Unknown);
+                    assert_eq!(route_message(tag, false), Route::Unknown);
+                }
+            }
+        }
+    }
 }
