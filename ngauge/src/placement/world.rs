@@ -80,6 +80,45 @@ pub struct WorldFormation {
     pub migrated: Vec<ContentHash>,
 }
 
+/// A validated but **not-yet-committed** formation — the seam that lets an
+/// external caller admit the child world on its own gate BEFORE the
+/// shard→child mapping becomes observable here (admit-before-migrate,
+/// VISION.md §5.5).
+///
+/// `WorldManager::form_from_hotspot` migrates shards and joins the child in one
+/// atomic call, which gives a cross-crate caller (blockmatrix's
+/// `WorldCoordinator`, which also holds the isolation gate) no point at which
+/// to admit the gate first. Splitting the decision
+/// ([`plan_formation`](WorldManager::plan_formation)) from the mutation
+/// ([`commit_formation`](WorldManager::commit_formation)) exposes exactly that
+/// seam: the child id is known from the plan, so the gate can admit it, and
+/// only then is the plan committed. `form_from_hotspot` is unchanged — it now
+/// simply composes the two.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorldFormationPlan {
+    child: NetworkId,
+    parent: NetworkId,
+    migrated: Vec<ContentHash>,
+}
+
+impl WorldFormationPlan {
+    /// The child world this plan will form — known before commit, so an
+    /// external gate can be admitted for it first.
+    pub fn child(&self) -> NetworkId {
+        self.child
+    }
+
+    /// The parent world being partitioned.
+    pub fn parent(&self) -> NetworkId {
+        self.parent
+    }
+
+    /// The shards this plan will migrate down into the child on commit.
+    pub fn migrated(&self) -> &[ContentHash] {
+        &self.migrated
+    }
+}
+
 /// Record of a child world reabsorbed into its parent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorldMerge {
@@ -241,6 +280,28 @@ impl WorldManager {
         alert: &HotspotAlert,
         hot_shards: &[ContentHash],
     ) -> Option<WorldFormation> {
+        let plan = self.plan_formation(parent, alert, hot_shards)?;
+        Some(self.commit_formation(plan))
+    }
+
+    /// Decide a formation **without mutating** — the read-only half of the
+    /// admit-before-migrate seam (VISION.md §5.5). Runs exactly the guards
+    /// `form_from_hotspot` runs (membership, congestion threshold, minimum hot
+    /// shards, child≠parent) and derives the deterministic child id, but leaves
+    /// `member_worlds` / `shard_worlds` / `parents` untouched. Returns `None`
+    /// in precisely the cases `form_from_hotspot` returns `None`.
+    ///
+    /// A caller that also owns an external isolation gate (blockmatrix's
+    /// `WorldCoordinator`) uses the returned child id to `admit_world(child)`
+    /// on the gate BEFORE calling [`commit_formation`], so a concurrent
+    /// `world_of(shard)` can never observe the child while the gate has yet to
+    /// admit it.
+    pub fn plan_formation(
+        &self,
+        parent: NetworkId,
+        alert: &HotspotAlert,
+        hot_shards: &[ContentHash],
+    ) -> Option<WorldFormationPlan> {
         if !self.member_worlds.contains(&parent) {
             return None;
         }
@@ -262,27 +323,42 @@ impl WorldManager {
             return None;
         }
 
-        self.parents.insert(child, parent);
-        self.member_worlds.insert(child);
-
-        let mut migrated = Vec::with_capacity(hot_shards.len());
-        for shard in hot_shards {
-            self.shard_worlds.insert(*shard, child);
-            migrated.push(*shard);
-        }
-
-        info!(
-            "world: formed child {} under {} from hotspot (congestion {:.2}, {} shards migrated)",
+        Some(WorldFormationPlan {
             child,
             parent,
-            alert.congestion_ratio,
-            migrated.len(),
-        );
-        Some(WorldFormation {
+            migrated: hot_shards.to_vec(),
+        })
+    }
+
+    /// Apply a [`WorldFormationPlan`] — the mutating half of the seam. Joins the
+    /// child, records the nesting pointer, and migrates the planned shards down
+    /// into the child. Identical in effect to the tail of the original
+    /// `form_from_hotspot`; call it only after the plan's child has been
+    /// admitted on any external gate.
+    pub fn commit_formation(&mut self, plan: WorldFormationPlan) -> WorldFormation {
+        let WorldFormationPlan {
             child,
             parent,
             migrated,
-        })
+        } = plan;
+
+        self.parents.insert(child, parent);
+        self.member_worlds.insert(child);
+        for shard in &migrated {
+            self.shard_worlds.insert(*shard, child);
+        }
+
+        info!(
+            "world: formed child {} under {} ({} shards migrated)",
+            child,
+            parent,
+            migrated.len(),
+        );
+        WorldFormation {
+            child,
+            parent,
+            migrated,
+        }
     }
 
     /// Emergent **merge**: reabsorb a child world back into its parent, handing

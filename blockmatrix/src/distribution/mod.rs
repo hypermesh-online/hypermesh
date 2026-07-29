@@ -52,6 +52,7 @@ use crate::assets::pipeline::sharding::Shard;
 use crate::matrix::coordinate::MatrixCoordinate;
 use serde::{Deserialize, Serialize};
 
+pub mod audit_ledger;
 pub mod audit_trail;
 pub mod matrix_optimizer;
 pub mod migration;
@@ -61,7 +62,7 @@ pub mod redistribution;
 pub mod swarm;
 
 // Re-exports
-pub use audit_trail::{record_shard_placement_on_chain, AuditRecord, PlacementEvent};
+pub use audit_trail::{record_shard_placement, AuditRecord, PlacementEvent};
 pub use matrix_optimizer::{
     calculate_octant_placements, distribute_across_octants, OctantDistribution,
 };
@@ -137,7 +138,7 @@ pub struct DistributionResult {
 ///
 /// 1. **PoS Validation** - Query state proof for eligible nodes
 /// 2. **Matrix Optimization** - Distribute across 8 octants using golden ratio
-/// 3. **Blockchain Recording** - Audit trail of placement decisions
+/// 3. **Audit Recording** - Bounded in-memory placement-audit trail (not on-chain)
 ///
 /// # Arguments
 ///
@@ -172,8 +173,8 @@ where
     // Step 2: Apply matrix-aware optimization WITHIN eligible pool
     let octant_distribution = distribute_across_octants(shards, &eligible_nodes)?;
 
-    // Step 3: Blockchain records placement (audit trail)
-    record_shard_placement_on_chain(asset_id, &octant_distribution.placements).await?;
+    // Step 3: Record placement in the bounded in-memory audit trail (not on-chain)
+    record_shard_placement(asset_id, &octant_distribution.placements).await?;
 
     Ok(octant_distribution)
 }

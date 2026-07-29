@@ -132,7 +132,7 @@ where
         )?,
     };
 
-    // Record redistribution on blockchain
+    // Record redistribution in the bounded in-memory placement-audit trail
     record_redistribution(
         asset_id,
         &new_placements,

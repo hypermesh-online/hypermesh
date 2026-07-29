@@ -66,7 +66,7 @@ pub use organic_detection::{
 };
 pub use placement::{
     LocalityProvider, PeerProximity, PlacementLease, WorldAction, WorldFormation,
-    WorldFormationConfig, WorldManager, WorldMerge,
+    WorldFormationConfig, WorldFormationPlan, WorldManager, WorldMerge,
 };
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
