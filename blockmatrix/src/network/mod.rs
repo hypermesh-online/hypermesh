@@ -29,6 +29,11 @@ pub mod placement;
 pub mod shard_dedup;
 pub mod shard_distribution;
 pub mod reflector_pool;
+/// Replication / placement background loops (H3 demand feed, H4/H5 propagation,
+/// E.2 replication-poll). Extracted from the connect command (P8); gated on the
+/// `intelligence` feature since the loops consume ngauge's analytics surface.
+#[cfg(feature = "intelligence")]
+pub mod replication_service;
 pub mod shard_store;
 pub mod shard_transport;
 pub mod stoq_integration;
