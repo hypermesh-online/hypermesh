@@ -6,7 +6,7 @@
 //!
 //! Every 15 seconds, compute routing-intelligence weight adjustments and push
 //! them into the block propagator (H4), then check replication triggers in the
-//! single implicit world and log any urgent replication signals (H5). Reuses
+//! single implicit network and log any urgent replication signals (H5). Reuses
 //! the SAME eBPF orchestrator shared with the `PeerContext` (P5/E.1) so kernel-
 //! map state stays consistent. Byte-identical to the loop previously inline in
 //! `start_network`.
@@ -96,9 +96,9 @@ pub(super) fn spawn(svc: &ReplicationService) {
                     let trigger = ngauge::ReplicationTrigger::new(
                         ngauge::ReplicationConfig::default(),
                     );
-                    // P2: worlds seam — check the single implicit world.
+                    // check the single implicit network.
                     let signals =
-                        trigger.check_in_world(&analytics, hypermesh_lib::GLOBAL_WORLD);
+                        trigger.check_in_network(&analytics, hypermesh_lib::DEFAULT_NETWORK);
                     for signal in &signals {
                         if signal.urgency > 0.5 {
                             info!(

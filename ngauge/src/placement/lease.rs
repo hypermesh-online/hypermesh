@@ -15,7 +15,7 @@
 //!
 //! [`PlacementLease`] is the named seam between those two. It pairs a durable
 //! identity ([`content_hash`](PlacementLease::content_hash)) with the elastic
-//! coordinate NGauge currently places it at, scoped to the world (network) the
+//! coordinate NGauge currently places it at, scoped to the network the
 //! placement belongs to and ordered by a demand [`priority`] scheduler hint.
 //!
 //! It is deliberately **unused** at this stage. P1 introduces the boundary as a
@@ -34,7 +34,7 @@
 use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId};
 use serde::{Deserialize, Serialize};
 
-/// A demand-driven placement of one asset within one world.
+/// A demand-driven placement of one asset within one network.
 ///
 /// This is the boundary between *identity* (durable, verifiable, never moves —
 /// [`content_hash`](Self::content_hash)) and *location* (elastic, demand-driven,
@@ -53,13 +53,12 @@ pub struct PlacementLease {
     /// `content_hash` it names is invariant.
     content_hash: ContentHash,
 
-    /// Which world (network) this placement belongs to. Worlds are emergent,
-    /// nestable sub-meshes (VISION.md §5.5); the same asset identity can hold
-    /// distinct leases in distinct worlds.
-    world_id: NetworkId,
+    /// Which network this placement belongs to. A shard belongs to its network;
+    /// the same asset identity can hold distinct leases in distinct networks.
+    network_id: NetworkId,
 
     /// The matrix coordinate where NGauge currently places the asset. Elastic:
-    /// NGauge may re-place the asset (extend/partition worlds, re-replicate) and
+    /// NGauge may re-place the asset (re-replicate across mirrors) and
     /// issue a fresh lease at a different coordinate for the same identity.
     coordinate: MatrixPosition,
 
@@ -71,16 +70,16 @@ pub struct PlacementLease {
 
 impl PlacementLease {
     /// Create a lease binding a durable identity to an elastic coordinate within
-    /// one world, ordered by a demand `priority` hint.
+    /// one network, ordered by a demand `priority` hint.
     pub fn new(
         content_hash: ContentHash,
-        world_id: NetworkId,
+        network_id: NetworkId,
         coordinate: MatrixPosition,
         priority: f64,
     ) -> Self {
         Self {
             content_hash,
-            world_id,
+            network_id,
             coordinate,
             priority,
         }
@@ -92,9 +91,9 @@ impl PlacementLease {
         &self.content_hash
     }
 
-    /// The world (network) this placement belongs to.
-    pub fn world_id(&self) -> &NetworkId {
-        &self.world_id
+    /// The network this placement belongs to.
+    pub fn network_id(&self) -> &NetworkId {
+        &self.network_id
     }
 
     /// The matrix coordinate NGauge currently places the asset at. Elastic.
@@ -107,7 +106,7 @@ impl PlacementLease {
         self.priority
     }
 
-    /// Re-place the asset at a new coordinate, keeping its identity, world, and
+    /// Re-place the asset at a new coordinate, keeping its identity, network, and
     /// priority. Location is elastic; identity is durable.
     pub fn with_coordinate(self, coordinate: MatrixPosition) -> Self {
         Self { coordinate, ..self }
@@ -135,7 +134,7 @@ mod tests {
     fn accessors_return_constructed_values() {
         let lease = sample();
         assert_eq!(lease.content_hash(), &ContentHash::from_bytes([7u8; 32]));
-        assert_eq!(lease.world_id(), &NetworkId([3u8; 16]));
+        assert_eq!(lease.network_id(), &NetworkId([3u8; 16]));
         assert_eq!(lease.coordinate().x, 1.0);
         assert_eq!(lease.priority(), 0.75);
     }
@@ -150,7 +149,7 @@ mod tests {
         });
         // Identity durable, location elastic.
         assert_eq!(moved.content_hash(), lease.content_hash());
-        assert_eq!(moved.world_id(), lease.world_id());
+        assert_eq!(moved.network_id(), lease.network_id());
         assert_eq!(moved.priority(), lease.priority());
         assert_eq!(moved.coordinate().x, 9.0);
     }

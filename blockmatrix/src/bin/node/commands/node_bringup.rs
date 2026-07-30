@@ -380,9 +380,9 @@ pub(crate) async fn start_network(
     // P8: hand the intelligence-driven replication / placement loops (H3
     // demand feed 10s, H4/H5 propagation-weight + replication-signal 15s, E.2
     // replication-poll 30s) off to the scoped service. Same handles (the SAME
-    // Arcs the transport bring-up holds), same intervals, same GLOBAL_WORLD
-    // defaults, same world-gate mount + check_fetch consult before a fetch —
-    // a pure move (P8), not a behaviour change.
+    // Arcs the transport bring-up holds), same intervals, same DEFAULT_NETWORK
+    // defaults, same flat per-network replication — a pure move (P8), not a
+    // behaviour change.
     #[cfg(feature = "intelligence")]
     blockmatrix::network::replication_service::ReplicationService {
         coord,

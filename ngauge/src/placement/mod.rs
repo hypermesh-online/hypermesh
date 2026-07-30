@@ -10,15 +10,11 @@
 //! [`lease`] names that boundary as a type, [`PlacementLease`]. [`locality`]
 //! supplies the *placement* coordinate from a real proximity metric (measured
 //! peer RTT) so matrix distance is physically meaningful — the precondition for
-//! demand clustering and world formation, and the replacement for the
+//! demand clustering, and the replacement for the
 //! identity-derived (uniform-random) cell as a location source.
 
 pub mod lease;
 pub mod locality;
-pub mod world;
 
 pub use lease::PlacementLease;
 pub use locality::{LocalityProvider, PeerProximity};
-pub use world::{
-    WorldAction, WorldFormation, WorldFormationConfig, WorldFormationPlan, WorldManager, WorldMerge,
-};
