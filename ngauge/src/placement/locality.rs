@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn dispersion_advisor_places_by_proximity() {
         use crate::{DispersionAdvisor, SwarmAnalytics};
-        use hypermesh_lib::{ContentHash, NodeId, GLOBAL_WORLD};
+        use hypermesh_lib::{ContentHash, NodeId, DEFAULT_NETWORK};
 
         // Consumers with low RTT (a nearby locality) dominate demand for a
         // shard; a couple of far consumers also request it.
@@ -337,7 +337,7 @@ mod tests {
         }
 
         let advisor = DispersionAdvisor::new();
-        let placements = advisor.recommend_placement_in_world(GLOBAL_WORLD, &shard, &analytics, 2);
+        let placements = advisor.recommend_placement_in_network(DEFAULT_NETWORK, &shard, &analytics, 2);
         assert!(!placements.is_empty(), "advisor must recommend a placement");
 
         // The dominant recommended placement sits in the low-RTT band (x ≈ 5-6

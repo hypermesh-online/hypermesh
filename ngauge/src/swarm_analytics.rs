@@ -14,7 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
-use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId, GLOBAL_WORLD};
+use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId, DEFAULT_NETWORK};
 
 // ---------------------------------------------------------------------------
 // ReplicationRecommendation (windowed fetch-rate API)
@@ -75,19 +75,19 @@ impl ShardPopularity {
 /// time-windowed fetch-rate tracking (via [`record_fetch`]).  The windowed
 /// API powers [`ReplicationRecommendation`] generation for R12 swarm scaling.
 pub struct SwarmAnalytics {
-    /// Per-shard popularity data (cumulative), keyed by `(world, shard)`.
-    /// Until worlds form, every key's world is [`GLOBAL_WORLD`] and iteration is
-    /// identical to the old flat `ContentHash`-keyed map (VISION.md §5.5).
+    /// Per-shard popularity data (cumulative), keyed by `(network, shard)`.
+    /// With a single default network, every key's network is [`DEFAULT_NETWORK`]
+    /// and iteration is identical to the old flat `ContentHash`-keyed map.
     shard_data: HashMap<(NetworkId, ContentHash), ShardPopularity>,
-    /// Per-shard set of unique consumer node IDs, keyed by `(world, shard)`.
+    /// Per-shard set of unique consumer node IDs, keyed by `(network, shard)`.
     shard_consumers: HashMap<(NetworkId, ContentHash), HashSet<NodeId>>,
     /// Per-shard replica count (set externally by BlockMatrix), keyed by
-    /// `(world, shard)`.
+    /// `(network, shard)`.
     replica_counts: HashMap<(NetworkId, ContentHash), u32>,
 
     // -- Windowed fetch-rate tracking --
 
-    /// `(world, shard_hash)` -> list of fetch timestamps (windowed).
+    /// `(network, shard_hash)` -> list of fetch timestamps (windowed).
     fetch_history: HashMap<(NetworkId, [u8; 32]), Vec<Instant>>,
     /// Sliding window for counting fetches.
     window: Duration,
@@ -126,7 +126,7 @@ impl SwarmAnalytics {
         }
     }
 
-    /// Record a request for a shard in [`GLOBAL_WORLD`] (the default world).
+    /// Record a request for a shard in [`DEFAULT_NETWORK`] (the default network).
     pub fn record_request(
         &mut self,
         shard_id: ContentHash,
@@ -134,13 +134,13 @@ impl SwarmAnalytics {
         consumer_pos: MatrixPosition,
         timestamp_us: u64,
     ) {
-        self.record_request_in_world(GLOBAL_WORLD, shard_id, consumer_id, consumer_pos, timestamp_us);
+        self.record_request_in_network(DEFAULT_NETWORK, shard_id, consumer_id, consumer_pos, timestamp_us);
     }
 
-    /// Record a request for a shard within a specific world (P2 world seam).
-    pub fn record_request_in_world(
+    /// Record a request for a shard within a specific network.
+    pub fn record_request_in_network(
         &mut self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_id: ContentHash,
         consumer_id: NodeId,
         consumer_pos: MatrixPosition,
@@ -148,93 +148,93 @@ impl SwarmAnalytics {
     ) {
         let entry = self
             .shard_data
-            .entry((world_id, shard_id))
+            .entry((network_id, shard_id))
             .or_insert_with(ShardPopularity::new);
         entry.request_count += 1;
         entry.last_access_us = timestamp_us;
         entry.consumer_positions.push(consumer_pos);
 
-        let consumers = self.shard_consumers.entry((world_id, shard_id)).or_default();
+        let consumers = self.shard_consumers.entry((network_id, shard_id)).or_default();
         consumers.insert(consumer_id);
         entry.unique_consumers = consumers.len();
     }
 
-    /// Get popularity data for a shard in [`GLOBAL_WORLD`].
+    /// Get popularity data for a shard in [`DEFAULT_NETWORK`].
     pub fn get_popularity(&self, shard_id: &ContentHash) -> Option<&ShardPopularity> {
-        self.get_popularity_in_world(GLOBAL_WORLD, shard_id)
+        self.get_popularity_in_network(DEFAULT_NETWORK, shard_id)
     }
 
-    /// Get popularity data for a shard within a specific world (P2 world seam).
-    pub fn get_popularity_in_world(
+    /// Get popularity data for a shard within a specific network.
+    pub fn get_popularity_in_network(
         &self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_id: &ContentHash,
     ) -> Option<&ShardPopularity> {
-        self.shard_data.get(&(world_id, *shard_id))
+        self.shard_data.get(&(network_id, *shard_id))
     }
 
     /// Get all shards exceeding a request count threshold, sorted by popularity.
     ///
-    /// Spans all worlds (until worlds form, only [`GLOBAL_WORLD`] is present, so
-    /// the result is identical to the pre-world map).
+    /// Spans all networks (only [`DEFAULT_NETWORK`] is present, so
+    /// the result is identical to the flat map).
     pub fn get_popular_shards(&self, min_request_count: u64) -> Vec<(ContentHash, &ShardPopularity)> {
         let mut popular: Vec<_> = self
             .shard_data
             .iter()
             .filter(|(_, pop)| pop.request_count >= min_request_count)
-            .map(|((_world, hash), pop)| (*hash, pop))
+            .map(|((_network, hash), pop)| (*hash, pop))
             .collect();
         popular.sort_by(|a, b| b.1.request_count.cmp(&a.1.request_count));
         popular
     }
 
-    /// Get the demand map for a shard in [`GLOBAL_WORLD`] (consumer positions).
+    /// Get the demand map for a shard in [`DEFAULT_NETWORK`] (consumer positions).
     pub fn get_demand_map(&self, shard_id: &ContentHash) -> Option<&[MatrixPosition]> {
-        self.get_demand_map_in_world(GLOBAL_WORLD, shard_id)
+        self.get_demand_map_in_network(DEFAULT_NETWORK, shard_id)
     }
 
-    /// Get the demand map for a shard within a specific world (P2 world seam).
-    pub fn get_demand_map_in_world(
+    /// Get the demand map for a shard within a specific network.
+    pub fn get_demand_map_in_network(
         &self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_id: &ContentHash,
     ) -> Option<&[MatrixPosition]> {
         self.shard_data
-            .get(&(world_id, *shard_id))
+            .get(&(network_id, *shard_id))
             .map(|pop| pop.consumer_positions.as_slice())
     }
 
-    /// Set the replica count for a shard in [`GLOBAL_WORLD`].
+    /// Set the replica count for a shard in [`DEFAULT_NETWORK`].
     pub fn set_replica_count(&mut self, shard_id: ContentHash, count: u32) {
-        self.set_replica_count_in_world(GLOBAL_WORLD, shard_id, count);
+        self.set_replica_count_in_network(DEFAULT_NETWORK, shard_id, count);
     }
 
-    /// Set the replica count for a shard within a specific world (P2 world seam).
-    pub fn set_replica_count_in_world(&mut self, world_id: NetworkId, shard_id: ContentHash, count: u32) {
-        self.replica_counts.insert((world_id, shard_id), count);
+    /// Set the replica count for a shard within a specific network.
+    pub fn set_replica_count_in_network(&mut self, network_id: NetworkId, shard_id: ContentHash, count: u32) {
+        self.replica_counts.insert((network_id, shard_id), count);
     }
 
-    /// Get the replica count for a shard in [`GLOBAL_WORLD`].
+    /// Get the replica count for a shard in [`DEFAULT_NETWORK`].
     pub fn get_replica_count(&self, shard_id: &ContentHash) -> u32 {
-        self.get_replica_count_in_world(GLOBAL_WORLD, shard_id)
+        self.get_replica_count_in_network(DEFAULT_NETWORK, shard_id)
     }
 
-    /// Get the replica count for a shard within a specific world (P2 world seam).
-    pub fn get_replica_count_in_world(&self, world_id: NetworkId, shard_id: &ContentHash) -> u32 {
-        self.replica_counts.get(&(world_id, *shard_id)).copied().unwrap_or(0)
+    /// Get the replica count for a shard within a specific network.
+    pub fn get_replica_count_in_network(&self, network_id: NetworkId, shard_id: &ContentHash) -> u32 {
+        self.replica_counts.get(&(network_id, *shard_id)).copied().unwrap_or(0)
     }
 
     // -- Windowed fetch-rate API (R12 swarm scaling) --
 
-    /// Record a shard fetch event at a specific instant in [`GLOBAL_WORLD`]
+    /// Record a shard fetch event at a specific instant in [`DEFAULT_NETWORK`]
     /// (test-friendly).
     pub fn record_fetch_at(&mut self, shard_hash: [u8; 32], at: Instant) {
-        self.record_fetch_at_in_world(GLOBAL_WORLD, shard_hash, at);
+        self.record_fetch_at_in_network(DEFAULT_NETWORK, shard_hash, at);
     }
 
-    /// Record a shard fetch event at a specific instant within a world.
-    pub fn record_fetch_at_in_world(&mut self, world_id: NetworkId, shard_hash: [u8; 32], at: Instant) {
-        let history = self.fetch_history.entry((world_id, shard_hash)).or_default();
+    /// Record a shard fetch event at a specific instant within a network.
+    pub fn record_fetch_at_in_network(&mut self, network_id: NetworkId, shard_hash: [u8; 32], at: Instant) {
+        let history = self.fetch_history.entry((network_id, shard_hash)).or_default();
         history.push(at);
 
         // Trim entries outside the window.
@@ -247,36 +247,36 @@ impl SwarmAnalytics {
         }
     }
 
-    /// Record a shard fetch event at the current time in [`GLOBAL_WORLD`].
+    /// Record a shard fetch event at the current time in [`DEFAULT_NETWORK`].
     pub fn record_fetch(&mut self, shard_hash: [u8; 32]) {
         self.record_fetch_at(shard_hash, Instant::now());
     }
 
-    /// Record a shard fetch event at the current time within a world (P2 seam).
-    pub fn record_fetch_in_world(&mut self, world_id: NetworkId, shard_hash: [u8; 32]) {
-        self.record_fetch_at_in_world(world_id, shard_hash, Instant::now());
+    /// Record a shard fetch event at the current time within a network.
+    pub fn record_fetch_in_network(&mut self, network_id: NetworkId, shard_hash: [u8; 32]) {
+        self.record_fetch_at_in_network(network_id, shard_hash, Instant::now());
     }
 
-    /// Count of fetches for a shard within the current window ([`GLOBAL_WORLD`]).
+    /// Count of fetches for a shard within the current window ([`DEFAULT_NETWORK`]).
     pub fn get_fetch_rate(&self, shard_hash: &[u8; 32]) -> u32 {
         let now = Instant::now();
         self.get_fetch_rate_at(shard_hash, now)
     }
 
     /// Count of fetches within the window relative to a given instant
-    /// ([`GLOBAL_WORLD`]).
+    /// ([`DEFAULT_NETWORK`]).
     fn get_fetch_rate_at(&self, shard_hash: &[u8; 32], now: Instant) -> u32 {
-        self.get_fetch_rate_at_in_world(GLOBAL_WORLD, shard_hash, now)
+        self.get_fetch_rate_at_in_network(DEFAULT_NETWORK, shard_hash, now)
     }
 
-    /// Count of fetches within the window for a `(world, shard)` at an instant.
-    fn get_fetch_rate_at_in_world(
+    /// Count of fetches within the window for a `(network, shard)` at an instant.
+    fn get_fetch_rate_at_in_network(
         &self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_hash: &[u8; 32],
         now: Instant,
     ) -> u32 {
-        let history = match self.fetch_history.get(&(world_id, *shard_hash)) {
+        let history = match self.fetch_history.get(&(network_id, *shard_hash)) {
             Some(h) => h,
             None => return 0,
         };
@@ -295,24 +295,24 @@ impl SwarmAnalytics {
         self.get_recommendation_at(shard_hash, Instant::now())
     }
 
-    /// Recommendation relative to a given instant ([`GLOBAL_WORLD`],
+    /// Recommendation relative to a given instant ([`DEFAULT_NETWORK`],
     /// test-friendly).
     fn get_recommendation_at(
         &self,
         shard_hash: &[u8; 32],
         now: Instant,
     ) -> ReplicationRecommendation {
-        self.get_recommendation_at_in_world(GLOBAL_WORLD, shard_hash, now)
+        self.get_recommendation_at_in_network(DEFAULT_NETWORK, shard_hash, now)
     }
 
-    /// Recommendation for a `(world, shard)` relative to a given instant.
-    fn get_recommendation_at_in_world(
+    /// Recommendation for a `(network, shard)` relative to a given instant.
+    fn get_recommendation_at_in_network(
         &self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_hash: &[u8; 32],
         now: Instant,
     ) -> ReplicationRecommendation {
-        let rate = self.get_fetch_rate_at_in_world(world_id, shard_hash, now);
+        let rate = self.get_fetch_rate_at_in_network(network_id, shard_hash, now);
         if self.popularity_threshold == 0 || rate < self.popularity_threshold {
             return ReplicationRecommendation::None;
         }
@@ -339,8 +339,8 @@ impl SwarmAnalytics {
         let mut recs: Vec<ReplicationRecommendation> = self
             .fetch_history
             .keys()
-            .filter_map(|(world, hash)| {
-                let rec = self.get_recommendation_at_in_world(*world, hash, now);
+            .filter_map(|(network, hash)| {
+                let rec = self.get_recommendation_at_in_network(*network, hash, now);
                 if rec == ReplicationRecommendation::None {
                     None
                 } else {
@@ -449,38 +449,38 @@ impl ReplicationTrigger {
         Self { config }
     }
 
-    /// Check all tracked shards (across all worlds) and return signals for those
-    /// needing replication. Until worlds form, only [`GLOBAL_WORLD`] is present,
-    /// so this is identical to the pre-world check.
+    /// Check all tracked shards (across all networks) and return signals for those
+    /// needing replication. Only [`DEFAULT_NETWORK`] is present,
+    /// so this is identical to the flat check.
     pub fn check(&self, analytics: &SwarmAnalytics) -> Vec<ReplicationSignal> {
         self.check_filtered(analytics, None)
     }
 
-    /// Check only the shards in a specific world (P2 world seam).
-    pub fn check_in_world(
+    /// Check only the shards in a specific network.
+    pub fn check_in_network(
         &self,
         analytics: &SwarmAnalytics,
-        world_id: NetworkId,
+        network_id: NetworkId,
     ) -> Vec<ReplicationSignal> {
-        self.check_filtered(analytics, Some(world_id))
+        self.check_filtered(analytics, Some(network_id))
     }
 
-    /// Shared implementation: `world_filter = None` spans all worlds, `Some(w)`
-    /// restricts to world `w`.
+    /// Shared implementation: `network_filter = None` spans all networks, `Some(w)`
+    /// restricts to network `w`.
     fn check_filtered(
         &self,
         analytics: &SwarmAnalytics,
-        world_filter: Option<NetworkId>,
+        network_filter: Option<NetworkId>,
     ) -> Vec<ReplicationSignal> {
         let mut signals = Vec::new();
 
-        for ((world, shard_id), popularity) in &analytics.shard_data {
-            if let Some(w) = world_filter {
-                if *world != w {
+        for ((network, shard_id), popularity) in &analytics.shard_data {
+            if let Some(w) = network_filter {
+                if *network != w {
                     continue;
                 }
             }
-            let replicas = analytics.get_replica_count_in_world(*world, shard_id);
+            let replicas = analytics.get_replica_count_in_network(*network, shard_id);
             let rate = popularity.request_count;
             let threshold = self.config.requests_per_replica_threshold;
 
@@ -522,7 +522,7 @@ impl ReplicationTrigger {
 /// Recommends optimal placement for new shard replicas based on
 /// consumer demand distribution in the matrix.
 pub struct DispersionAdvisor {
-    /// Existing replica positions to avoid clustering, keyed by `(world, shard)`.
+    /// Existing replica positions to avoid clustering, keyed by `(network, shard)`.
     existing_replicas: HashMap<(NetworkId, ContentHash), Vec<MatrixPosition>>,
 }
 
@@ -534,26 +534,26 @@ impl DispersionAdvisor {
         }
     }
 
-    /// Register an existing replica position for a shard in [`GLOBAL_WORLD`].
+    /// Register an existing replica position for a shard in [`DEFAULT_NETWORK`].
     pub fn register_replica(&mut self, shard_id: ContentHash, position: MatrixPosition) {
-        self.register_replica_in_world(GLOBAL_WORLD, shard_id, position);
+        self.register_replica_in_network(DEFAULT_NETWORK, shard_id, position);
     }
 
-    /// Register an existing replica position within a world (P2 world seam).
-    pub fn register_replica_in_world(
+    /// Register an existing replica position within a network.
+    pub fn register_replica_in_network(
         &mut self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_id: ContentHash,
         position: MatrixPosition,
     ) {
         self.existing_replicas
-            .entry((world_id, shard_id))
+            .entry((network_id, shard_id))
             .or_default()
             .push(position);
     }
 
     /// Recommend placement positions for new replicas of a shard in
-    /// [`GLOBAL_WORLD`].
+    /// [`DEFAULT_NETWORK`].
     ///
     /// Uses geographic clustering of consumers to find optimal positions,
     /// then filters out positions too close to existing replicas.
@@ -563,24 +563,24 @@ impl DispersionAdvisor {
         analytics: &SwarmAnalytics,
         count: usize,
     ) -> Vec<MatrixPosition> {
-        self.recommend_placement_in_world(GLOBAL_WORLD, shard_id, analytics, count)
+        self.recommend_placement_in_network(DEFAULT_NETWORK, shard_id, analytics, count)
     }
 
     /// Recommend placement positions for new replicas of a shard within a
-    /// specific world (P2 world seam).
-    pub fn recommend_placement_in_world(
+    /// specific network.
+    pub fn recommend_placement_in_network(
         &self,
-        world_id: NetworkId,
+        network_id: NetworkId,
         shard_id: &ContentHash,
         analytics: &SwarmAnalytics,
         count: usize,
     ) -> Vec<MatrixPosition> {
-        let demand_map = match analytics.get_demand_map_in_world(world_id, shard_id) {
+        let demand_map = match analytics.get_demand_map_in_network(network_id, shard_id) {
             Some(positions) if !positions.is_empty() => positions,
             _ => return Vec::new(),
         };
 
-        let existing = self.existing_replicas.get(&(world_id, *shard_id));
+        let existing = self.existing_replicas.get(&(network_id, *shard_id));
 
         // Compute demand centroid clusters using simple grid-based clustering.
         let clusters = cluster_positions(demand_map, count.max(1));
@@ -1197,7 +1197,7 @@ mod tests {
         let past = Instant::now() - Duration::from_millis(200);
         analytics
             .fetch_history
-            .entry((GLOBAL_WORLD, hash))
+            .entry((DEFAULT_NETWORK, hash))
             .or_default()
             .push(past);
 
@@ -1224,7 +1224,7 @@ mod tests {
 
         let history = analytics
             .fetch_history
-            .get(&(GLOBAL_WORLD, hash))
+            .get(&(DEFAULT_NETWORK, hash))
             .expect("test: history should exist");
         assert_eq!(history.len(), 20, "history should be capped at max_history_per_shard");
     }

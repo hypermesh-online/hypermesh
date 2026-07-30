@@ -6,7 +6,7 @@
 //!
 //! Every 10 seconds, snapshot the live per-shard demand and feed it into
 //! `SwarmAnalytics`, recording each request at a proximity-real coordinate
-//! (P3) in the single implicit world (`GLOBAL_WORLD`, P2). Byte-identical to
+//! (P3) in the single implicit network (`DEFAULT_NETWORK`, P2). Byte-identical to
 //! the loop previously inline in `start_network`.
 
 use tracing::debug;
@@ -56,10 +56,9 @@ pub(super) fn spawn(svc: &ReplicationService) {
                             let consumer_pos = locality
                                 .coordinate_for(requester_id)
                                 .unwrap_or(feed_position);
-                            // P2: worlds seam — the single implicit world
-                            // (GLOBAL_WORLD) until worlds form (VISION §5.5).
-                            analytics.record_request_in_world(
-                                hypermesh_lib::GLOBAL_WORLD,
+                            // the single default network (DEFAULT_NETWORK).
+                            analytics.record_request_in_network(
+                                hypermesh_lib::DEFAULT_NETWORK,
                                 *shard_id,
                                 consumer_id,
                                 consumer_pos,

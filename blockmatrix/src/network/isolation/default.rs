@@ -182,29 +182,6 @@ impl DefaultIsolationManager {
         }
         Ok(())
     }
-
-    /// Pre-flight world-boundary check for a `source -> destination` pair,
-    /// without recording a persistent packet origin.
-    ///
-    /// This reuses the full enforcer path (`validate_packet`): boundary
-    /// detection, per-network packet filter, violation logging, and statistics
-    /// are all identical. The single difference is that the synthetic probe
-    /// packet's origin is *not* retained — a gate consult is not real packet
-    /// transit, so the audit `packet_origins` map stays bounded to genuine
-    /// traffic instead of accumulating one entry per same-world check.
-    pub async fn validate_boundary(
-        &self,
-        source: NetworkId,
-        destination: NetworkId,
-    ) -> Result<()> {
-        let packet = Packet::new(source, destination, zero_hash());
-        let probe_id = packet.id.clone();
-        let result = self.validate_packet(&packet).await;
-        // Drop the probe's origin (only inserted on the same-world success
-        // path); harmless no-op on the rejected path.
-        self.packet_origins.write().await.remove(&probe_id);
-        result
-    }
 }
 
 #[async_trait]

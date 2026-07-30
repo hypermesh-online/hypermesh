@@ -42,7 +42,6 @@ pub mod swarm_provider;
 pub mod sync_dispatch;
 pub mod trust;
 pub mod validation;
-pub mod world_coordinator;
 
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -99,9 +98,9 @@ impl std::fmt::Debug for NetworkNode {
 /// and dispersion decisions.
 pub struct SwarmDemandTracker {
     /// Per-shard request counts and last-access timestamps, keyed by
-    /// `(world, shard)`. Until worlds form (VISION.md §5.5), every key's world
-    /// is [`hypermesh_lib::GLOBAL_WORLD`] and behavior is identical to the
-    /// pre-world flat map.
+    /// `(network, shard)`. With a single default network, every key's network
+    /// is [`hypermesh_lib::DEFAULT_NETWORK`] and behavior is identical to the
+    /// flat map.
     entries: tokio::sync::Mutex<HashMap<(hypermesh_lib::NetworkId, hypermesh_lib::ContentHash), DemandEntry>>,
 }
 
@@ -125,26 +124,26 @@ impl SwarmDemandTracker {
     }
 
     /// Record a fetch request for a shard from a specific peer in
-    /// [`hypermesh_lib::GLOBAL_WORLD`] (the default world).
+    /// [`hypermesh_lib::DEFAULT_NETWORK`] (the default network).
     pub async fn record_fetch(
         &self,
         shard_id: hypermesh_lib::ContentHash,
         requester_node_id: &str,
     ) {
-        self.record_fetch_in_world(hypermesh_lib::GLOBAL_WORLD, shard_id, requester_node_id)
+        self.record_fetch_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id, requester_node_id)
             .await;
     }
 
-    /// Record a fetch request for a shard within a specific world (P2 world seam).
-    pub async fn record_fetch_in_world(
+    /// Record a fetch request for a shard within a specific network.
+    pub async fn record_fetch_in_network(
         &self,
-        world_id: hypermesh_lib::NetworkId,
+        network_id: hypermesh_lib::NetworkId,
         shard_id: hypermesh_lib::ContentHash,
         requester_node_id: &str,
     ) {
         let now_us = chrono::Utc::now().timestamp_micros() as u64;
         let mut entries = self.entries.lock().await;
-        let entry = entries.entry((world_id, shard_id)).or_insert_with(|| DemandEntry {
+        let entry = entries.entry((network_id, shard_id)).or_insert_with(|| DemandEntry {
             request_count: 0,
             last_request_us: 0,
             requester_ids: std::collections::HashSet::new(),
@@ -155,30 +154,30 @@ impl SwarmDemandTracker {
     }
 
     /// Get a snapshot of all demand entries for feeding into ngauge, flattened
-    /// to `shard -> entry`. Until worlds form, only
-    /// [`hypermesh_lib::GLOBAL_WORLD`] is present, so this equals the pre-world
+    /// to `shard -> entry`. Only
+    /// [`hypermesh_lib::DEFAULT_NETWORK`] is present, so this equals the pre-network
     /// snapshot exactly.
     pub async fn snapshot(&self) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
         self.entries
             .lock()
             .await
             .iter()
-            .map(|((_world, shard), entry)| (*shard, entry.clone()))
+            .map(|((_network, shard), entry)| (*shard, entry.clone()))
             .collect()
     }
 
-    /// Get demand entry for a specific shard in [`hypermesh_lib::GLOBAL_WORLD`].
+    /// Get demand entry for a specific shard in [`hypermesh_lib::DEFAULT_NETWORK`].
     pub async fn get(&self, shard_id: &hypermesh_lib::ContentHash) -> Option<DemandEntry> {
-        self.get_in_world(hypermesh_lib::GLOBAL_WORLD, shard_id).await
+        self.get_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id).await
     }
 
-    /// Get demand entry for a specific shard within a world (P2 world seam).
-    pub async fn get_in_world(
+    /// Get demand entry for a specific shard within a network.
+    pub async fn get_in_network(
         &self,
-        world_id: hypermesh_lib::NetworkId,
+        network_id: hypermesh_lib::NetworkId,
         shard_id: &hypermesh_lib::ContentHash,
     ) -> Option<DemandEntry> {
-        self.entries.lock().await.get(&(world_id, *shard_id)).cloned()
+        self.entries.lock().await.get(&(network_id, *shard_id)).cloned()
     }
 }
 
@@ -877,7 +876,6 @@ use message_handlers::run_peer_message_loop;
 
 // Re-export MetricsReporter at the same path for backwards compatibility.
 pub use metrics_reporter::MetricsReporter;
-pub use world_coordinator::WorldCoordinator;
 
 #[cfg(test)]
 mod tests {

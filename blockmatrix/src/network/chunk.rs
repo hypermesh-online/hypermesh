@@ -3,19 +3,19 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Chunk arithmetic — a world's elastic slice of the matrix (VISION.md §5.5).
+//! Chunk arithmetic — a network's elastic slice of the matrix.
 //!
-//! A **chunk** is the set of matrix cells a world currently occupies — the
-//! coordinates of its members. Worlds resize, so a chunk is elastic, never a
-//! fixed cube; this module is the minimal REAL geometry over that set, and
+//! A **chunk** is the set of matrix cells a network currently occupies — the
+//! coordinates of its members. Membership resizes, so a chunk is elastic, never
+//! a fixed cube; this module is the minimal REAL geometry over that set, and
 //! nothing more.
 //!
 //! It runs on the real primitives only — an integer [`MatrixCoordinate`]
 //! centroid and [`find_k_nearest`] over those cells — fed the **proximity-
 //! derived** coordinates P3 made meaningful (measured QUIC RTT, not the
-//! identity-hash cell). Membership itself (which shard belongs to which world)
-//! is owned upstream by `ngauge::WorldManager`; this is only the geometry of a
-//! world's slice, kept on the BlockMatrix side because the matrix primitives
+//! identity-hash cell). Membership itself (which shard belongs to which
+//! network) is owned upstream by the network model; this is only the geometry
+//! of a network's slice, kept on the BlockMatrix side because the matrix primitives
 //! (`MatrixCoordinate`, `neighbors`) live here.
 //!
 //! Scope discipline (this is P7): exactly one consumed operation is built.
@@ -27,14 +27,14 @@
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::find_k_nearest;
 
-/// A world's slice of the matrix: the coordinates of its member cells.
+/// A network's slice of the matrix: the coordinates of its member cells.
 #[derive(Debug, Clone, Default)]
 pub struct Chunk {
     members: Vec<MatrixCoordinate>,
 }
 
 impl Chunk {
-    /// Build a chunk from the coordinates of a world's members.
+    /// Build a chunk from the coordinates of a network's members.
     pub fn from_coords(members: Vec<MatrixCoordinate>) -> Self {
         Self { members }
     }
@@ -50,7 +50,7 @@ impl Chunk {
     }
 
     /// The chunk's integer centroid — the component-wise mean cell, the single
-    /// point that best represents where the world's slice sits in the matrix.
+    /// point that best represents where the network's slice sits in the matrix.
     /// `None` for an empty chunk.
     ///
     /// Accumulates in `i128` so a large membership cannot overflow; each mean

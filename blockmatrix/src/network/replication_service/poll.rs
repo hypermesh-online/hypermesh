@@ -6,64 +6,25 @@
 //!
 //! Every 30 seconds, ask ngauge which shards need more replicas and proactively
 //! fetch additional copies from known providers via `TAG_SHARD_FETCH`, closing
-//! the consumer-becomes-provider loop. Before every fetch the mounted
-//! [`WorldIsolationGate`] is consulted, fed the shard's TRUE world from the
-//! `WorldManager` (P6). Byte-identical to the loop previously inline in
-//! `start_network`.
-//!
-//! [`WorldIsolationGate`]: crate::network::isolation::WorldIsolationGate
+//! the consumer-becomes-provider loop. Flat per-network replication: the loop
+//! fetches the nearest provider by dispersion, registers this node as a new
+//! provider, and updates the replica count — all keyed by
+//! [`DEFAULT_NETWORK`](hypermesh_lib::DEFAULT_NETWORK).
 
 use tracing::{debug, info};
 
-use crate::bootstrap::PrivacyMode;
-
 use super::ReplicationService;
 
-/// Mount the world-isolation gate and spawn the E.2 replication-poll loop.
+/// Spawn the E.2 replication-poll loop.
 ///
-/// `async` + fallible: the [`WorldIsolationGate::mount`] is the same `?` that
-/// previously propagated out of `start_network`.
-///
-/// [`WorldIsolationGate::mount`]: crate::network::isolation::WorldIsolationGate::mount
+/// `async` + fallible to match the `spawn` seam of the sibling loops; the loop
+/// body itself is a fire-and-forget `tokio::spawn`.
 pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     let rp_analytics = svc.ngauge_analytics.clone();
     let rp_index = svc.shard_location_index.clone();
     let rp_transport = svc.shard_transport.clone();
     let rp_network = svc.network.clone();
     let rp_local_node_id = svc.node_id.clone();
-
-    // P5: mount the dormant world-isolation enforcer for this node's
-    // home world. Until worlds form (VISION §5.5) the home world is
-    // GLOBAL_WORLD, so every same-world check in the loop below is a
-    // strict no-op — the gate only ever rejects a genuine foreign-world
-    // shard, of which there is none in a single-world node.
-    let rp_home_world = hypermesh_lib::GLOBAL_WORLD;
-    let rp_world_type = if svc.privacy_mode == PrivacyMode::ANONYMOUS {
-        crate::network::trust::NetworkType::Anonymous
-    } else {
-        crate::network::trust::NetworkType::P2P
-    };
-    // P6/hardening: the WorldManager (shard→world authority) and the
-    // WorldIsolationGate (the fetch gate's admitted-worlds view) are the
-    // two membership sets that must never disagree about a held shard's
-    // world. They are owned together by a single `WorldCoordinator` — the
-    // one path that mutates both, in the order that closes the desync
-    // window (admit-before-migrate on form, remap-before-revoke on merge).
-    //
-    // The coordinator roots the manager at the node's home world
-    // (GLOBAL_WORLD until a world forms) and mounts the gate for it. NO
-    // formation is fired here — nothing on the live path calls
-    // `form`/`merge` — so `world_of` returns GLOBAL_WORLD for every shard
-    // and the `check_fetch` below is the same strict P5 no-op: the
-    // coordinator is the single owner of both sets, with zero behavioural
-    // change until a world is deliberately (and separately) formed.
-    let rp_world = std::sync::Arc::new(
-        crate::network::world_coordinator::WorldCoordinator::mount(
-            rp_home_world,
-            rp_world_type,
-        )
-        .await?,
-    );
 
     tokio::spawn(async move {
         let mut interval =
@@ -88,8 +49,8 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                 Ok(guard) => ngauge::ReplicationTrigger::new(
                     ngauge::ReplicationConfig::default(),
                 )
-                // P2: worlds seam — check the single implicit world.
-                .check_in_world(&guard, hypermesh_lib::GLOBAL_WORLD),
+                // check the single implicit network.
+                .check_in_network(&guard, hypermesh_lib::DEFAULT_NETWORK),
                 Err(e) => {
                     debug!(
                         "replication-poll: analytics lock poisoned: {e}"
@@ -132,11 +93,10 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                 .collect();
 
             for signal in signals.iter().filter(|s| s.urgency > 0.5) {
-                // Find peers known to provide this shard (P2: single
-                // implicit world until worlds form).
+                // Find peers known to provide this shard in the default network.
                 let providers = rp_index
-                    .get_providers_in_world(
-                        hypermesh_lib::GLOBAL_WORLD,
+                    .get_providers_in_network(
+                        hypermesh_lib::DEFAULT_NETWORK,
                         &signal.shard_id,
                     )
                     .await;
@@ -172,20 +132,6 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                     target_node_id.as_bytes(),
                 );
 
-                // P6: consult the world-membership coordinator before
-                // fetching. It resolves the shard's TRUE world from the
-                // WorldManager and checks the isolation gate as one call —
-                // `world_of` returns GLOBAL_WORLD until a world forms (a
-                // strict no-op on the live single-world node); once a shard
-                // has migrated into an emergent child world, the gate
-                // accepts it only if this node is a member of that world
-                // (it holds the migrated chunk) and rejects a genuine
-                // foreign-world shard before any transfer.
-                if let Err(e) = rp_world.check_fetch(&signal.shard_id).await {
-                    debug!("replication-poll: world gate: {e}");
-                    continue;
-                }
-
                 use crate::network::shard_transport::ShardTransport;
                 match rp_transport
                     .fetch_shard(&target_id, &signal.shard_id)
@@ -203,23 +149,23 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                         // Without this hook the replica count stayed 0
                         // forever and the loop never converged.
                         rp_index
-                            .register_provider_in_world(
-                                hypermesh_lib::GLOBAL_WORLD,
+                            .register_provider_in_network(
+                                hypermesh_lib::DEFAULT_NETWORK,
                                 &rp_local_node_id,
                                 &[signal.shard_id],
                             )
                             .await;
                         let replica_count = rp_index
-                            .get_providers_in_world(
-                                hypermesh_lib::GLOBAL_WORLD,
+                            .get_providers_in_network(
+                                hypermesh_lib::DEFAULT_NETWORK,
                                 &signal.shard_id,
                             )
                             .await
                             .len()
                             as u32;
                         if let Ok(mut guard) = rp_analytics.lock() {
-                            guard.set_replica_count_in_world(
-                                hypermesh_lib::GLOBAL_WORLD,
+                            guard.set_replica_count_in_network(
+                                hypermesh_lib::DEFAULT_NETWORK,
                                 signal.shard_id,
                                 replica_count,
                             );
@@ -272,9 +218,9 @@ fn select_dispersion_source(
     let recommendations = match analytics.lock() {
         Ok(guard) => {
             let advisor = ngauge::DispersionAdvisor::new();
-            // P2: worlds seam — recommend within the single implicit world.
-            advisor.recommend_placement_in_world(
-                hypermesh_lib::GLOBAL_WORLD,
+            // recommend within the single implicit network.
+            advisor.recommend_placement_in_network(
+                hypermesh_lib::DEFAULT_NETWORK,
                 shard_id,
                 &guard,
                 candidates.len().max(1),

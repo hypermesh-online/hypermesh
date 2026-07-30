@@ -8,12 +8,12 @@
 //! This is a **mechanical extraction** (P8) of the loops that previously lived
 //! inline in the `connect` command's `start_network`. Behaviour is byte-for-byte
 //! identical: same intervals (H3 demand feed 10s, H4/H5 propagation-weight +
-//! replication-signal 15s, E.2 replication-poll 30s), same `GLOBAL_WORLD`
-//! defaults, same `WorldIsolationGate` mount + `check_fetch` consult before a
-//! fetch, same dispersion source selection.
+//! replication-signal 15s, E.2 replication-poll 30s), same `DEFAULT_NETWORK`
+//! defaults, same flat per-network replication, same dispersion source
+//! selection.
 //!
 //! The service takes every handle it needs as an explicit field on
-//! [`ReplicationService`] (the analytics/index/transport/world-gate inputs)
+//! [`ReplicationService`] (the analytics/index/transport inputs)
 //! rather than reaching back into the connect command's locals — the transport
 //! bring-up owns those `Arc`s and hands the SAME instances here, so lock scopes
 //! and sharing semantics are unchanged.
@@ -46,7 +46,7 @@ pub struct ReplicationService {
     pub coord: MatrixCoordinate,
     /// This node's id (skip-self guard when picking replication sources).
     pub node_id: String,
-    /// Transport privacy mode — selects the world-isolation `NetworkType`.
+    /// Transport privacy mode carried for the loops' `NetworkType` selection.
     pub privacy_mode: PrivacyMode,
     /// Live per-shard demand snapshot source (H3 feed input).
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
@@ -71,11 +71,8 @@ impl ReplicationService {
     ///
     /// Order and await points match the original inline code: the H3 feed and
     /// H4/H5 propagation loops are fire-and-forget `tokio::spawn`s; the E.2
-    /// replication-poll loop first mounts the [`WorldIsolationGate`] (async,
-    /// fallible) and then spawns — so the single `?` here is the same one that
-    /// previously propagated out of `start_network`.
-    ///
-    /// [`WorldIsolationGate`]: crate::network::isolation::WorldIsolationGate
+    /// replication-poll loop is `async` + fallible to match, so the single `?`
+    /// here is the same one that previously propagated out of `start_network`.
     pub async fn spawn(self) -> anyhow::Result<()> {
         feed::spawn(&self);
         propagation::spawn(&self);

@@ -19,7 +19,7 @@
 //! 2. [`locality_centroids`] runs [`GeographicClustering`] over the
 //!    proximity-embedded peer coordinates to find locality centroids — the first
 //!    real runtime caller of that previously-dormant engine, fed the real
-//!    signal. World formation (P6) builds on these centroids.
+//!    signal. Demand-driven placement builds on these centroids.
 //!
 //! Identity/address derivation (`base::derive_cell`) is untouched — this only
 //! decides *where* assets live, never *what* they are.
