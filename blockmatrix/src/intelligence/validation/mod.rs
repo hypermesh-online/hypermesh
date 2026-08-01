@@ -314,7 +314,7 @@ impl IntegrationValidator {
             }
         }
 
-        let test_network: NetworkId = NetworkId([0u8; 16]);
+        let test_network: NetworkId = hypermesh_lib::DEFAULT_NETWORK;
         if let Err(e) = network
             .register_asset(
                 test_network,

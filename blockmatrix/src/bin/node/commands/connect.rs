@@ -174,9 +174,6 @@ pub async fn run_connect(
         started_at: std::time::Instant::now(),
         shutdown_tx: shutdown_tx.clone(),
         dns_resolver: bootstrap.dns().clone(),
-        dns_popularity_tracker: Some(std::sync::Arc::new(
-            blockmatrix::dns::DnsPopularityTracker::new(),
-        )),
         shard_location_index: shard_location_index_ref,
         consumer_provider_manager: consumer_provider_manager_ref,
         #[cfg(feature = "caesar")]

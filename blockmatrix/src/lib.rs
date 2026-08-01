@@ -166,11 +166,6 @@ pub mod blockchain;
 /// zero data loss recovery mechanisms
 pub mod persistence;
 
-// Privacy System - Sprint 2.2: Four Privacy Tiers
-/// Revolutionary privacy system with four tiers (Anonymous, Private P2P, Federated, Public)
-/// and flexibility matrix for independent network/asset privacy settings
-pub mod privacy;
-
 // Phase 2 Intelligence Layer - Sprint 2.6: Integration
 /// Unified intelligence layer integrating all Phase 2 revolutionary concepts:
 /// STOQ Protocol Intelligence, Privacy Tiers, Multi-Network Participation,
@@ -264,13 +259,6 @@ pub use persistence::{
     PersistenceConfig, PersistenceManager, RecoveryManager, RecoveryReport, RecoveryStatus,
     SerializationFormat, SnapshotManager, SnapshotMetadata, SnapshotSchedule, StorageStats,
     TopologyBackup,
-};
-
-// Re-export privacy types for easy access
-pub use privacy::{
-    AssetSharing, NetworkVisibility, PolicyAction, PolicyDecision, PolicyManager, PrivacyConfig,
-    PrivacyFlexibilityMatrix, PrivacyPresets, PrivacySystem, TierSwitcher, TrustLevel,
-    ValidationRequirements,
 };
 
 // Real hardware metrics collection from /proc filesystem

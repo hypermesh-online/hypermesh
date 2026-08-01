@@ -14,15 +14,12 @@ pub mod ca_enrollment;
 pub mod chunk;
 pub mod cluster;
 pub mod consumer_provider;
-pub mod config;
 pub mod discovery;
 pub mod gossip;
 pub mod hash_bucket;
-pub mod isolation;
 pub mod locality;
 pub mod message_handlers;
 pub mod metrics_reporter;
-pub mod multi_network;
 pub mod peer_auth;
 mod peer_discovery;
 pub mod placement;
@@ -40,7 +37,6 @@ pub mod stoq_integration;
 pub mod stoq_transfer_transport;
 pub mod swarm_provider;
 pub mod sync_dispatch;
-pub mod trust;
 pub mod validation;
 
 use anyhow::{anyhow, Result};
@@ -224,9 +220,6 @@ pub struct PeerContext {
     /// Swarm demand tracker for recording shard fetch requests.
     /// Fed into ngauge SwarmAnalytics when the `intelligence` feature is enabled.
     pub swarm_demand_tracker: Arc<SwarmDemandTracker>,
-    /// DNS popularity tracker for ngauge-driven replication of popular names.
-    /// When `Some`, DNS resolution requests are recorded for analytics.
-    pub dns_popularity_tracker: Option<Arc<crate::dns::DnsPopularityTracker>>,
     /// Shard location index for consumer-becomes-provider (R12).
     /// Tracks which peers provide which shards, populated from TAG_SHARD_ANNOUNCE.
     pub shard_location_index: Option<Arc<swarm_provider::ShardLocationIndex>>,

@@ -279,9 +279,6 @@ pub(crate) async fn start_network(
         authenticated_peers: network_manager.authenticated_peers(),
         gossip_protocol: Some(gossip_proto.clone()),
         swarm_demand_tracker: swarm_demand_tracker.clone(),
-        dns_popularity_tracker: Some(std::sync::Arc::new(
-            blockmatrix::dns::DnsPopularityTracker::new(),
-        )),
         shard_location_index: Some(shard_location_index.clone()),
         inbox_store: Some(share_inbox_store.clone()),
         message_store: Some(std::sync::Arc::new(

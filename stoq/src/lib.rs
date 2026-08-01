@@ -18,7 +18,6 @@ pub mod config;
 pub mod error_utils;
 pub mod errors;
 pub mod extensions;
-pub mod network_isolation;
 pub mod protocol;
 pub mod transport;
 
@@ -49,12 +48,6 @@ pub use transport::{Connection, Endpoint, NetworkTier, StoqTransport, Stream, Tr
 
 // Re-export API layer for application protocol
 pub use api::{ApiError, ApiHandler, ApiRequest, ApiResponse, StoqApiClient, StoqApiServer};
-
-// Re-export network isolation for multi-network support
-pub use network_isolation::{
-    IsolationConfig, IsolationViolation, NetworkIsolationManager, NetworkStack, NetworkTunnel,
-    TrafficType,
-};
 
 // Re-export multi-path QUIC connection management
 pub use transport::multipath::{MultiPathConnection, PathPolicy, PathScheduler};

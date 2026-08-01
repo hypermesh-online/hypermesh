@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use ngauge::routing_intel::{EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule};
 use hypermesh_ebpf::HyperMeshEbpf;
-use hypermesh_lib::{NetworkId, PrivacyMode};
+use hypermesh_lib::{NetworkId, PrivacyMode, DEFAULT_NETWORK};
 
 /// Adapter that pushes ngauge routing intelligence decisions into the
 /// kernel-level eBPF policy maps managed by [`HyperMeshEbpf`].
@@ -35,13 +35,13 @@ pub struct EbpfFeedbackAdapter {
 impl EbpfFeedbackAdapter {
     /// Construct a new adapter wired to the given eBPF orchestrator.
     ///
-    /// Uses [`NetworkId([0u8; 16])`] as the default network identifier for
+    /// Uses [`DEFAULT_NETWORK`] as the default network identifier for
     /// privacy-action propagation. Callers that need per-network behavior
     /// should use [`with_default_network`].
     pub fn new(ebpf: Arc<HyperMeshEbpf>) -> Self {
         Self {
             ebpf,
-            default_network: NetworkId([0u8; 16]),
+            default_network: DEFAULT_NETWORK,
         }
     }
 

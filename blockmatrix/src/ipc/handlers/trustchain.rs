@@ -659,7 +659,6 @@ mod tests {
             started_at: std::time::Instant::now(),
             shutdown_tx,
             dns_resolver: crate::bootstrap::DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]

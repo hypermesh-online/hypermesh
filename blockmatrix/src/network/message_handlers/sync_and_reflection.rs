@@ -266,11 +266,6 @@ pub(super) async fn handle_dns_resolve_request(
 
     debug!(name = name, peer = peer_node_id, "DNS network resolve request");
 
-    // Record in popularity tracker if available.
-    if let Some(ref tracker) = ctx.dns_popularity_tracker {
-        tracker.record_resolution(name).await;
-    }
-
     // Check local DNS resolver.
     let response = if let Some(ref dns) = ctx.dns_resolver {
         match dns.resolve(name).await {
@@ -321,11 +316,6 @@ pub(super) async fn handle_dns_query(
             return;
         }
     };
-
-    // Record popularity if available.
-    if let Some(ref tracker) = ctx.dns_popularity_tracker {
-        tracker.record_resolution(&query.domain_name).await;
-    }
 
     let response = build_dns_response_for_query(&query, ctx).await;
 

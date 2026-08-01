@@ -31,11 +31,6 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                             data: None,
                         })?;
 
-                    // Record resolution for popularity tracking (ngauge).
-                    if let Some(ref tracker) = s.dns_popularity_tracker {
-                        tracker.record_resolution(name).await;
-                    }
-
                     match s.dns_resolver.resolve(name).await {
                         Some(addr) => Ok(serde_json::json!({
                             "name": name,
@@ -262,7 +257,6 @@ mod tests {
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]

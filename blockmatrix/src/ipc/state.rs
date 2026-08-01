@@ -5,7 +5,6 @@
 
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::bootstrap::DnsResolver;
-use crate::dns::DnsPopularityTracker;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::consumer_provider::ConsumerProviderManager;
 use crate::network::shard_store::ShardStore;
@@ -43,9 +42,6 @@ pub struct DaemonState {
     pub shutdown_tx: tokio::sync::watch::Sender<bool>,
     /// Bootstrap DNS resolver for name resolution.
     pub dns_resolver: DnsResolver,
-    /// DNS popularity tracker for ngauge-driven replication.
-    /// Records resolution frequency so popular names get replicated to more nodes.
-    pub dns_popularity_tracker: Option<Arc<DnsPopularityTracker>>,
     /// Shard location index — same instance shared with PeerContext so
     /// TAG_SHARD_ANNOUNCE updates from peers and provider registrations from
     /// local fetches converge on a single canonical view.

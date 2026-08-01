@@ -188,7 +188,6 @@ items = [
     "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
     # Core Protocol Completion (L1-L5)
     "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
-    "DNS popularity tracking — DnsPopularityTracker records resolution frequency, feeds ngauge SwarmAnalytics",
     "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
     "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, ngauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
     "EbpfFeedbackAdapter wires ngauge routing intelligence into kernel-level BPF maps",
