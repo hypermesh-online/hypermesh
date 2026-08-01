@@ -9,6 +9,7 @@
 
 use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
+use hypermesh_lib::NetworkId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -47,11 +48,15 @@ impl DomainRegistration {
         owner_node_id: String,
     ) -> Self {
         let chain_id = derive_chain_id(domain_name);
-        let network_id = derive_network_id(domain_name);
+        // The on-disk `network_id` field is the wire/serde form — the canonical
+        // hex of the derived `NetworkId` (Display), byte-identical to the value
+        // stored before this retype. `derive_network_id` now returns the typed
+        // `NetworkId`; we render it to the wire hex exactly at this serde boundary.
+        let network_id = derive_network_id(domain_name).to_string();
 
         // Parent: split on '.', if >1 component, parent is everything after first '.'
         let parent_network_id = extract_parent_domain(domain_name)
-            .map(|parent| derive_network_id(&parent));
+            .map(|parent| derive_network_id(&parent).to_string());
 
         Self {
             domain_name: domain_name.to_string(),
@@ -71,11 +76,16 @@ pub fn derive_chain_id(domain_name: &str) -> [u8; 32] {
     *blake3::hash(domain_name.as_bytes()).as_bytes()
 }
 
-/// Derive a human-readable network ID: hex of the first 16 bytes of the chain ID.
-/// Returns a 32-character hex string.
-pub fn derive_network_id(domain_name: &str) -> String {
+/// Derive the canonical [`NetworkId`] for a domain: the first 16 bytes of the
+/// BLAKE3 chain id. `NetworkId`'s `Display` renders these bytes as the same
+/// 32-char lowercase hex string this used to return, so the wire/disk form is
+/// unchanged and `NetworkId::from_wire_str(derive_network_id(d).to_string())`
+/// round-trips back to `derive_network_id(d)`.
+pub fn derive_network_id(domain_name: &str) -> NetworkId {
     let chain_id = derive_chain_id(domain_name);
-    hex::encode(&chain_id[..16])
+    let mut id = [0u8; 16];
+    id.copy_from_slice(&chain_id[..16]);
+    NetworkId(id)
 }
 
 /// Extract the parent domain from a dotted domain name.
@@ -138,6 +148,12 @@ impl DomainNetworkManager {
         privacy_mode: PrivacyMode,
     ) -> Result<(), String> {
         let network_id = derive_network_id(domain_name);
+        // A sub-domain nests inside its parent domain's network — the same
+        // nesting model `join_network_nested` expects. This is that method's
+        // first real caller: a top-level domain has no parent (`None`), a
+        // sub-domain carries its parent's derived `NetworkId`.
+        let parent_network_id =
+            extract_parent_domain(domain_name).map(|parent| derive_network_id(&parent));
         let now_secs = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .map(|d| d.as_secs())
@@ -146,13 +162,19 @@ impl DomainNetworkManager {
         info!(
             domain = %domain_name,
             network_id = %network_id,
+            nested = parent_network_id.is_some(),
             "Joining domain network"
         );
 
-        self.sync_manager
-            .lock()
-            .await
-            .join_network(network_id, privacy_mode, now_secs)
+        // The SyncManager keeps the wire-form network id as its label; hand it
+        // the canonical hex string (Display), byte-identical to what a peer on
+        // this domain network advertises.
+        self.sync_manager.lock().await.join_network_nested(
+            network_id.to_string(),
+            privacy_mode,
+            parent_network_id,
+            now_secs,
+        )
     }
 
     /// Leave a domain's Network-scope chain.
@@ -165,13 +187,19 @@ impl DomainNetworkManager {
             "Leaving domain network"
         );
 
-        self.sync_manager.lock().await.leave_network(&network_id)
+        self.sync_manager
+            .lock()
+            .await
+            .leave_network(&network_id.to_string())
     }
 
     /// Check whether this node is a member of the given domain's network.
     pub async fn is_domain_member(&self, domain_name: &str) -> bool {
         let network_id = derive_network_id(domain_name);
-        self.sync_manager.lock().await.is_member(&network_id)
+        self.sync_manager
+            .lock()
+            .await
+            .is_member(&network_id.to_string())
     }
 }
 
@@ -191,11 +219,20 @@ mod tests {
 
     #[test]
     fn test_derive_network_id_format() {
+        // `derive_network_id` now returns a typed `NetworkId`; its wire/serde
+        // form (Display) is still the 32-char lowercase hex it always was, and
+        // it round-trips through the single ingress converter.
         let nid = derive_network_id("hypermesh");
-        assert_eq!(nid.len(), 32, "network_id must be 32 hex chars");
+        let wire = nid.to_string();
+        assert_eq!(wire.len(), 32, "network_id wire form must be 32 hex chars");
         assert!(
-            nid.chars().all(|c| c.is_ascii_hexdigit()),
-            "network_id must be all hex chars"
+            wire.chars().all(|c| c.is_ascii_hexdigit()),
+            "network_id wire form must be all hex chars"
+        );
+        assert_eq!(
+            NetworkId::from_wire_str(&wire),
+            nid,
+            "wire form must round-trip back to the same NetworkId"
         );
     }
 
@@ -275,7 +312,7 @@ mod tests {
             PrivacyMode::PRIVATE,
             "n1".to_string(),
         );
-        let expected_parent_nid = derive_network_id("persist.hypermesh");
+        let expected_parent_nid = derive_network_id("persist.hypermesh").to_string();
         assert_eq!(
             reg.parent_network_id.as_deref(),
             Some(expected_parent_nid.as_str())
@@ -304,7 +341,7 @@ mod tests {
             .await
             .expect("test: join domain");
 
-        let network_id = derive_network_id("example.hypermesh");
+        let network_id = derive_network_id("example.hypermesh").to_string();
         assert!(sm.lock().await.is_member(&network_id));
     }
 
@@ -318,7 +355,7 @@ mod tests {
             .await
             .expect("test: join");
 
-        let network_id = derive_network_id("test.domain");
+        let network_id = derive_network_id("test.domain").to_string();
         assert!(sm.lock().await.is_member(&network_id));
 
         mgr.leave_domain("test.domain")

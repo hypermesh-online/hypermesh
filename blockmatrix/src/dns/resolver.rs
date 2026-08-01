@@ -388,7 +388,10 @@ impl DnsResolver {
 
         while let Some(parent_domain) = current {
             let parent_name = parent_domain.full.clone();
-            let network_id = derive_network_id(&parent_name);
+            // The federated DNS pools + `DnsResolutionTier` are keyed by the
+            // network's wire string; render the derived `NetworkId` to its
+            // canonical hex here (byte-identical to the pre-retype value).
+            let network_id = derive_network_id(&parent_name).to_string();
 
             debug!(
                 "Hierarchical walk: trying parent '{}' (network {})",
@@ -562,8 +565,9 @@ mod tests {
         let resolver = DnsResolver::new(pool_manager.clone(), validator, cache)
             .with_domain_registry(domain_registry);
 
-        // Register a record in the parent domain's pool (keyed by network_id)
-        let parent_network_id = crate::dns::domain::derive_network_id("hypermesh");
+        // Register a record in the parent domain's pool (keyed by network_id
+        // wire string, matching the hierarchical walk's `derive_network_id(..).to_string()`).
+        let parent_network_id = crate::dns::domain::derive_network_id("hypermesh").to_string();
         let record = create_test_record("host.hypermesh");
         pool_manager
             .register_federated(parent_network_id, record)

@@ -11,7 +11,7 @@ use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::shard_transport;
 use crate::network::stoq_integration::MatrixMessage;
 use crate::network::sync_dispatch;
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{ContentHash, NetworkId};
 
 use super::super::PeerContext;
 use super::dns_protocol::{DistributedDnsQuery, DistributedDnsResponse};
@@ -57,8 +57,17 @@ pub(super) async fn record_shard_demand(data: &[u8], peer_node_id: &str, ctx: &P
     shard_id_bytes.copy_from_slice(&data[1..33]);
     let shard_id = ContentHash(shard_id_bytes);
 
+    // Attribute the demand to the REQUESTER's authenticated network (TAG_SHARD_FETCH
+    // is auth-gated, so the peer is in the map). Falls back to our own network id
+    // if the lookup misses. Under a single network these are the same canonical
+    // NetworkId, so this is byte-identical today; it also stops demand silently
+    // flattening to the default network once multiple networks exist.
+    let network = crate::network::peer_auth::peer_network_id(&ctx.authenticated_peers, peer_node_id)
+        .await
+        .unwrap_or_else(|| NetworkId::from_wire_str(&ctx.network_id));
+
     ctx.swarm_demand_tracker
-        .record_fetch(shard_id, peer_node_id)
+        .record_fetch_in_network(network, shard_id, peer_node_id)
         .await;
 }
 

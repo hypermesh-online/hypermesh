@@ -650,7 +650,8 @@ async fn handle_handshake_connection(
             node_id: peer_node_id.clone(),
             pubkey: result.peer_pubkey.clone(),
             coordinate: (coordinate.x as i32, coordinate.y as i32, coordinate.z as i32),
-            network_id: peer_network_id,
+            // Ingress boundary: peer's advertised wire string -> canonical NetworkId.
+            network_id: hypermesh_lib::NetworkId::from_wire_str(&peer_network_id),
             authenticated_at: std::time::Instant::now(),
             proof_bytes: result.peer_proof.clone(),
         },

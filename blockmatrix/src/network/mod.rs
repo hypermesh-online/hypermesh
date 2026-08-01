@@ -57,7 +57,7 @@ use crate::network::shard_store::ShardStore;
 use crate::network::peer_auth::AuthenticatedPeers;
 use crate::network::gossip::GossipProtocol;
 use crate::network::stoq_integration::{MatrixNodeInfo, MatrixStoqIntegration};
-use hypermesh_lib::BlockchainScope;
+use hypermesh_lib::{BlockchainScope, NetworkId};
 
 /// Node network information
 #[derive(Clone)]
@@ -272,9 +272,12 @@ struct HandshakeData {
     peer_pubkey: Vec<u8>,
     /// Validated state proof bytes from the peer
     peer_proof: Vec<u8>,
-    /// Network ID received from the peer during post-handshake metadata exchange.
-    /// Empty string if the peer is running an older version without this field.
-    peer_network_id: String,
+    /// Canonical network the peer advertised during post-handshake metadata
+    /// exchange, mapped from the wire string via [`NetworkId::from_wire_str`] at
+    /// the ingress boundary. An older peer that sends no metadata yields
+    /// `from_wire_str("")` — a network id that will not match ours, exactly as
+    /// the empty-string mismatch behaved before this retype.
+    peer_network_id: NetworkId,
 }
 
 /// Post-handshake metadata exchanged at the blockmatrix layer.
@@ -587,7 +590,9 @@ impl NetworkManager {
             },
             peer_pubkey: result.peer_pubkey,
             peer_proof: result.peer_proof,
-            peer_network_id,
+            // Ingress boundary: the peer's advertised wire string becomes its
+            // canonical NetworkId here (and only here on this path).
+            peer_network_id: NetworkId::from_wire_str(&peer_network_id),
         })
     }
 

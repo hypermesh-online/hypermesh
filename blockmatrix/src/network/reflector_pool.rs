@@ -19,15 +19,32 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::bootstrap::PrivacyMode;
-use hypermesh_lib::MatrixPosition;
+use hypermesh_lib::{MatrixPosition, NetworkId};
+
+/// The reflectors of a single network, plus the wire label that network was
+/// registered under.
+///
+/// The label is retained so `tracked_networks` and log lines reproduce the
+/// byte-identical wire string a caller used, even though the pool keys by the
+/// canonical [`NetworkId`].
+#[derive(Debug, Default)]
+struct NetworkReflectors {
+    /// Wire/JSON label of this network (its JSON-wire-boundary representation).
+    label: String,
+    /// Reflectors keyed by node_id.
+    nodes: HashMap<String, Reflector>,
+}
 
 /// Tracks block replicas across the network for redundancy and availability.
 ///
 /// Each network scope can have multiple reflectors. The pool monitors their
 /// health and provides sorted selection for sync operations.
 pub struct ReflectorPool {
-    /// Available reflectors keyed by network_id, then by node_id
-    reflectors: HashMap<String, HashMap<String, Reflector>>,
+    /// Available reflectors keyed by canonical [`NetworkId`], then by node_id.
+    ///
+    /// Callers address networks by their wire string; each method maps it to a
+    /// `NetworkId` via [`NetworkId::from_wire_str`] before touching the map.
+    reflectors: HashMap<NetworkId, NetworkReflectors>,
     /// Configuration
     config: ReflectorConfig,
 }
@@ -99,7 +116,14 @@ impl ReflectorPool {
     /// If the network has reached max_reflectors, the lowest-health
     /// reflector is evicted to make room (only if the new one is better).
     pub fn register_reflector(&mut self, network_id: &str, reflector: Reflector) {
-        let network_pool = self.reflectors.entry(network_id.to_string()).or_default();
+        let entry = self
+            .reflectors
+            .entry(NetworkId::from_wire_str(network_id))
+            .or_default();
+        if entry.label.is_empty() {
+            entry.label = network_id.to_string();
+        }
+        let network_pool = &mut entry.nodes;
 
         // If already registered, just update
         if network_pool.contains_key(&reflector.node_id) {
@@ -158,8 +182,8 @@ impl ReflectorPool {
     ///
     /// Returns true if the reflector was found and removed.
     pub fn remove_reflector(&mut self, network_id: &str, node_id: &str) -> bool {
-        if let Some(network_pool) = self.reflectors.get_mut(network_id) {
-            let removed = network_pool.remove(node_id).is_some();
+        if let Some(entry) = self.reflectors.get_mut(&NetworkId::from_wire_str(network_id)) {
+            let removed = entry.nodes.remove(node_id).is_some();
             if removed {
                 debug!(
                     network = %network_id,
@@ -176,11 +200,12 @@ impl ReflectorPool {
     /// Get the best reflectors for a network, sorted by health score
     /// (highest first), limited to `count`.
     pub fn get_best_reflectors(&self, network_id: &str, count: usize) -> Vec<&Reflector> {
-        let Some(network_pool) = self.reflectors.get(network_id) else {
+        let Some(entry) = self.reflectors.get(&NetworkId::from_wire_str(network_id)) else {
             return Vec::new();
         };
 
-        let mut eligible: Vec<&Reflector> = network_pool
+        let mut eligible: Vec<&Reflector> = entry
+            .nodes
             .values()
             .filter(|r| r.health_score >= self.config.health_threshold)
             .collect();
@@ -205,11 +230,12 @@ impl ReflectorPool {
 
     /// Count reflectors above the health threshold for a network
     pub fn healthy_count(&self, network_id: &str) -> usize {
-        let Some(network_pool) = self.reflectors.get(network_id) else {
+        let Some(entry) = self.reflectors.get(&NetworkId::from_wire_str(network_id)) else {
             return 0;
         };
 
-        network_pool
+        entry
+            .nodes
             .values()
             .filter(|r| r.health_score >= self.config.health_threshold)
             .count()
@@ -217,7 +243,9 @@ impl ReflectorPool {
 
     /// Total reflector count for a network (regardless of health)
     pub fn total_count(&self, network_id: &str) -> usize {
-        self.reflectors.get(network_id).map_or(0, |pool| pool.len())
+        self.reflectors
+            .get(&NetworkId::from_wire_str(network_id))
+            .map_or(0, |entry| entry.nodes.len())
     }
 
     /// Update the health score for a specific reflector node.
@@ -226,8 +254,8 @@ impl ReflectorPool {
     pub fn update_health(&mut self, node_id: &str, health_score: f64) {
         let clamped = health_score.clamp(0.0, 1.0);
 
-        for pool in self.reflectors.values_mut() {
-            if let Some(reflector) = pool.get_mut(node_id) {
+        for entry in self.reflectors.values_mut() {
+            if let Some(reflector) = entry.nodes.get_mut(node_id) {
                 reflector.health_score = clamped;
             }
         }
@@ -241,13 +269,13 @@ impl ReflectorPool {
         let cutoff_secs = now_ms.saturating_sub(self.config.stale_timeout_ms) / 1000;
         let mut pruned = 0;
 
-        for (network_id, pool) in &mut self.reflectors {
-            let before = pool.len();
-            pool.retain(|_, r| r.last_seen >= cutoff_secs);
-            let removed = before - pool.len();
+        for entry in self.reflectors.values_mut() {
+            let before = entry.nodes.len();
+            entry.nodes.retain(|_, r| r.last_seen >= cutoff_secs);
+            let removed = before - entry.nodes.len();
             if removed > 0 {
                 warn!(
-                    network = %network_id,
+                    network = %entry.label,
                     pruned = removed,
                     "Pruned stale reflectors"
                 );
@@ -269,8 +297,8 @@ impl ReflectorPool {
         network_id: &str,
         success: bool,
     ) {
-        if let Some(pool) = self.reflectors.get_mut(network_id) {
-            if let Some(reflector) = pool.get_mut(node_id) {
+        if let Some(entry) = self.reflectors.get_mut(&NetworkId::from_wire_str(network_id)) {
+            if let Some(reflector) = entry.nodes.get_mut(node_id) {
                 if success {
                     reflector.health_score = (reflector.health_score + 0.05).min(1.0);
                 } else {
@@ -300,13 +328,13 @@ impl ReflectorPool {
         let cutoff = now_secs.saturating_sub(stale_timeout_secs);
         let mut pruned = 0;
 
-        for (network_id, pool) in &mut self.reflectors {
-            let before = pool.len();
-            pool.retain(|_, r| r.last_seen >= cutoff);
-            let removed = before - pool.len();
+        for entry in self.reflectors.values_mut() {
+            let before = entry.nodes.len();
+            entry.nodes.retain(|_, r| r.last_seen >= cutoff);
+            let removed = before - entry.nodes.len();
             if removed > 0 {
                 warn!(
-                    network = %network_id,
+                    network = %entry.label,
                     pruned = removed,
                     timeout_secs = stale_timeout_secs,
                     "Pruned stale reflectors by timeout"
@@ -318,9 +346,13 @@ impl ReflectorPool {
         pruned
     }
 
-    /// Get all tracked network IDs
+    /// Get all tracked network labels (the wire strings networks were
+    /// registered under).
     pub fn tracked_networks(&self) -> Vec<&str> {
-        self.reflectors.keys().map(|s| s.as_str()).collect()
+        self.reflectors
+            .values()
+            .map(|entry| entry.label.as_str())
+            .collect()
     }
 }
 

@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use hypermesh_lib::NetworkId;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
@@ -25,8 +26,13 @@ pub struct AuthenticatedPeer {
     pub pubkey: Vec<u8>,
     /// Matrix coordinate of the peer.
     pub coordinate: (i32, i32, i32),
-    /// Network ID the peer belongs to.
-    pub network_id: String,
+    /// Canonical network the peer belongs to.
+    ///
+    /// Derived at the handshake ingress boundary from the peer's advertised
+    /// wire string via [`NetworkId::from_wire_str`]. Comparisons are against our
+    /// own network id put through the SAME converter, so two nodes that agree on
+    /// a wire string agree here.
+    pub network_id: NetworkId,
     /// When the peer was authenticated.
     pub authenticated_at: std::time::Instant,
     /// Last verified PoS proof bytes (from handshake).
@@ -107,14 +113,32 @@ pub async fn is_authenticated(
     peers.read().await.contains_key(node_id)
 }
 
-/// Check whether a node_id belongs to the given network_id.
+/// The canonical [`NetworkId`] an authenticated peer belongs to, if known.
+///
+/// Returns `None` when the peer has not completed a bilateral handshake (not in
+/// the map). Used to attribute a peer's shard demand/announcements to ITS
+/// network rather than flattening to the default.
+pub async fn peer_network_id(
+    peers: &AuthenticatedPeers,
+    node_id: &str,
+) -> Option<NetworkId> {
+    peers.read().await.get(node_id).map(|p| p.network_id)
+}
+
+/// Check whether a node_id belongs to the given network.
+///
+/// `our_network_id` is the caller's wire-form network string; it is mapped to
+/// its canonical [`NetworkId`] through the single ingress converter before the
+/// comparison, so this stays byte-for-byte equivalent to the old
+/// string-equality check under a single network.
 pub async fn is_same_network(
     peers: &AuthenticatedPeers,
     node_id: &str,
     our_network_id: &str,
 ) -> bool {
+    let ours = NetworkId::from_wire_str(our_network_id);
     match peers.read().await.get(node_id) {
-        Some(peer) => peer.network_id == our_network_id,
+        Some(peer) => peer.network_id == ours,
         None => false,
     }
 }
@@ -129,6 +153,7 @@ pub async fn verify_peer_access(
     our_network_id: &str,
 ) -> bool {
     let short_id = &node_id[..8.min(node_id.len())];
+    let ours = NetworkId::from_wire_str(our_network_id);
 
     let expired = {
         let map = peers.read().await;
@@ -140,7 +165,7 @@ pub async fn verify_peer_access(
                 );
                 return false;
             }
-            Some(peer) if peer.network_id != our_network_id => {
+            Some(peer) if peer.network_id != ours => {
                 warn!(
                     "Rejected message from peer {} (network '{}' != ours '{}')",
                     short_id, peer.network_id, our_network_id,
@@ -257,7 +282,9 @@ mod tests {
             node_id: node_id.to_string(),
             pubkey: vec![1, 2, 3],
             coordinate: (0, 0, 0),
-            network_id: network_id.to_string(),
+            // AuthenticatedPeer.network_id is now the canonical NetworkId, mapped
+            // from the wire label through the single ingress converter.
+            network_id: NetworkId::from_wire_str(network_id),
             authenticated_at: std::time::Instant::now(),
             proof_bytes: vec![4, 5, 6],
         }
@@ -300,7 +327,7 @@ mod tests {
             node_id: String::new(),
             pubkey: vec![1, 2, 3],
             coordinate: (0, 0, 0),
-            network_id: "net-1".to_string(),
+            network_id: NetworkId::from_wire_str("net-1"),
             authenticated_at: std::time::Instant::now(),
             proof_bytes: vec![4, 5, 6],
         };

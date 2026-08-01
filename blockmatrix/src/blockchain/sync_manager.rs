@@ -67,17 +67,23 @@ pub trait SyncObserver: Send {
 pub struct SyncManager {
     /// Identifier for this node's device chain
     device_chain_id: String,
-    /// Network chains this node participates in (keyed by network_id)
-    network_memberships: HashMap<String, NetworkMembership>,
-    /// Sync state per network
-    sync_states: HashMap<String, SyncState>,
+    /// Network chains this node participates in (keyed by canonical [`NetworkId`]).
+    ///
+    /// Callers still address networks by their wire string; every method maps
+    /// that string to a `NetworkId` via [`NetworkId::from_wire_str`] before
+    /// touching the map, and each membership retains the original wire label so
+    /// sync messages echo byte-identical `network_id` strings.
+    network_memberships: HashMap<NetworkId, NetworkMembership>,
+    /// Sync state per network, keyed by canonical [`NetworkId`].
+    sync_states: HashMap<NetworkId, SyncState>,
     /// Configuration
     config: SyncConfig,
     /// Optional observer notified on sync completion
     observer: Option<Box<dyn SyncObserver>>,
     /// S3.0/B3: verified genesis block per network, recorded on receipt of a
     /// `GenesisResponse`. Non-destructive: the device chain is untouched.
-    network_genesis: HashMap<String, super::block::Block>,
+    /// Keyed by canonical [`NetworkId`].
+    network_genesis: HashMap<NetworkId, super::block::Block>,
     /// Phase I.1: when `true`, [`Self::generate_sync_request`] emits
     /// [`SyncMessage::HeaderRequest`] instead of [`SyncMessage::Request`].
     ///
@@ -103,8 +109,13 @@ pub struct SyncManager {
 /// Represents membership in a Network scope chain
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkMembership {
-    /// Unique identifier for this network
-    pub network_id: String,
+    /// Canonical identifier for this network.
+    pub network_id: NetworkId,
+    /// The wire/JSON label this network was joined under (the CLI free-form id
+    /// or a domain's derived hex). Retained so `network_id` fields echoed onto
+    /// the wire stay byte-identical — this is the network's JSON-wire-boundary
+    /// representation, not a second identity type.
+    pub network_label: String,
     /// Always `Network` for memberships (Device is implicit)
     pub scope: BlockchainScope,
     /// Privacy mode controlling participation rules
@@ -257,7 +268,8 @@ impl SyncManager {
         parent_network_id: Option<NetworkId>,
         now_unix_secs: u64,
     ) -> Result<(), String> {
-        if self.network_memberships.contains_key(&network_id) {
+        let key = NetworkId::from_wire_str(&network_id);
+        if self.network_memberships.contains_key(&key) {
             return Err(format!("Already a member of network {network_id}"));
         }
 
@@ -269,7 +281,8 @@ impl SyncManager {
         }
 
         let membership = NetworkMembership {
-            network_id: network_id.clone(),
+            network_id: key,
+            network_label: network_id.clone(),
             scope: BlockchainScope::Network,
             privacy_mode,
             joined_at: now_unix_secs,
@@ -284,9 +297,8 @@ impl SyncManager {
             "Joined network"
         );
 
-        self.network_memberships
-            .insert(network_id.clone(), membership);
-        self.sync_states.insert(network_id, SyncState::Discovering);
+        self.network_memberships.insert(key, membership);
+        self.sync_states.insert(key, SyncState::Discovering);
 
         Ok(())
     }
@@ -309,6 +321,7 @@ impl SyncManager {
         network_id: &str,
         genesis: super::block::Block,
     ) -> Result<(), String> {
+        let key = NetworkId::from_wire_str(network_id);
         if !genesis.is_genesis() {
             return Err(format!(
                 "Refusing genesis for {network_id}: index {} / previous_hash {} is not a genesis",
@@ -322,7 +335,7 @@ impl SyncManager {
             ));
         }
 
-        if let Some(existing) = self.network_genesis.get(network_id) {
+        if let Some(existing) = self.network_genesis.get(&key) {
             if existing.hash != genesis.hash {
                 return Err(format!(
                     "Refusing genesis for {network_id}: conflicts with the already-recorded \
@@ -338,23 +351,23 @@ impl SyncManager {
             genesis = %&genesis.hash[..16.min(genesis.hash.len())],
             "Recorded verified network genesis (non-destructive)",
         );
-        self.network_genesis
-            .insert(network_id.to_string(), genesis);
+        self.network_genesis.insert(key, genesis);
         Ok(())
     }
 
     /// The verified genesis block recorded for `network_id`, if any.
     pub fn network_genesis(&self, network_id: &str) -> Option<&super::block::Block> {
-        self.network_genesis.get(network_id)
+        self.network_genesis.get(&NetworkId::from_wire_str(network_id))
     }
 
     /// Leave a Network scope chain
     pub fn leave_network(&mut self, network_id: &str) -> Result<(), String> {
-        if self.network_memberships.remove(network_id).is_none() {
+        let key = NetworkId::from_wire_str(network_id);
+        if self.network_memberships.remove(&key).is_none() {
             return Err(format!("Not a member of network {network_id}"));
         }
 
-        self.sync_states.remove(network_id);
+        self.sync_states.remove(&key);
         info!(network = %network_id, "Left network");
 
         Ok(())
@@ -362,7 +375,7 @@ impl SyncManager {
 
     /// Get the current sync state for a network
     pub fn sync_state(&self, network_id: &str) -> Option<&SyncState> {
-        self.sync_states.get(network_id)
+        self.sync_states.get(&NetworkId::from_wire_str(network_id))
     }
 
     /// Get all active network memberships
@@ -377,12 +390,14 @@ impl SyncManager {
 
     /// Check if the node is a member of a specific network
     pub fn is_member(&self, network_id: &str) -> bool {
-        self.network_memberships.contains_key(network_id)
+        self.network_memberships
+            .contains_key(&NetworkId::from_wire_str(network_id))
     }
 
     /// Update the sync state for a network
     pub fn update_sync_state(&mut self, network_id: &str, state: SyncState) -> Result<(), String> {
-        if !self.network_memberships.contains_key(network_id) {
+        let key = NetworkId::from_wire_str(network_id);
+        if !self.network_memberships.contains_key(&key) {
             return Err(format!("Not a member of network {network_id}"));
         }
 
@@ -392,14 +407,17 @@ impl SyncManager {
             "Sync state updated"
         );
 
-        self.sync_states.insert(network_id.to_string(), state);
+        self.sync_states.insert(key, state);
 
         Ok(())
     }
 
     /// Record a successful sync timestamp for a network
     pub fn record_sync(&mut self, network_id: &str, now_unix_secs: u64) {
-        if let Some(membership) = self.network_memberships.get_mut(network_id) {
+        if let Some(membership) = self
+            .network_memberships
+            .get_mut(&NetworkId::from_wire_str(network_id))
+        {
             membership.last_sync = Some(now_unix_secs);
         }
     }
@@ -505,12 +523,12 @@ impl SyncManager {
             "Received block announcement"
         );
 
-        if let Some(SyncState::Synchronized { last_block_height }) =
-            self.sync_states.get(network_id)
+        let key = NetworkId::from_wire_str(network_id);
+        if let Some(SyncState::Synchronized { last_block_height }) = self.sync_states.get(&key)
         {
             if block_height > last_block_height + self.config.max_block_lag {
                 self.sync_states.insert(
-                    network_id.to_string(),
+                    key,
                     SyncState::Syncing {
                         progress: 0.0,
                         peer_count: 1,
@@ -542,7 +560,7 @@ impl SyncManager {
 
         if block_hashes.is_empty() {
             self.sync_states.insert(
-                network_id.to_string(),
+                NetworkId::from_wire_str(network_id),
                 SyncState::Synchronized {
                     last_block_height: peer_height,
                 },
@@ -578,7 +596,7 @@ impl SyncManager {
             return None;
         }
 
-        let state = self.sync_states.get(network_id)?;
+        let state = self.sync_states.get(&NetworkId::from_wire_str(network_id))?;
 
         match state {
             SyncState::Discovering | SyncState::Syncing { .. } => {
@@ -616,14 +634,21 @@ impl SyncManager {
         req
     }
 
-    /// Get networks that need syncing (Discovering or Syncing state)
+    /// Get networks that need syncing (Discovering or Syncing state).
+    ///
+    /// Returns each network's wire label (not its `NetworkId`) so callers echo
+    /// byte-identical `network_id` strings onto the wire when they build sync
+    /// requests for these networks.
     pub fn networks_needing_sync(&self) -> Vec<&str> {
-        self.sync_states
+        self.network_memberships
             .iter()
-            .filter(|(_, state)| {
-                matches!(state, SyncState::Discovering | SyncState::Syncing { .. })
+            .filter(|(key, _)| {
+                matches!(
+                    self.sync_states.get(*key),
+                    Some(SyncState::Discovering) | Some(SyncState::Syncing { .. })
+                )
             })
-            .map(|(id, _)| id.as_str())
+            .map(|(_, membership)| membership.network_label.as_str())
             .collect()
     }
 }

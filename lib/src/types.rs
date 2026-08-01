@@ -93,6 +93,43 @@ pub struct NetworkId(pub [u8; 16]);
 /// network is today's flat set.
 pub const DEFAULT_NETWORK: NetworkId = NetworkId([0u8; 16]);
 
+impl NetworkId {
+    /// Map an on-wire / CLI network-id STRING to its canonical [`NetworkId`].
+    ///
+    /// This is the ONE ingress conversion for the whole system: every place that
+    /// receives a network id as a `String` (the JSON handshake `network_id`
+    /// field, the CLI `--network-id` flag, a domain-derived hex id) funnels
+    /// through here so that two nodes agreeing on the same wire string always map
+    /// to the same `NetworkId`.
+    ///
+    /// Two input shapes are recognised:
+    ///  - **32-char lowercase hex** — the DNS/domain form produced by
+    ///    [`Display`](fmt::Display) (`hex(BLAKE3(domain)[..16])`). It is
+    ///    hex-DECODED to its 16 bytes so it round-trips (`from_wire_str(x).to_string() == x`)
+    ///    and equals the domain's own `derive_network_id`.
+    ///  - **anything else** — a free-form label (e.g. the CLI default
+    ///    `"trustnet-test"`) is folded deterministically via `BLAKE3(s)[..16]`.
+    ///
+    /// No egress inverse exists: the wire string is always carried verbatim
+    /// (it is retained at the CLI-parse + JSON-wire boundary), never
+    /// reconstructed from a `NetworkId`, so free-form labels survive byte-exact.
+    pub fn from_wire_str(s: &str) -> NetworkId {
+        if s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+            if let Ok(bytes) = hex::decode(s) {
+                if bytes.len() == 16 {
+                    let mut id = [0u8; 16];
+                    id.copy_from_slice(&bytes);
+                    return NetworkId(id);
+                }
+            }
+        }
+        let digest = blake3::hash(s.as_bytes());
+        let mut id = [0u8; 16];
+        id.copy_from_slice(&digest.as_bytes()[..16]);
+        NetworkId(id)
+    }
+}
+
 impl fmt::Display for NetworkId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for byte in &self.0 {
@@ -728,6 +765,39 @@ pub trait StateProofProvider: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- NetworkId::from_wire_str (the ONE ingress boundary) ---
+
+    #[test]
+    fn network_id_from_wire_dns_hex_roundtrips() {
+        // The DNS/domain form is hex(BLAKE3(domain)[..16]) — a 32-char lowercase
+        // hex string. from_wire_str must hex-decode it so it round-trips through
+        // Display and equals the domain's own derived id.
+        let domain = "home.persist.hypermesh";
+        let derived = {
+            let h = blake3::hash(domain.as_bytes());
+            let mut id = [0u8; 16];
+            id.copy_from_slice(&h.as_bytes()[..16]);
+            NetworkId(id)
+        };
+        let wire = derived.to_string(); // 32 lowercase hex chars
+        assert_eq!(wire.len(), 32);
+        assert_eq!(NetworkId::from_wire_str(&wire), derived);
+        assert_eq!(NetworkId::from_wire_str(&wire).to_string(), wire);
+    }
+
+    #[test]
+    fn network_id_from_wire_free_form_is_deterministic() {
+        // The CLI default "trustnet-test" is NOT 32-hex, so it folds via BLAKE3.
+        // Deterministic + distinct from other labels; two nodes with the same
+        // wire string map to the same NetworkId (so they still agree).
+        let a = NetworkId::from_wire_str("trustnet-test");
+        let b = NetworkId::from_wire_str("trustnet-test");
+        assert_eq!(a, b);
+        assert_ne!(a, NetworkId::from_wire_str("other-net"));
+        // Never accidentally collides with the default sentinel.
+        assert_ne!(a, DEFAULT_NETWORK);
+    }
 
     // --- NodeId ---
 

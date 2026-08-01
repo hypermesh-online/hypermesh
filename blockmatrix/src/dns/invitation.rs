@@ -41,7 +41,9 @@ pub fn create_invitation(
         .as_secs();
     let expires_at = now.saturating_add(ttl_secs);
     let invitee = invitee_node_id.unwrap_or("");
-    let network_id = super::domain::derive_network_id(domain_name);
+    // `DomainInvitation.network_id` is a serialized wire field; keep its
+    // canonical hex string form (byte-identical to the pre-retype value).
+    let network_id = super::domain::derive_network_id(domain_name).to_string();
 
     let key = derive_key(owner_proof_bytes);
     let payload = format!("{domain_name}:{invitee}:{expires_at}");

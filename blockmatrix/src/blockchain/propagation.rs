@@ -1076,7 +1076,7 @@ mod tests {
                 node_id: "consumer-node-1".to_string(),
                 pubkey: vec![1, 2, 3],
                 coordinate: (2, 2, 2),
-                network_id: "test-net".to_string(),
+                network_id: hypermesh_lib::NetworkId::from_wire_str("test-net"),
                 authenticated_at: std::time::Instant::now(),
                 proof_bytes: vec![4, 5, 6],
             },
