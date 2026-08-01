@@ -189,11 +189,6 @@ pub mod network;
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
 
-// Instruction-Based Retrieval System - Sprint 3.1: Revolutionary Concept #6
-/// Revolutionary retrieval system that sends compact instruction maps (<1KB)
-/// instead of transferring entire files, enabling clients to fetch shards directly
-pub mod retrieval;
-
 // Matrix-Aware Shard Distribution - Sprint 3.2: PoS-driven Architecture
 /// PoS-driven shard distribution with matrix-aware optimization
 /// Queries blockchain Asset records for node eligibility, then applies

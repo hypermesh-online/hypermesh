@@ -15,6 +15,10 @@
 
 pub mod lease;
 pub mod locality;
+pub mod replica_selection;
 
 pub use lease::PlacementLease;
 pub use locality::{LocalityProvider, PeerProximity};
+pub use replica_selection::{
+    order_by_proximity, FallbackStrategy, ReplicaCandidate, ReplicaSelector, SelectionCriteria,
+};

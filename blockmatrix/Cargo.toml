@@ -39,10 +39,6 @@ harness = false
 name = "transfer_bench"
 harness = false
 
-[[bench]]
-name = "retrieval_bench"
-harness = false
-
 [dependencies]
 # Shared types (single source of truth)
 hypermesh-lib = { workspace = true }

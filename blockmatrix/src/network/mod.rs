@@ -25,6 +25,7 @@ mod peer_discovery;
 pub mod placement;
 pub mod shard_dedup;
 pub mod shard_distribution;
+pub mod shard_locate;
 pub mod reflector_pool;
 /// Replication / placement background loops (H3 demand feed, H4/H5 propagation,
 /// E.2 replication-poll). Extracted from the connect command (P8); gated on the

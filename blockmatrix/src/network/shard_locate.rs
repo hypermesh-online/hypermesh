@@ -3,7 +3,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Two-layer shard-location resolution (Phase A2).
+//! Two-layer shard-location resolution.
 //!
 //! "Clients ARE mirrors ARE hosts ARE trackers." A shard has TWO complementary
 //! location layers that this module reconciles into ONE ordered provider list:
@@ -14,10 +14,10 @@
 //!    come first — they are the nodes we KNOW are serving the shard right now.
 //!
 //! 2. **Canonical matrix placement** (authoritative fallback): where the
-//!    `InstructionGenerator` / `ContentAddressedStorage` placed the shard in the
-//!    matrix. Each placement is a [`MatrixCoordinate`]; the owning node's id is
-//!    derived deterministically from that coordinate. This is the authority when
-//!    no live mirror is known (or all live mirrors are unreachable).
+//!    content-addressed store placed the shard in the matrix. Each placement is
+//!    a [`MatrixCoordinate`]; the owning node's id is derived deterministically
+//!    from that coordinate. This is the authority when no live mirror is known
+//!    (or all live mirrors are unreachable).
 //!
 //! The two layers use DIFFERENT id spaces — live mirrors are real peer
 //! identities (`BLAKE3(FALCON pubkey)` hex), canonical placements are
@@ -30,7 +30,7 @@
 //! (freshest-first, as [`ShardLocationIndex::get_providers`] already orders),
 //! then canonical-placement holders, then any upstream-tracker answers appended
 //! by [`merge_upstream`]. Neither layer replaces the other — they are
-//! complementary, and this is the ONE resolution authority both fetch paths use.
+//! complementary, and this is the ONE resolution authority the fetch paths use.
 
 use hypermesh_lib::{ContentHash, NodeId};
 
@@ -72,9 +72,8 @@ pub struct ResolvedProvider {
 /// Derive the owning `NodeId` for a matrix coordinate (deterministic).
 ///
 /// This is the canonical coordinate→node reconciliation: `BLAKE3(x||y||z)`.
-/// It matches `retrieval::client_assembly::fetching::node_id_from_coordinate`
-/// exactly so the resolver and the transport fetch path agree on which node
-/// owns a matrix cell.
+/// The transport fetch path derives the owning node for a matrix cell the same
+/// way, so the resolver and the fetch path agree on which node owns a cell.
 pub fn coordinate_to_node_id(coord: &MatrixCoordinate) -> NodeId {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&coord.x.to_le_bytes());
@@ -104,10 +103,10 @@ pub fn coordinate_to_node_id_hex(coord: &MatrixCoordinate) -> String {
 /// to prefer the live swarm, falling through to canonical placement.
 ///
 /// `canonical_coords` is supplied by the caller from whatever it has: a
-/// `RetrievalPlan`'s per-shard [`crate::retrieval::ShardLocation`]s on the
-/// client-assembly path, or empty on the bare-content-hash IPC path (where only
-/// live mirrors + the upstream fallback are available). This keeps the resolver
-/// reusable by both fetch paths — the ONE resolution authority.
+/// per-shard placement list on the client-assembly path, or empty on the
+/// bare-content-hash IPC path (where only live mirrors + the upstream fallback
+/// are available). This keeps the resolver reusable by both fetch paths — the
+/// ONE resolution authority.
 pub async fn resolve_shard_locations(
     content_hash: &ContentHash,
     live_index: Option<&ShardLocationIndex>,
@@ -144,7 +143,7 @@ pub async fn resolve_shard_locations(
     out
 }
 
-/// Append upstream-tracker provider ids to an existing resolve (Part 2).
+/// Append upstream-tracker provider ids to an existing resolve.
 ///
 /// De-duplicates against providers already present so a node returned by the
 /// upstream tracker that we already knew from a live mirror or canonical
@@ -184,18 +183,6 @@ mod tests {
             coordinate_to_node_id(&c),
             coordinate_to_node_id(&coord(3, 7, 12)),
         );
-    }
-
-    #[test]
-    fn test_coordinate_hex_matches_fetching_derivation() {
-        // The resolver's coordinate→node derivation MUST match the transport
-        // fetch path's `node_id_from_coordinate`, or the two layers would dial
-        // different nodes for the same matrix cell.
-        let c = coord(5, 0, 2);
-        let via_resolver = coordinate_to_node_id(&c);
-        let via_fetching =
-            crate::retrieval::client_assembly::fetching::node_id_from_coordinate(&c);
-        assert_eq!(via_resolver, via_fetching);
     }
 
     #[tokio::test]
