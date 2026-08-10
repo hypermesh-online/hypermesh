@@ -6,50 +6,41 @@ phase = "alpha"
 
 [features.working]
 items = [
-    # Sharding authority (A1 — NGauge now OWNS the erasure-coding engine)
+    # Sharding authority (A1 — NGauge now OWNS the erasure-coding engine; audit-confirmed live)
     "Reed-Solomon sharding engine (ngauge::Sharder — encode/decode k-of-n via reed-solomon-erasure, last-shard length trailer, per-shard BLAKE3 integrity hash; byte-identical to the old blockmatrix impl; blockmatrix consumes it at its shard seam via pub use ngauge::sharding::Sharder)",
     "Adaptive ShardingConfig (adaptive_for_size delegates to lib ErasureCodingParams::for_asset_size — R14 RS param scaling; ngauge is now a MANDATORY blockmatrix dependency, intelligence feature gates only the analytics surface)",
-    # Data structures and local computation (real logic, tested)
-    "Content receipts (BLAKE3 hash + timestamp + node signature, receipt bundles, verification)",
-    "Metrics collector (compute cycles, bandwidth, latency, receipt density, activity scoring)",
-    "KYC compliance checker (self-sovereign attestation structure, tier-based levels)",
-    "Organic vs speculative traffic detection (pattern-based aggregate flow analysis)",
-    "Governor throttle signal (activity score, band modifier, demurrage modifier, organic ratio)",
-    "Capacity metrics (bytes served, compute delivered, storage, bandwidth, uptime)",
-    "Multi-epoch capacity aggregation and trending (EpochTracker, CapacityTrend)",
+    # Data structures / protocol types (real logic, tested, genuinely correct)
     "Metrics streaming protocol (MetricsFrame, 4 payload types, encode/decode, privacy-mode-aware)",
     "Differential privacy filter (Laplace noise injection, epsilon-calibrated)",
     "Routing intelligence traits (TensorWeightModifier, PathPolicyRecommendation)",
-    "Resource pool and lease contracts (sovereign allocation percentages, time-bounded leases)",
-    "Lease manager (supply/demand matching, validation, lifecycle management)",
-    "Pricing engine (Governor-adjusted, tier-aware multipliers)",
-    "Content push manager (opt-in/out recipients, publisher registration, fee-based anti-spam)",
     "STOQ METRICS frame type integration (0xfe000007 custom frame)",
     "Swarm analytics data structures (ShardPopularity, demand maps, cascade tracker)",
-    "Min-spec performance profiling (budget validation against R13 limits)",
-    "Caesar in-transit/holding amount tracking (per-node economic state struct)",
-    "STOQ-compatible API server (NGaugeStoqApi: 6 handlers, bind [::1]:9296)",
     "UDP metrics ingestion listener ([::1]:9297) — receives MetricsFrame datagrams, feeds into MetricsIngestionPipeline",
     "eBPF policy feedback — EbpfPolicyFeedback trait (apply_routing_rules + apply_privacy_action), RoutingIntelFeed auto-pushes privacy actions on publish_update()",
     "MetricsPublisher transport callbacks",
     "MetricsSubscriber byte ingestion",
     "RegionalAggregator periodic change detection",
-    "Swarm analytics — windowed fetch tracking, popularity detection, ReplicationRecommendation (None/Replicate/UrgentReplicate)",
     "MetricsIngestionPipeline — configurable ingest pipeline for MetricsFrame processing (dedup, validation, backpressure)",
-    "UI-facing API handlers — /throttle, /routing/advisory, /marketplace/pools, /marketplace/leases, /marketplace/pricing, /metrics/stream (response formats aligned with UI TypeScript interfaces via serde rename)",
-    "Routing intelligence feedback consumed by blockmatrix EbpfFeedbackAdapter",
-    "ReplicationTrigger consumed by blockmatrix swarm coordinator — ngauge popularity drives blockmatrix's 30s replication poll, which fetches extra replicas via TAG_SHARD_FETCH from providers in ShardLocationIndex",
-    "Reconciler convergence closed (P6) — set_replica_count feedback hook (was the never-called gap) drives actual→desired replica convergence: after each fetch the actuator reports provider count back, ReplicationTrigger sees needed<=replicas and STOPS firing (swarm-emergent stable fixed point, verified by convergence tests)",
-    "DispersionAdvisor (P6) — anti-affinity placement recommends where new replicas go instead of naive candidates[0]",
-    "PeerTrustSignals + TrustBand — public reputation signals (activity_score, capacity, traffic_classification) exposed to trustchain federation gating; thresholds: composite activity ≥ 0.6, bandwidth ≥ 10 Mbps, uptime ≥ 0.9, organic-only traffic for Full",
 ]
 
 [features.in_development]
 items = [
-    "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources",
+    "Collective intelligence aggregation — privacy-aware aggregation code exists but no multi-node data sources (CollectiveIntelligence is orphaned: re-export only, zero consumers, W1-44/W2-36/W2-70)",
+    # Reconciled against full-system audit 2026-07-30 — moved out of [working]: built + tested but DORMANT (zero live callers) or corrupt on the live path
+    "Content receipts, Metrics collector, KYC compliance, organic-vs-speculative detection, Governor throttle signal, capacity metrics, multi-epoch trending, min-spec profiling, Caesar in-transit tracking — ~2000L of real, tested logic that is unreachable from any shipped caller (W2-37); previously tagged 'working'",
+    "Marketplace engines — Resource pool + lease contracts, Lease manager, Pricing engine, Content push manager (~1135L) have zero callers; the standalone NGaugeStoqApi / UI-facing handlers (/marketplace/*, /throttle, /routing/advisory) serve FABRICATED data (W2-33)",
+    "Swarm analytics windowed fetch-tracking + popularity detection + its GC (cleanup_cold_shards) — the bounded/windowed mechanism R12 needs is DEAD; the live replication path runs off an ever-growing cumulative counter instead (W2-34)",
+    "Reconciler convergence (P6 set_replica_count) — presented as a closed convergent loop, but blockmatrix's actuator discards fetched replica bytes and registers phantom providership, so replica accounting is corrupt (W1-34); loop is not closed on the shipped binary",
+    "DispersionAdvisor anti-affinity — recommends where new replicas go, but the blockmatrix caller builds a fresh advisor each poll and never calls register_replica, so anti-affinity is a live no-op (W1-37/W1-48/W2-25)",
+    "ReplicationTrigger / routing-intelligence feedback into blockmatrix — consumed, but MetricsReporter frames never deserialize into ngauge::MetricsFrame (NodeId hex vs [u8;32], W2-31) so ingestion is starved and RoutingIntelligence stays permanently neutral (W1-46/W1-49)",
+    "PeerTrustSignals + TrustBand → TrustChain federation gating — built but UNMOUNTED (F.1 gating does not run, W2-32); the 'public reputation signals' wording also violates the no-reputation-float terminology canon",
 ]
 
 [features.planned]
 items = [
     "Cross-node metrics federation via reflector pool",
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Bounded swarm-analytics working set — consumer_positions and cumulative request_count grow unbounded and inflate with uptime, not demand (W1-35/W1-47/W2-22/W2-69); needs windowed/evicting state per the substrate-memory rule",
+    "PlacementLease consumers — promised live in P2-P4 but has zero consumers; the identity↔location seam does not exist at runtime (W2-28/W2-35)",
+    "File-size split — swarm_analytics.rs (1383L), api/stoq_api.rs (945L), routing_intel.rs (857L) exceed the 500-line bar (W2-38)",
 ]

@@ -9,7 +9,6 @@ items = [
     # Matrix topology (real math, real data structures)
     "3D coordinate system (x,y,z positioning)",
     "Tensor math library (Vector3D, Matrix3x3, A*)",
-    "Geospatial module (GPS conversion, clustering)",
     # Single-node blockchain (real persistence, real BLAKE3 hashing)
     "Every-node blockchain (independent Device chain, genesis on boot)",
     "Blockchain state persistence (WAL, snapshots, recovery via PersistenceManager, versioned block format v1 with BLAKE3 integrity verification on every read) — until S3.0 the machinery existed but RUNTIME blocks never reached it (save_block had no call site in mutations.rs), so every stored asset was lost on restart",
@@ -24,18 +23,12 @@ items = [
     # Asset pipeline (real crypto, real erasure coding — LOCAL ONLY)
     "Asset pipeline: Compress(Brotli)->Encrypt(Kyber-1024 KEM)->Shard(ngauge/NGauge Sharder, RS 10+4)->store locally",
     "Sharding authority is NGauge (A1) — blockmatrix pipeline CONSUMES ngauge::Sharder/ShardingConfig; Shard/ShardMetadata/ShardingStats live in hypermesh-lib (no dependency cycle)",
-    "Streaming-first asset pipeline — segment-oriented processing with per-segment compress/encrypt/shard (R13)",
-    "Zstd compression with content-type auto-detection (video/audio skipped, text->Brotli, binary->Zstd)",
-    "Per-segment Kyber-1024 KEM encryption — one KEM per asset, BLAKE3 HKDF per-segment AES-256-GCM keys",
-    "Random-access byte range reconstruction — reconstruct only segments covering requested range",
-    "Async streaming I/O — process_stream (AsyncRead) and reconstruct_to_writer (AsyncWrite) for bounded-memory pipelines",
     "Adaptive erasure coding (R14 — RS parameters scale with asset size), engine now provided by ngauge::Sharder",
     "Store command: file -> pipeline -> local shard files + shard map",
     "Fetch command: local shard files -> reverse pipeline -> reconstructed file",
     # Asset adapters (data structures and trait impls, no network validation)
     "Asset adapters (CPU/GPU/Memory/Storage/Network/Container) — struct definitions and local operations",
     "AssetRegistration with BLAKE3 content hash (stored in blocks as hash only, not full data)",
-    "IPv6 asset addressing (AssetAddress: fd48:4d00 prefix, matrix coords, content fingerprint)",
     # Privacy model (real type system, maps to transport layer correctly)
     "Privacy allocation (PrivacyMode: Anonymous/Private/Public — transport layer selection)",
     "Privacy-aware certificate strategy (NetworkType selection based on PrivacyMode)",
@@ -59,8 +52,7 @@ items = [
     "Canonical block formula — Block_i = { prev_hash, entries: [{ hA, hπ, state_proof, ptr }] }, no timestamp/coordinate/nonce",
     "Module split — chain.rs, mutations.rs, genesis_ops.rs, stoq_transport.rs (all <500L)",
     # Scope-aware block sync (HashMatrix)
-    "Scope-aware block sync — Device (independent chains), Network/Private (shared chain full replication)",
-    "SpatialBucketAssigner — adaptive neighborhood radius via sqrt(n) k-nearest peers, octree-like partitioning of 3D hash volume",
+    "Scope-aware block sync (Device scope) — independent per-node Device chains persist and reconstruct",
     # Genesis and hardware (R1)
     "Genesis hardware assessment — OsAbstraction detects CPU/Memory/Storage/Network/GPU, registers as assets in block #1",
     # IPC daemon architecture (Phase 1 Sprints 1-2)
@@ -110,7 +102,6 @@ items = [
     "SDK service modules — per-service base URLs/ports (Caesar:9294, TrustChain:8444, NGauge:9296, Catalog:9295)",
     "SDK examples and GUIDE.md for all 5 languages (basic, blockchain, dns, domain, dashboard)",
     # CLI service subcommands (route through IPC daemon)
-    "CLI service subcommands (hypermesh caesar/trustchain/ngauge/catalog) with IPC relay",
     "CLI --mode flag (auto/ffi/ipc/http) and per-service URL flags",
     # Config services section
     "Config [services] section (ConnectionMode, per-service URLs in config.toml)",
@@ -122,10 +113,7 @@ items = [
     "Stream type discrimination — CONN_TYPE_HANDSHAKE (0x00) and CONN_TYPE_PEER_MESSAGE (0x01) on every STOQ connection",
     "Genesis Proof of State from real hardware — OsAbstraction-assessed capabilities bind the four proofs (S1 removed the (cores*mhz)+memory_mb stake formula and the minimum_stake gate; capacity is descriptive, PoStake is an identity binding)",
     "Recovery passphrase commitment in genesis block Identity asset — HKDF-SHA512 + BLAKE3 (§6.2.3)",
-    "Block fetching protocol — TransportSyncDriver pulls missing blocks from reflectors via SyncRequest→SyncResponse→BlockFetchRequest→BlockFetchResponse over STOQ streams",
-    "Metrics emission to ngauge — MetricsReporter pushes Capacity + Congestion + Routing frames (eBPF-sourced) via STOQ streams (CONN_TYPE_METRICS=0x02) to peers every 30s with backoff",
     "Real FALCON-1024 signed state proofs — re-exports TrustChainProofProvider (WireSignedProof envelope with BLAKE3+FALCON signing/verification)",
-    "Network sync MVP — shared --network-id CLI, runtime block propagation (5s poll), cross-genesis insertion, e2e verified two-node over QUIC",
     "Block sync wire protocol — TAG_BLOCK_ANNOUNCE format, BLAKE3 hash verification, insert_received_block with cross-genesis tolerance",
     "PoS-gated shard access control — AuthenticatedPeer tracking, verify_peer_access() gates shard/sync/block-announce/transfer/CA messages, network-ID scoping, per-entry proof_hash validation (P1/F1: TAG_BLOCK_ANNOUNCE now in the needs_auth allowlist — a mirror is only accepted from a bilaterally-PoS-authenticated peer)",
     "Shard distribution to network peers — placement-aware routing (closest peer by matrix coordinate), only to authenticated peers, graceful degradation to local storage",
@@ -136,20 +124,13 @@ items = [
     "Gossip protocol wiring — GossipProtocol spawned in sync loop (15s, fanout=3), STOQ CONN_TYPE_GOSSIP=0x03, available_assets from ShardStore",
     "Stream type discrimination — 0x00=handshake, 0x01=peer_msg, 0x02=metrics, 0x03=gossip with message_handlers dispatch",
     "Swarm demand tracking — SwarmDemandTracker records per-shard fetch counts, timestamps, unique requesters from TAG_SHARD_FETCH messages",
-    "NGauge intelligence bridge — feed_swarm_analytics(), compute_propagation_weights(), apply_path_recommendation() (feature-gated `intelligence`)",
-    "BlockPropagator routing weights — PropagationWeight integration, peers sorted by ngauge-computed weight, zero-weight filtered",
     "Bilateral PoS verification on peer auth",
     "Reflector health scoring and pruning",
-    "Cross-node metrics pipeline (MetricsReporter)",
-    "NGaugeBridge periodic feed + transmit",
-    "ReplicationTrigger wired to IntelligenceLayer",
-    "RoutingAdvisor weights in TransactionRouter",
     "Privacy tier mapping fix",
     # Sprint A1/B1/B2/C1 features
     "BlockHeader — lightweight header for selective chain reconstruction without full block data",
     "Shard refcount dedup — content-addressed dedup with DedupPolicy (Full/HashOnly/None), auto-GC at refcount 0 (R4)",
     "Privacy-scoped deduplication (R4 — DedupPolicy::HashOnly for Anonymous: detects dupes, saves storage, no refcount/provider tracking)",
-    "Genesis adoption protocol — nodes join networks by adopting foreign genesis, then sync headers",
     "SyncMessage extensions — GenesisRequest/Response, HeaderRequest/Response, BlockRequest/Response",
     "ShardLocationIndex — shard-to-provider mapping for swarm discovery (R12)",
     "TAG_SHARD_ANNOUNCE wire protocol — nodes announce shard availability to peers",
@@ -162,10 +143,6 @@ items = [
     "Send-side spatial filtering — block_relevant_to_peer() checks shard placement relevance before propagating to Public mode peers",
     # Intelligence loop (H1-H7)
     "Intelligence feature enabled by default — ngauge bridge compiles and runs in production",
-    "Metrics ingestion wired — handle_metrics_connection feeds frames into ngauge MetricsIngestionPipeline (no longer discarded)",
-    "NGaugeBridge periodic feed — SwarmDemandTracker → SwarmAnalytics every 10s via tokio task",
-    "Propagation weight feed — RoutingIntelligence → TensorWeightModifier → PropagationWeight every 15s",
-    "Replication trigger — ReplicationTrigger.check() against live SwarmAnalytics, signals logged with urgency > 0.5",
     "intelligence.stats IPC endpoint — queryable metrics (shard_count, peer_count, uptime)",
     "10-50 node simulation harness — 9 integration tests (asset lifecycle, ngauge feedback, shard loss, byzantine rejection, scaling, dedup, e2e loop)",
     # P2P File Sharing (J1-J7)
@@ -183,17 +160,11 @@ items = [
     "DirectMessage — Kyber-1024 encrypted body, FALCON-1024 signed, threading via reply_to, Application('Message') asset category",
     "MessageStore — blockchain-backed + YAML persistence, list_for_recipient, history_with_peer, Application asset registration",
     "TAG_DIRECT_MESSAGE (0x06) wire protocol + handler for peer-to-peer message delivery",
-    "Message IPC handlers — message.send, message.inbox, message.history, message.read",
     "Message CLI — hypermesh message send/inbox/history/read subcommands",
     "Messaging integration tests — 8 scenarios (full lifecycle, threading, wrong key, invalid signature, history ordering, persistence)",
     # Core Protocol Completion (L1-L5)
     "Identity distribution — KeyRotationEntry written to blockchain, TAG_KEY_ROTATION (0x08) wire protocol, validate_key_continuity(), split-brain detection",
     "Network DNS resolution — TAG_DNS_RESOLVE/RESPONSE wire protocol, resolve_from_network() queries peers when local fails",
-    "Service IPC handlers — caesar.overview/balance/transactions/rewards/staking, ngauge.capacity/traffic/throttle/routing, trustchain.status/certs/identity/federation, stoq.stats/connections/performance (16 methods, all local crate data via daemon)",
-    "EbpfFeedbackAdapter wires ngauge routing intelligence into kernel-level BPF maps",
-    "Consumer-becomes-provider (R12) closed loop — post-fetch announce broadcast over STOQ, ShardLocationIndex shared between PeerContext and IPC daemon, replication poll (30s) drives extra-replica fetches via TAG_SHARD_FETCH",
-    "NGaugeBridge::check_replication_signals — wraps ReplicationTrigger.check() so blockmatrix swarm coordinator can act on ngauge popularity signals",
-    "NGaugeTrustAdapter — implements trustchain TrustSignalProvider trait, exposes per-peer ngauge signals (activity/capacity/traffic) to FederationManager.add_peer trust gating",
     "DaemonState federation_manager + threshold_coordinator fields — Optional Arcs gate the trustchain.request_cert IPC handler to use threshold signing when federation is opted in",
     # Phase G.1 — cross-network transfer choreography
     "Cross-network transfer wire protocol — TAG_TRANSFER_LOCK/REGISTER_REQ/REGISTER_ACK/RELEASE/ROLLBACK over STOQ, alpha-default inert via Option<Arc<TransferCoordinator>> on DaemonState",
@@ -234,8 +205,6 @@ items = [
     # P5/F6 — eBPF kernel gate + PoS-authenticated shard fetch
     "F6 per-asset shard-fetch authorization — authorize_shard_fetch() binds TAG_SHARD_FETCH to (a) the requester's PoS proof (verify_shard_proof_binding) and (b) the shard belonging to an asset registered on our chain (authorizes_shard); a peer whose proof does not authorize that asset is refused",
     # P6 — NGauge reconciler convergence + TTL cache + version negotiation
-    "Replication convergence actuator — post-fetch set_replica_count(shard, provider_count) so ReplicationTrigger sees needed<=replicas next cycle and STOPS (swarm-emergent convergence), closing the R12 replication loop",
-    "DispersionAdvisor anti-affinity placement — extra-replica fetch consults ngauge::DispersionAdvisor for WHERE the swarm wants replicas instead of always taking candidates[0]",
     "TTL shard-location cache — provider records age like dns::cache (DEFAULT_PROVIDER_TTL 300s, is_expired sweep); expired providers are not handed out as fetch sources",
     "STOQ protocol-version negotiation — handshake carries protocol_version, major mismatch rejected BEFORE trust is granted, old peers without the field still accepted (serde default)",
     "Orphan-buffer bound — MAX_ORPHANS + 120s TTL sweep on the buffer-then-link path prevents distinct-prev-hash orphan floods from exhausting memory",
@@ -248,8 +217,6 @@ items = [
     "Unified seed-on-fetch — client-assembly and IPC fetch paths share ONE become-provider seeder; a fetched shard is re-announced only AFTER the BLAKE3 content-validity gate passes (mirror invariant #1)",
     # A3 — share.send wire delivery
     "share.send wire delivery — NetworkManager::send_tagged_to_peer frames [TAG_SHARE_INVITE]++invite_wire to the recipient over STOQ; receiver inbox + share.accept round-trip complete; delivered flag + graceful created_undelivered on failure",
-    # A4 / A4-CORRECT — eBPF PoS substrate + peer-auth→kernel mirror
-    "Peer-auth→kernel mirror hook — mirror_peer_auth_to_kernel() calls set_peer_pos_validated(peer_ipv6, ALG_FALCON_1024) on every completed bilateral handshake, keying the kernel eBPF PoS-peer allowlist on the SAME peers userspace trusts (P5 unification / A4)",
     # A4-MIRROR (#33) — per-shard mirror invariant on every live path
     "Live re-announce gate — seed_fetched_shard → reannounce_authorized → blockchain.authorizes_shard: a fetched shard is only re-announced when it is content-bound on THIS node's chain; the ungated ClientAssembler seeder is doc-guarded as unwired-to-production",
     "Per-shard MIRROR INVARIANT complete on every live path — content-valid (BLAKE3) on every RECEIVE + signed-to-content (authorizes_shard) on every SERVE / RE-ANNOUNCE / BLOCK-ACCEPT",
@@ -263,6 +230,20 @@ items = [
 
 [features.in_development]
 items = [
+    # Reconciled against full-system audit 2026-07-30 (moved out of [working] — built but not on the live path)
+    "Network sync — block propagation works PUSH-only to startup-injected peers; late/accepted peers never receive blocks (W2-92 duplicate connection registry) and cross-genesis convergence is NOT achievable on the shipped accept path (W1-1 adopt_genesis test-only); demote of prior 'Network sync MVP / cross-genesis insertion' claim",
+    "Block-fetch / reflector sync-pull — TransportSyncDriver + SyncRequest→BlockFetchRequest exist but dial an unauthenticated CONN_TYPE_PEER_MESSAGE connection whose messages the receiver drops (W2-91/W2-26); run_sync_round returns zero blocks, catch-up sync inert",
+    "Catch-up sync completeness — SyncManager flips to Synchronized after every round regardless of remaining lag (W1-2); a lagging node cannot reliably converge",
+    "Streaming segment pipeline (R13) — segment compress/encrypt/shard, Zstd content-type auto-detect, per-segment Kyber-1024 HKDF keys, random-access byte range, async streaming I/O: fully built + tested but DORMANT; the live store/fetch path uses the whole-blob AssetPipeline (W2-52/W2-73), so R13 bounded-memory is not enforced live",
+    "Metrics → ngauge pipeline — MetricsReporter emits and handle_metrics_connection ingests, but wire frames never deserialize into ngauge::MetricsFrame (NodeId hex vs [u8;32], W2-31); ingestion is starved so downstream routing/trending has no data source",
+    "Intelligence feedback loops — NGauge bridge periodic feed (10s), propagation-weight feed (15s), RoutingAdvisor/BlockPropagator weighting run but compute from a fresh, never-fed RoutingIntelligence (permanently neutral, W1-46/W1-49); the 10s feed re-ingests the full cumulative demand snapshot so signals inflate with uptime not demand (W1-35/W1-47)",
+    "Replication R12 loop — consumer-becomes-provider announce + 30s replication poll run, but the actuator discards fetched replica bytes and registers phantom providership (W1-34), and DispersionAdvisor anti-affinity is a live no-op (fresh advisor per poll, register_replica never fed, W1-37/W2-25); loop is NOT closed/convergent on the shipped binary",
+    "SpatialBucketAssigner — built but dead in production; Public-mode block sync never runs spatial hash-bucket filtering (W1-41)",
+    "EbpfFeedbackAdapter / peer-auth→kernel mirror — set_routing_rule/set_privacy_tier + mirror_peer_auth_to_kernel write to a HyperMeshEbpf instance that never attaches XDP, while stoq's attached instance never receives validations (W2-93); kernel PoS-peer gating admits no authenticated peer live",
+    "NGaugeTrustAdapter → TrustChain federation gating — TrustSignalProvider impl exists but is unmounted; peers admitted with no behavioral gating (W2-32)",
+    "Service IPC relay (caesar/trustchain/ngauge/catalog subcommands) — 15 CLI-dispatched IPC methods are not registered by the daemon and return method-not-found on a running node (W2-75/W1-50); only local-crate stoq/ngauge core methods resolve",
+    "message.* IPC handlers — send returns false 'created' with no wire send (receive-half only), inbox/history/read always empty against the live PeerContext MessageStore (W2-76)",
+    "IPv6 asset addressing (AssetAddress) — type is shaped correctly but fully decorative on live paths (no consumer; shards keyed by bare BLAKE3 ContentHash) and its 4-bit shard nibble cannot encode adaptive RS counts up to 112 (W2-56)",
     # Cross-network asset transfer lifecycle — G.1+G.2+I.1 landed (full choreography, chain-scan recovery, ack-routing, e2e + crash-recovery tests, daemon STOQ TransferTransport wrapper). Lock→Transfer→Unlock e2e integration with cross-chain receipt validation in Phase J.
     "Cross-network asset transfers — production StoqTransferTransport landed in Phase I.1; full daemon opt-in (DaemonState plumbing + IPC config to enable cross-network mode) scoped to Phase J",
     # Per-asset chain (S3.x) — ON BRANCH s3-asset-chain, NOT merged to main
@@ -281,4 +262,20 @@ items = [
 items = [
     "MFA identity Tier 3 — recovery execution (passphrase-based key recovery, threshold peer attestation k-of-n, Shamir key backup distribution) (§6.2.3)",
     "Browser namespace — Gateway bridges HTTP/3 to HyperMesh DNS namespace (http://persist → dashboard)",
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Received-block storage_pointer + registration + mirror_seal binding (CRITICAL W1-0) — these ride OUTSIDE the block hash and FALCON envelope, so any gossip relay can rewrite shard placements / network_scope / owners in transit; must be committed inside the signed envelope",
+    "proof_hash canonical-byte encoding (W1-4) — proof_hash and the FALCON envelope are defined over non-canonical serde_json, so any StateProof schema change invalidates every previously-signed block cross-version (blocks rolling upgrades / roadmap J)",
+    "Network-scope convergence model = per-asset (adopt_genesis retired) — cross-genesis block-spine sync is not achievable; genesis-adoption protocol removed from working (W1-1/W2-3), status must stop claiming it",
+    "Placement PoS-eligibility gate (W2-39/W2-51) — the live store/placement path is a hardcoded allow-all stub (DefaultStateAuthenticator 'Testing mode allows all'); WHO/authorization is unenforced, no on-chain AuthorizationSet consulted",
+    "Per-network shard isolation (cluster E) — DefaultIsolationManager/MultiNetworkRegistry were unmounted and the network/isolation, network/trust, network/multi_network.rs, dns/popularity.rs islands were DELETED on this branch; a single live per-network shard-serve gate keyed on NetworkId is not yet mounted (task #59 'Mount IsolationManager' was reverted by de-worlds)",
+    "Auth-gate ungated wire tags (W2-11/W1-30) — TAG_SHARD_ANNOUNCE/TAG_SHARD_LOCATE and state-mutating tags reach unbounded stores over an unauthenticated CONN_TYPE_PEER_MESSAGE path; index poisoning + provider-topology leakage",
+    "Bounded network-fed maps (W1-6/W1-31/W1-36) — BlockPropagator.seen_blocks, SwarmDemandTracker demand map, and swarm_analytics consumer_positions grow without bound (substrate-memory rule: evict, never grow)",
+    "ShardLocationIndex population on store/distribute (W1-39) — after publish no node's index knows any provider; directed fetch degrades to blind peer scans",
+    "R4 Anonymous HashOnly dedup selection (W1-40) — built + tested but never selected live; an Anonymous node still announces provider/location, defeating the privacy scope",
+    ">64KB shard/block transfer (W2-97) — stoq Stream::receive read_to_end 64KB cap silently fails any adaptive-RS shard or block batch over 64KB",
+    "Received-block structural size rule + ChainValidator on the received path (W1-3) — received blocks bypass ChainValidator and max_block_size is decorative (Block::size() is a fixed-formula estimate)",
+    "Remove HYPERMESH_ACCEPT_UNSIGNED_BLOCKS release lever (W1-13/W2-48) — the one-release unsigned-block migration flag still ships and is load-bearing in network_sync_e2e + scaling_integration tests",
+    "Dead/island removal (cluster L) — intelligence/ (~4000L duplicating ngauge), verification/ (R12 commitment + PoSPing dormant), genesis-auth MFA (~770L over placeholder keypair), genesis_assessor, errors.rs, ChainStateManager, api/, transport/, cli/, transfer/, and the ~23K-line orchestration+container+integration+security+performance+platform island are unreachable from the daemon",
+    "gateway.transfer IPC (W2-77) — constructs a per-request GatewayManager; transfers evaporate, status/list permanently empty, reports false 'pending'",
+    "--mode light|thin (W2-89) — accepted and silently ignored; runs a full node with no warning",
 ]

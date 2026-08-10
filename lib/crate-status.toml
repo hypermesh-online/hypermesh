@@ -43,8 +43,13 @@ items = [
 items = [
     # Lib types are defined but some are not yet exercised by real implementations
     "State proof depth — lib defines the canonical types and structural validity; generation/crypto lives in trustchain via the StateProofOps extension trait, and per-proof validity is still structural (identity binding present, timestamp bounds), not threshold-verifying",
-    "BlockchainScope::Network — blockmatrix implements Network scope sync MVP (block propagation, gossip, cross-genesis insertion, E2E two-node over QUIC)",
+    "BlockchainScope::Network — blockmatrix has PUSH block-propagation between genesis-sharing peers, but cross-genesis convergence is NOT achievable on the shipped accept path (adopt_genesis test-only, W1-1); target convergence model is per-asset, not a shared block-spine",
 ]
 
 [features.planned]
-items = []
+items = [
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Remove ProofValidationResult::confidence() float from the canonical proof type (W2-50) — banned 'confidence' graded-trust vocabulary on the single-source-of-truth proof module",
+    "Canonical-byte encoding for StateProof/proof_hash (W1-4) — proof_hash + FALCON envelope are computed over non-canonical serde_json, so any StateProof field change invalidates all previously-signed blocks cross-version",
+    "Rename spine_point/spine_seq wire fields on the signed MirrorAttestation type (W2-0) — 'spine' is non-authoritative; the value is a lineage_id, and the name is frozen into cross-version JSON wire compat",
+]
