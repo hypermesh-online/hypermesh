@@ -21,7 +21,7 @@ use ngauge::{
     PathPolicyRecommendation, ReplicationConfig, ReplicationSignal, ReplicationTrigger,
     RoutingAdvisor, RoutingIntelligence, SwarmAnalytics, TensorWeightModifier,
 };
-use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
+use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId};
 
 use crate::blockchain::propagation::PropagationWeight;
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -38,12 +38,14 @@ pub async fn feed_swarm_analytics(
     tracker: &SwarmDemandTracker,
     analytics: &mut SwarmAnalytics,
     our_position: MatrixPosition,
+    network_id: NetworkId,
 ) {
-    let snapshot = tracker.snapshot().await;
+    let snapshot = tracker.snapshot_in_network(network_id).await;
     for (shard_id, entry) in &snapshot {
         for requester_id in &entry.requester_ids {
             let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
-            analytics.record_request(
+            analytics.record_request_in_network(
+                network_id,
                 *shard_id,
                 consumer_id,
                 our_position,
@@ -107,20 +109,26 @@ pub struct NGaugeBridge {
     tracker: Arc<SwarmDemandTracker>,
     analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
     position: MatrixPosition,
+    /// The network this bridge attributes demand + replication checks to. Under
+    /// a single joined network this is that one canonical [`NetworkId`], so the
+    /// bridge feeds/reads the same key the replication loops use.
+    network_id: NetworkId,
 }
 
 #[cfg(feature = "intelligence")]
 impl NGaugeBridge {
-    /// Create a new bridge.
+    /// Create a new bridge scoped to `network_id`.
     pub fn new(
         tracker: Arc<SwarmDemandTracker>,
         analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
         position: MatrixPosition,
+        network_id: NetworkId,
     ) -> Self {
         Self {
             tracker,
             analytics,
             position,
+            network_id,
         }
     }
 
@@ -136,7 +144,8 @@ impl NGaugeBridge {
                     .analytics
                     .lock()
                     .expect("ngauge bridge: analytics lock poisoned");
-                feed_swarm_analytics(&self.tracker, &mut analytics, self.position).await;
+                feed_swarm_analytics(&self.tracker, &mut analytics, self.position, self.network_id)
+                    .await;
             }
             tokio::time::sleep(interval).await;
         }
@@ -164,7 +173,7 @@ impl NGaugeBridge {
     ) -> Vec<ReplicationSignal> {
         let trigger = ReplicationTrigger::new(config);
         match self.analytics.lock() {
-            Ok(guard) => trigger.check(&guard),
+            Ok(guard) => trigger.check_in_network(&guard, self.network_id),
             Err(e) => {
                 tracing::warn!("ngauge bridge: analytics lock poisoned: {e}");
                 Vec::new()
@@ -272,7 +281,7 @@ mod tests {
             z: 0.0,
         };
 
-        feed_swarm_analytics(&tracker, &mut analytics, pos).await;
+        feed_swarm_analytics(&tracker, &mut analytics, pos, hypermesh_lib::DEFAULT_NETWORK).await;
 
         let pop = analytics.get_popularity(&hash);
         assert!(pop.is_some(), "shard should have popularity data");

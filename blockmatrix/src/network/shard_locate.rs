@@ -116,8 +116,16 @@ pub async fn resolve_shard_locations(
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // Layer 1: live mirrors (freshest-first).
+    //
+    // This resolver has no live consumer yet (the live fetch paths carry their
+    // own inline resolution); its network-aware consumer is a later dedup step.
+    // Until then it reads the default network explicitly rather than through a
+    // silent flattening wrapper, so the flattening is visible at the callsite.
     if let Some(index) = live_index {
-        for node_id in index.get_providers(content_hash).await {
+        for node_id in index
+            .get_providers_in_network(hypermesh_lib::DEFAULT_NETWORK, content_hash)
+            .await
+        {
             if seen.insert(node_id.clone()) {
                 out.push(ResolvedProvider {
                     node_id,

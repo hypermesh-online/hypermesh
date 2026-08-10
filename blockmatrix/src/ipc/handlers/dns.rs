@@ -252,6 +252,7 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "dns-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),

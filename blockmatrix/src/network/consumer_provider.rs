@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{ContentHash, NetworkId};
 use tracing::{debug, info, warn};
 
 use crate::network::shard_dedup::DedupPolicy;
@@ -42,19 +42,26 @@ pub struct ConsumerProviderManager {
     shard_store: Arc<ShardStore>,
     shard_location_index: Arc<ShardLocationIndex>,
     local_node_id: String,
+    /// The network this node's fetched shards belong to. Provider registration
+    /// is keyed on this network — the same canonical NetworkId the shard-announce
+    /// handler and replication loops use — so consumer-becomes-provider records
+    /// never silently flatten to the default network.
+    network_id: NetworkId,
 }
 
 impl ConsumerProviderManager {
-    /// Create a new consumer-provider manager.
+    /// Create a new consumer-provider manager scoped to `network_id`.
     pub fn new(
         shard_store: Arc<ShardStore>,
         shard_location_index: Arc<ShardLocationIndex>,
         local_node_id: String,
+        network_id: NetworkId,
     ) -> Self {
         Self {
             shard_store,
             shard_location_index,
             local_node_id,
+            network_id,
         }
     }
 
@@ -126,9 +133,14 @@ impl ConsumerProviderManager {
             );
             None
         } else {
-            // Register ourselves as a provider for all shards
+            // Register ourselves as a provider for all shards, in this node's
+            // network.
             self.shard_location_index
-                .register_provider(&self.local_node_id, &announced_hashes)
+                .register_provider_in_network(
+                    self.network_id,
+                    &self.local_node_id,
+                    &announced_hashes,
+                )
                 .await;
 
             // Build announcement payload
@@ -279,6 +291,7 @@ mod tests {
             Arc::new(ShardStore::new()),
             Arc::new(ShardLocationIndex::new()),
             "local-node-001".to_string(),
+            hypermesh_lib::DEFAULT_NETWORK,
         )
     }
 

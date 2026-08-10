@@ -557,6 +557,7 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: TEST_NODE_ID.into(),
+            network_id: "trustnet-test".into(),
             data_dir,
             privacy_mode: "Private".into(),
             started_at: Instant::now(),

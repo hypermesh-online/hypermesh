@@ -429,6 +429,7 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: base.node_id.clone(),
+            network_id: base.network_id.clone(),
             data_dir: base.data_dir.clone(),
             privacy_mode: base.privacy_mode.clone(),
             started_at: base.started_at,

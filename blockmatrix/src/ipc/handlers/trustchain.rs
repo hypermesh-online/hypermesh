@@ -654,6 +654,7 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: node_id.to_string(),
+            network_id: "trustnet-test".to_string(),
             data_dir: data_dir.to_path_buf(),
             privacy_mode: "Private".into(),
             started_at: std::time::Instant::now(),

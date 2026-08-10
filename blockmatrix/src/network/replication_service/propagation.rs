@@ -33,6 +33,7 @@ pub(super) fn spawn(svc: &ReplicationService) {
     let h4_network = svc.network.clone();
     let h4_coord = svc.coord;
     let h4_ebpf = ebpf_for_feedback.clone();
+    let h5_sync_manager = svc.sync_manager.clone();
     tokio::spawn(async move {
         // Construct a RoutingIntelFeed once and reuse it across iterations
         // so the eBPF feedback adapter remains attached.
@@ -90,29 +91,34 @@ pub(super) fn spawn(svc: &ReplicationService) {
                 }
             }
 
-            // --- H5: Check replication triggers ---
-            match h4_analytics.lock() {
-                Ok(analytics) => {
-                    let trigger = ngauge::ReplicationTrigger::new(
-                        ngauge::ReplicationConfig::default(),
-                    );
-                    // check the single implicit network.
-                    let signals =
-                        trigger.check_in_network(&analytics, hypermesh_lib::DEFAULT_NETWORK);
-                    for signal in &signals {
-                        if signal.urgency > 0.5 {
-                            info!(
-                                "Replication signal: shard {} needs {} more replicas (urgency: {:.2}, rate: {})",
-                                hex::encode(&signal.shard_id.0[..4]),
-                                signal.suggested_count,
-                                signal.urgency,
-                                signal.current_request_rate,
-                            );
+            // --- H5: Check replication triggers, per joined network ---
+            // Snapshot joined networks (async) before taking the std analytics
+            // lock — the analytics guard is not Send across await.
+            let networks = super::joined_networks(&h5_sync_manager).await;
+            if !networks.is_empty() {
+                match h4_analytics.lock() {
+                    Ok(analytics) => {
+                        let trigger = ngauge::ReplicationTrigger::new(
+                            ngauge::ReplicationConfig::default(),
+                        );
+                        for network in &networks {
+                            let signals = trigger.check_in_network(&analytics, *network);
+                            for signal in &signals {
+                                if signal.urgency > 0.5 {
+                                    info!(
+                                        "Replication signal: shard {} needs {} more replicas (urgency: {:.2}, rate: {})",
+                                        hex::encode(&signal.shard_id.0[..4]),
+                                        signal.suggested_count,
+                                        signal.urgency,
+                                        signal.current_request_rate,
+                                    );
+                                }
+                            }
                         }
                     }
-                }
-                Err(e) => {
-                    debug!("Failed to lock analytics for replication check: {e}");
+                    Err(e) => {
+                        debug!("Failed to lock analytics for replication check: {e}");
+                    }
                 }
             }
         }

@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
-use hypermesh_lib::{ContentHash, NetworkId, DEFAULT_NETWORK};
+use hypermesh_lib::{ContentHash, NetworkId};
 
 /// Default provider-record lifetime (P6). Mirrors the DNS TTL cache
 /// (`dns/cache.rs`): a provider learned via `TAG_SHARD_ANNOUNCE` is trusted
@@ -98,14 +98,6 @@ impl ShardLocationIndex {
         }
     }
 
-    /// Register a node as a provider of the given shards in [`DEFAULT_NETWORK`],
-    /// stamping (or refreshing) a TTL on each record. Re-registration from a
-    /// fresh `TAG_SHARD_ANNOUNCE` extends the record's lifetime rather than
-    /// resetting `registered_at`.
-    pub async fn register_provider(&self, node_id: &str, shard_ids: &[ContentHash]) {
-        self.register_provider_with_ttl(node_id, shard_ids, self.ttl).await;
-    }
-
     /// Register a node as a provider within a specific network.
     pub async fn register_provider_in_network(
         &self,
@@ -114,18 +106,6 @@ impl ShardLocationIndex {
         shard_ids: &[ContentHash],
     ) {
         self.register_provider_in_network_with_ttl(network_id, node_id, shard_ids, self.ttl)
-            .await;
-    }
-
-    /// Register with an explicit TTL in [`DEFAULT_NETWORK`] (used by tests to force
-    /// fast expiry).
-    pub async fn register_provider_with_ttl(
-        &self,
-        node_id: &str,
-        shard_ids: &[ContentHash],
-        ttl: Duration,
-    ) {
-        self.register_provider_in_network_with_ttl(DEFAULT_NETWORK, node_id, shard_ids, ttl)
             .await;
     }
 
@@ -157,18 +137,13 @@ impl ShardLocationIndex {
         locs.retain(|_, providers| !providers.is_empty());
     }
 
-    /// Get all known, non-expired providers for a shard, freshest-first.
+    /// Get all known, non-expired providers for a shard within a specific network,
+    /// freshest-first.
     ///
     /// Expired location hints are filtered out (but not reclaimed — call
     /// [`cleanup_expired`] on a cadence to free memory). Ordering is by record
     /// age (most-recently registered/refreshed first) so callers that take the
     /// head of the list prefer the freshest announcement.
-    pub async fn get_providers(&self, shard_id: &ContentHash) -> Vec<String> {
-        self.get_providers_in_network(DEFAULT_NETWORK, shard_id).await
-    }
-
-    /// Get all known, non-expired providers for a shard within a specific network
-    ///, freshest-first.
     pub async fn get_providers_in_network(
         &self,
         network_id: NetworkId,
@@ -227,6 +202,40 @@ impl ShardLocationIndex {
 impl Default for ShardLocationIndex {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Test-only ergonomic wrappers keyed on [`hypermesh_lib::DEFAULT_NETWORK`].
+///
+/// Production code MUST name a shard's network explicitly via the `*_in_network`
+/// methods — a shard belongs to its network and can never silently flatten to
+/// the default. These `#[cfg(test)]` helpers keep the large single-network test
+/// suite terse without reintroducing a production flattening path.
+#[cfg(test)]
+impl ShardLocationIndex {
+    pub(crate) async fn register_provider(&self, node_id: &str, shard_ids: &[ContentHash]) {
+        self.register_provider_in_network(hypermesh_lib::DEFAULT_NETWORK, node_id, shard_ids)
+            .await;
+    }
+
+    pub(crate) async fn register_provider_with_ttl(
+        &self,
+        node_id: &str,
+        shard_ids: &[ContentHash],
+        ttl: Duration,
+    ) {
+        self.register_provider_in_network_with_ttl(
+            hypermesh_lib::DEFAULT_NETWORK,
+            node_id,
+            shard_ids,
+            ttl,
+        )
+        .await;
+    }
+
+    pub(crate) async fn get_providers(&self, shard_id: &ContentHash) -> Vec<String> {
+        self.get_providers_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id)
+            .await
     }
 }
 

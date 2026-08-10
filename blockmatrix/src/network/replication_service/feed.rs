@@ -6,8 +6,12 @@
 //!
 //! Every 10 seconds, snapshot the live per-shard demand and feed it into
 //! `SwarmAnalytics`, recording each request at a proximity-real coordinate
-//! (P3) in the single implicit network (`DEFAULT_NETWORK`, P2). Byte-identical to
-//! the loop previously inline in `start_network`.
+//! (P3) under the network the demand belongs to. The loop iterates the node's
+//! joined networks (SyncManager memberships) and feeds each network's demand
+//! into `SwarmAnalytics` under that same network, so demand never flattens to a
+//! default. Under a single joined network this records into exactly the one
+//! canonical `NetworkId` the poll/propagation loops read — byte-identical to the
+//! pre-network path.
 
 use tracing::debug;
 
@@ -27,12 +31,38 @@ pub(super) fn spawn(svc: &ReplicationService) {
     let feed_analytics = svc.ngauge_analytics.clone();
     let feed_position = bridge_position;
     let feed_network = svc.network.clone();
+    let feed_sync_manager = svc.sync_manager.clone();
     tokio::spawn(async move {
         let interval = std::time::Duration::from_secs(10);
         loop {
             tokio::time::sleep(interval).await;
-            // Snapshot demand data (async lock).
-            let snapshot = feed_tracker.snapshot().await;
+
+            // The networks this node has joined — demand is fed per-network.
+            let networks = super::joined_networks(&feed_sync_manager).await;
+            if networks.is_empty() {
+                continue;
+            }
+
+            // Snapshot each joined network's demand (async lock) BEFORE taking
+            // the std::sync analytics lock — the analytics guard is not Send
+            // across await, so all awaits happen first.
+            let mut per_network: Vec<(
+                hypermesh_lib::NetworkId,
+                std::collections::HashMap<
+                    hypermesh_lib::ContentHash,
+                    crate::network::DemandEntry,
+                >,
+            )> = Vec::new();
+            for network in &networks {
+                let snapshot = feed_tracker.snapshot_in_network(*network).await;
+                if !snapshot.is_empty() {
+                    per_network.push((*network, snapshot));
+                }
+            }
+            if per_network.is_empty() {
+                continue;
+            }
+
             // P3: build a proximity locality provider from the live peer
             // RTT (QUIC-measured), so demand is recorded at a
             // proximity-real coordinate instead of this node's random
@@ -45,32 +75,33 @@ pub(super) fn spawn(svc: &ReplicationService) {
             // Feed into analytics (sync lock, no await while held).
             match feed_analytics.lock() {
                 Ok(mut analytics) => {
-                    for (shard_id, entry) in &snapshot {
-                        for requester_id in &entry.requester_ids {
-                            let consumer_id = hypermesh_lib::NodeId::from_public_key(
-                                requester_id.as_bytes(),
-                            );
-                            // P3: proximity-derived placement coordinate for
-                            // the requesting peer; fall back to our own
-                            // coordinate when unmeasured (cold start).
-                            let consumer_pos = locality
-                                .coordinate_for(requester_id)
-                                .unwrap_or(feed_position);
-                            // the single default network (DEFAULT_NETWORK).
-                            analytics.record_request_in_network(
-                                hypermesh_lib::DEFAULT_NETWORK,
-                                *shard_id,
-                                consumer_id,
-                                consumer_pos,
-                                entry.last_request_us,
-                            );
+                    let mut fed = 0usize;
+                    for (network, snapshot) in &per_network {
+                        for (shard_id, entry) in snapshot {
+                            for requester_id in &entry.requester_ids {
+                                let consumer_id = hypermesh_lib::NodeId::from_public_key(
+                                    requester_id.as_bytes(),
+                                );
+                                // P3: proximity-derived placement coordinate for
+                                // the requesting peer; fall back to our own
+                                // coordinate when unmeasured (cold start).
+                                let consumer_pos = locality
+                                    .coordinate_for(requester_id)
+                                    .unwrap_or(feed_position);
+                                // Record under the shard's own network.
+                                analytics.record_request_in_network(
+                                    *network,
+                                    *shard_id,
+                                    consumer_id,
+                                    consumer_pos,
+                                    entry.last_request_us,
+                                );
+                            }
                         }
+                        fed += snapshot.len();
                     }
-                    if !snapshot.is_empty() {
-                        debug!(
-                            "Fed {} shard demand entries into SwarmAnalytics",
-                            snapshot.len(),
-                        );
+                    if fed > 0 {
+                        debug!("Fed {fed} shard demand entries into SwarmAnalytics");
                     }
                 }
                 Err(e) => {

@@ -30,7 +30,7 @@ use blockmatrix::network::swarm_provider::ShardLocationIndex;
 use blockmatrix::network::SwarmDemandTracker;
 use blockmatrix::intelligence::ngauge_bridge::NGaugeBridge;
 use ngauge::SwarmAnalytics;
-use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
+use hypermesh_lib::{ContentHash, MatrixPosition, NodeId, DEFAULT_NETWORK};
 
 fn test_hash(seed: u8) -> ContentHash {
     ContentHash([seed; 32])
@@ -67,6 +67,7 @@ async fn fetched_shards_are_announced_and_indexed_on_peer() {
         Arc::new(ShardStore::new()),
         node_a_index.clone(),
         node_a_id.clone(),
+        DEFAULT_NETWORK,
     );
 
     let h1 = test_hash(0xA1);
@@ -84,7 +85,7 @@ async fn fetched_shards_are_announced_and_indexed_on_peer() {
         .expect("post-fetch announce payload must be present for Full policy");
     assert!(
         node_a_index
-            .get_providers(&h1)
+            .get_providers_in_network(DEFAULT_NETWORK, &h1)
             .await
             .contains(&node_a_id),
         "node A must be registered as provider for h1 after fetch",
@@ -97,13 +98,13 @@ async fn fetched_shards_are_announced_and_indexed_on_peer() {
     let parsed = parse_announce_payload(&payload);
     assert_eq!(parsed.len(), 2, "two shards announced");
     node_b_index
-        .register_provider(&node_a_id, &parsed)
+        .register_provider_in_network(DEFAULT_NETWORK, &node_a_id, &parsed)
         .await;
 
     // CRITICAL ASSERTION: from B's perspective, A is now a known provider
     // for both shards — this is the visibility property R12 requires.
-    let providers_h1 = node_b_index.get_providers(&h1).await;
-    let providers_h2 = node_b_index.get_providers(&h2).await;
+    let providers_h1 = node_b_index.get_providers_in_network(DEFAULT_NETWORK, &h1).await;
+    let providers_h2 = node_b_index.get_providers_in_network(DEFAULT_NETWORK, &h2).await;
     assert!(
         providers_h1.contains(&node_a_id),
         "node B must learn A as provider for h1, got {:?}",
@@ -129,6 +130,7 @@ async fn anonymous_policy_skips_announce_and_provider_registration() {
         Arc::new(ShardStore::new()),
         index.clone(),
         node_a_id.clone(),
+        DEFAULT_NETWORK,
     );
 
     let h = test_hash(0xBB);
@@ -144,7 +146,7 @@ async fn anonymous_policy_skips_announce_and_provider_registration() {
         "Anonymous (HashOnly) policy must NOT emit announce payload",
     );
     assert!(
-        index.get_providers(&h).await.is_empty(),
+        index.get_providers_in_network(DEFAULT_NETWORK, &h).await.is_empty(),
         "Anonymous (HashOnly) policy must NOT register provider locally",
     );
 }
@@ -170,6 +172,7 @@ async fn replication_signals_fire_under_synthetic_demand() {
         tracker.clone(),
         analytics.clone(),
         MatrixPosition { x: 0.0, y: 0.0, z: 0.0 },
+        DEFAULT_NETWORK,
     );
 
     // Default ReplicationConfig threshold = 100 requests per replica.
@@ -177,7 +180,7 @@ async fn replication_signals_fire_under_synthetic_demand() {
     let hot_shard = test_hash(0xC0);
     for i in 0..150 {
         tracker
-            .record_fetch(hot_shard, &format!("consumer-{i}"))
+            .record_fetch_in_network(DEFAULT_NETWORK, hot_shard, &format!("consumer-{i}"))
             .await;
     }
 
@@ -232,6 +235,7 @@ async fn end_to_end_swarm_closure_signal_flow() {
         Arc::new(ShardStore::new()),
         a_index.clone(),
         node_a_id.clone(),
+        DEFAULT_NETWORK,
     );
     let h = test_hash(0xE2);
     let result = a_manager
@@ -244,10 +248,12 @@ async fn end_to_end_swarm_closure_signal_flow() {
     // --- B side: receive announce ---
     let b_index = Arc::new(ShardLocationIndex::new());
     let parsed = parse_announce_payload(&payload);
-    b_index.register_provider(&node_a_id, &parsed).await;
+    b_index
+        .register_provider_in_network(DEFAULT_NETWORK, &node_a_id, &parsed)
+        .await;
     assert!(
         b_index
-            .get_providers(&h)
+            .get_providers_in_network(DEFAULT_NETWORK, &h)
             .await
             .contains(&node_a_id),
         "B's index must show A as provider after announce",
@@ -260,9 +266,10 @@ async fn end_to_end_swarm_closure_signal_flow() {
         tracker.clone(),
         analytics.clone(),
         MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+        DEFAULT_NETWORK,
     );
     for i in 0..120 {
-        tracker.record_fetch(h, &format!("c-{i}")).await;
+        tracker.record_fetch_in_network(DEFAULT_NETWORK, h, &format!("c-{i}")).await;
     }
     {
         let snapshot = tracker.snapshot().await;
@@ -287,7 +294,7 @@ async fn end_to_end_swarm_closure_signal_flow() {
     // there because of the announce broadcast — and issue TAG_SHARD_FETCH
     // to A to pull an extra replica. We assert the inputs that drive that
     // decision are present.
-    let providers = b_index.get_providers(&h).await;
+    let providers = b_index.get_providers_in_network(DEFAULT_NETWORK, &h).await;
     assert!(!providers.is_empty(), "B has at least one provider");
     assert!(hot.urgency > 0.0, "signal urgency drives the fetch decision");
 }

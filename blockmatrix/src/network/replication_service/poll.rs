@@ -24,6 +24,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     let rp_index = svc.shard_location_index.clone();
     let rp_transport = svc.shard_transport.clone();
     let rp_network = svc.network.clone();
+    let rp_sync_manager = svc.sync_manager.clone();
     let rp_local_node_id = svc.node_id.clone();
 
     tokio::spawn(async move {
@@ -45,20 +46,9 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                 );
             }
 
-            let signals = match rp_analytics.lock() {
-                Ok(guard) => ngauge::ReplicationTrigger::new(
-                    ngauge::ReplicationConfig::default(),
-                )
-                // check the single implicit network.
-                .check_in_network(&guard, hypermesh_lib::DEFAULT_NETWORK),
-                Err(e) => {
-                    debug!(
-                        "replication-poll: analytics lock poisoned: {e}"
-                    );
-                    continue;
-                }
-            };
-            if signals.is_empty() {
+            // The networks this node has joined — replication is per-network.
+            let networks = super::joined_networks(&rp_sync_manager).await;
+            if networks.is_empty() {
                 continue;
             }
 
@@ -92,98 +82,109 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                 })
                 .collect();
 
-            for signal in signals.iter().filter(|s| s.urgency > 0.5) {
-                // Find peers known to provide this shard in the default network.
-                let providers = rp_index
-                    .get_providers_in_network(
-                        hypermesh_lib::DEFAULT_NETWORK,
-                        &signal.shard_id,
+            for network in &networks {
+                let signals = match rp_analytics.lock() {
+                    Ok(guard) => ngauge::ReplicationTrigger::new(
+                        ngauge::ReplicationConfig::default(),
                     )
-                    .await;
-                // Skip if we are the only known provider (cannot
-                // self-replicate) or no providers at all.
-                let candidates: Vec<String> = providers
-                    .iter()
-                    .filter(|id| id.as_str() != rp_local_node_id.as_str())
-                    .cloned()
-                    .collect();
-                if candidates.is_empty() {
-                    debug!(
-                        "replication-poll: no remote providers for shard {} yet",
-                        hex::encode(&signal.shard_id.0[..4])
-                    );
+                    .check_in_network(&guard, *network),
+                    Err(e) => {
+                        debug!("replication-poll: analytics lock poisoned: {e}");
+                        continue;
+                    }
+                };
+                if signals.is_empty() {
                     continue;
                 }
 
-                // P6 (step 3): dispersion-aware source selection.
-                // Ask the DispersionAdvisor where the swarm WANTS new
-                // replicas (k-means over consumer demand, anti-affinity
-                // to existing provider positions), then pick the
-                // candidate provider nearest a recommended placement.
-                // This spreads fetches toward under-served demand
-                // clusters instead of always hammering candidates[0].
-                let target_node_id = select_dispersion_source(
-                    &rp_analytics,
-                    &signal.shard_id,
-                    &candidates,
-                    &peer_coords,
-                );
-                let target_id = hypermesh_lib::NodeId::from_public_key(
-                    target_node_id.as_bytes(),
-                );
+                for signal in signals.iter().filter(|s| s.urgency > 0.5) {
+                    // Find peers known to provide this shard in this network.
+                    let providers = rp_index
+                        .get_providers_in_network(*network, &signal.shard_id)
+                        .await;
+                    // Skip if we are the only known provider (cannot
+                    // self-replicate) or no providers at all.
+                    let candidates: Vec<String> = providers
+                        .iter()
+                        .filter(|id| id.as_str() != rp_local_node_id.as_str())
+                        .cloned()
+                        .collect();
+                    if candidates.is_empty() {
+                        debug!(
+                            "replication-poll: no remote providers for shard {} yet",
+                            hex::encode(&signal.shard_id.0[..4])
+                        );
+                        continue;
+                    }
 
-                use crate::network::shard_transport::ShardTransport;
-                match rp_transport
-                    .fetch_shard(&target_id, &signal.shard_id)
-                    .await
-                {
-                    Ok(_data) => {
-                        // P6 (step 2): CLOSE THE FEEDBACK LOOP. The
-                        // local node just became a provider of this
-                        // shard — register it in the shared index so
-                        // the provider count grows, then report that
-                        // count back to SwarmAnalytics via
-                        // set_replica_count. Next cycle
-                        // ReplicationTrigger::check sees
-                        // needed <= replicas and STOPS → convergence.
-                        // Without this hook the replica count stayed 0
-                        // forever and the loop never converged.
-                        rp_index
-                            .register_provider_in_network(
-                                hypermesh_lib::DEFAULT_NETWORK,
-                                &rp_local_node_id,
-                                &[signal.shard_id],
-                            )
-                            .await;
-                        let replica_count = rp_index
-                            .get_providers_in_network(
-                                hypermesh_lib::DEFAULT_NETWORK,
-                                &signal.shard_id,
-                            )
-                            .await
-                            .len()
-                            as u32;
-                        if let Ok(mut guard) = rp_analytics.lock() {
-                            guard.set_replica_count_in_network(
-                                hypermesh_lib::DEFAULT_NETWORK,
-                                signal.shard_id,
+                    // P6 (step 3): dispersion-aware source selection.
+                    // Ask the DispersionAdvisor where the swarm WANTS new
+                    // replicas (k-means over consumer demand, anti-affinity
+                    // to existing provider positions), then pick the
+                    // candidate provider nearest a recommended placement.
+                    // This spreads fetches toward under-served demand
+                    // clusters instead of always hammering candidates[0].
+                    let target_node_id = select_dispersion_source(
+                        &rp_analytics,
+                        *network,
+                        &signal.shard_id,
+                        &candidates,
+                        &peer_coords,
+                    );
+                    let target_id = hypermesh_lib::NodeId::from_public_key(
+                        target_node_id.as_bytes(),
+                    );
+
+                    use crate::network::shard_transport::ShardTransport;
+                    match rp_transport
+                        .fetch_shard(&target_id, &signal.shard_id)
+                        .await
+                    {
+                        Ok(_data) => {
+                            // P6 (step 2): CLOSE THE FEEDBACK LOOP. The
+                            // local node just became a provider of this
+                            // shard — register it in the shared index so
+                            // the provider count grows, then report that
+                            // count back to SwarmAnalytics via
+                            // set_replica_count. Next cycle
+                            // ReplicationTrigger::check sees
+                            // needed <= replicas and STOPS → convergence.
+                            // Without this hook the replica count stayed 0
+                            // forever and the loop never converged.
+                            rp_index
+                                .register_provider_in_network(
+                                    *network,
+                                    &rp_local_node_id,
+                                    &[signal.shard_id],
+                                )
+                                .await;
+                            let replica_count = rp_index
+                                .get_providers_in_network(*network, &signal.shard_id)
+                                .await
+                                .len()
+                                as u32;
+                            if let Ok(mut guard) = rp_analytics.lock() {
+                                guard.set_replica_count_in_network(
+                                    *network,
+                                    signal.shard_id,
+                                    replica_count,
+                                );
+                            }
+                            info!(
+                                "replication-poll: fetched extra replica of {} from {} (urgency {:.2}, replicas now {})",
+                                hex::encode(&signal.shard_id.0[..4]),
+                                &target_node_id[..8.min(target_node_id.len())],
+                                signal.urgency,
                                 replica_count,
                             );
                         }
-                        info!(
-                            "replication-poll: fetched extra replica of {} from {} (urgency {:.2}, replicas now {})",
-                            hex::encode(&signal.shard_id.0[..4]),
-                            &target_node_id[..8.min(target_node_id.len())],
-                            signal.urgency,
-                            replica_count,
-                        );
-                    }
-                    Err(e) => {
-                        debug!(
-                            "replication-poll: fetch from {} failed: {}",
-                            &target_node_id[..8.min(target_node_id.len())],
-                            e,
-                        );
+                        Err(e) => {
+                            debug!(
+                                "replication-poll: fetch from {} failed: {}",
+                                &target_node_id[..8.min(target_node_id.len())],
+                                e,
+                            );
+                        }
                     }
                 }
             }
@@ -208,6 +209,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
 /// [`DispersionAdvisor`]: ngauge::DispersionAdvisor
 fn select_dispersion_source(
     analytics: &std::sync::Mutex<ngauge::SwarmAnalytics>,
+    network: hypermesh_lib::NetworkId,
     shard_id: &hypermesh_lib::ContentHash,
     candidates: &[String],
     peer_coords: &std::collections::HashMap<String, hypermesh_lib::MatrixPosition>,
@@ -218,9 +220,9 @@ fn select_dispersion_source(
     let recommendations = match analytics.lock() {
         Ok(guard) => {
             let advisor = ngauge::DispersionAdvisor::new();
-            // recommend within the single implicit network.
+            // recommend within the shard's own network.
             advisor.recommend_placement_in_network(
-                hypermesh_lib::DEFAULT_NETWORK,
+                network,
                 shard_id,
                 &guard,
                 candidates.len().max(1),

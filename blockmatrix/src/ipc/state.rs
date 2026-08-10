@@ -32,6 +32,12 @@ pub struct DaemonState {
     pub coordinate: MatrixCoordinate,
     /// Unique node identifier derived from the coordinate.
     pub node_id: String,
+    /// The node's network label (the CLI `--network-id`). Converted to a
+    /// canonical [`hypermesh_lib::NetworkId`] via `from_wire_str` wherever the
+    /// daemon keys a network-scoped index (e.g. the shard-fetch live-mirror
+    /// lookup), so IPC reads hit the same network the shard-announce handler and
+    /// replication loops write under.
+    pub network_id: String,
     /// On-disk data directory for this node.
     pub data_dir: PathBuf,
     /// Current privacy mode as a display string.

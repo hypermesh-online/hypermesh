@@ -24,7 +24,10 @@
 
 use std::sync::{Arc, Mutex};
 
+use hypermesh_lib::NetworkId;
+
 use crate::blockchain::propagation::BlockPropagator;
+use crate::blockchain::sync_manager::SyncManager;
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::shard_transport::StoqShardTransport;
@@ -56,6 +59,12 @@ pub struct ReplicationService {
     pub block_propagator: Arc<tokio::sync::Mutex<BlockPropagator>>,
     /// Live network manager — connected-peer/coordinate source.
     pub network: Arc<NetworkManager>,
+    /// Sync manager — the source of the node's joined Network memberships. The
+    /// loops key every `SwarmAnalytics` / `ShardLocationIndex` access on the
+    /// node's joined network(s) rather than a hardcoded default, so writers and
+    /// readers stay consistent. Under a single joined network every access uses
+    /// that one canonical [`NetworkId`] (byte-identical to the pre-network path).
+    pub sync_manager: Arc<tokio::sync::Mutex<SyncManager>>,
     /// Shared provider index (R12) — the E.2 loop reads providers and
     /// registers this node after a successful replica fetch.
     pub shard_location_index: Arc<ShardLocationIndex>,
@@ -79,4 +88,24 @@ impl ReplicationService {
         poll::spawn(&self).await?;
         Ok(())
     }
+}
+
+/// Snapshot the node's joined Network memberships as canonical [`NetworkId`]s.
+///
+/// The loops call this once per tick (locking the sync manager briefly, then
+/// dropping the guard before touching the analytics/index locks — no nested
+/// lock ordering). An empty result means the node has joined no Network chain,
+/// in which case the loops have nothing to replicate; under the normal
+/// single-network bring-up this returns exactly the one network the node joined,
+/// so every index access keys on that one canonical id.
+pub(super) async fn joined_networks(
+    sync_manager: &Arc<tokio::sync::Mutex<SyncManager>>,
+) -> Vec<NetworkId> {
+    sync_manager
+        .lock()
+        .await
+        .active_networks()
+        .iter()
+        .map(|m| m.network_id)
+        .collect()
 }

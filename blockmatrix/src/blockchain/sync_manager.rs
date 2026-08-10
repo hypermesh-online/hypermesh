@@ -388,6 +388,16 @@ impl SyncManager {
         self.network_memberships.len()
     }
 
+    /// The privacy mode this node joined a given network under, if it is a
+    /// member. `None` when the node is not a member of `network_id` (e.g. a
+    /// reflector heartbeat arrives for a network we do not participate in), in
+    /// which case callers fall back to the transport default.
+    pub fn network_privacy_mode(&self, network_id: &str) -> Option<PrivacyMode> {
+        self.network_memberships
+            .get(&NetworkId::from_wire_str(network_id))
+            .map(|m| m.privacy_mode)
+    }
+
     /// Check if the node is a member of a specific network
     pub fn is_member(&self, network_id: &str) -> bool {
         self.network_memberships

@@ -72,8 +72,13 @@ async fn handle_shard_fetch(
 
         // Live-mirror providers known to hold this shard (non-expired). Empty
         // when the index is unwired (Private mode / test fixtures) or on a miss.
+        let shard_network = hypermesh_lib::NetworkId::from_wire_str(&state.network_id);
         let mut known_providers: Vec<String> = match state.shard_location_index {
-            Some(ref index) => index.get_providers(&content_hash).await,
+            Some(ref index) => {
+                index
+                    .get_providers_in_network(shard_network, &content_hash)
+                    .await
+            }
             None => Vec::new(),
         };
 

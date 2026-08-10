@@ -231,6 +231,7 @@ pub(crate) async fn start_network(
             shard_store.clone(),
             shard_location_index.clone(),
             nid.to_string(),
+            hypermesh_lib::NetworkId::from_wire_str(&network_id),
         ),
     );
 
@@ -389,6 +390,7 @@ pub(crate) async fn start_network(
         ngauge_analytics: ngauge_analytics.clone(),
         block_propagator: block_propagator.clone(),
         network: network_clone.clone(),
+        sync_manager: sync_manager.clone(),
         shard_location_index: shard_location_index.clone(),
         shard_transport: shard_transport.clone(),
         ebpf: ebpf_orchestrator.clone(),

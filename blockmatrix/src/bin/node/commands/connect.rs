@@ -169,6 +169,7 @@ pub async fn run_connect(
         shard_transport: shard_transport_ref,
         coordinate: coord,
         node_id: nid.to_string(),
+        network_id: cli.network_id.clone(),
         data_dir: data_dir.to_path_buf(),
         privacy_mode: format!("{:?}", bootstrap.privacy_mode().await),
         started_at: std::time::Instant::now(),
@@ -188,6 +189,7 @@ pub async fn run_connect(
                     y: coord.y as f64,
                     z: coord.z as f64,
                 },
+                hypermesh_lib::NetworkId::from_wire_str(&cli.network_id),
             ))
         }),
         // Phase F.1: not yet wired — these become Some(...) when the

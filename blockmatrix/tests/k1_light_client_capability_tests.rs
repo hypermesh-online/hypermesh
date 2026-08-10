@@ -69,6 +69,7 @@ async fn build_state_with_issuer(
         shard_transport: None,
         coordinate: coord,
         node_id: "k1-test".into(),
+        network_id: "trustnet-test".into(),
         data_dir: PathBuf::from("/tmp"),
         privacy_mode: "Private".into(),
         started_at: Instant::now(),

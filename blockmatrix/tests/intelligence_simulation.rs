@@ -31,7 +31,7 @@ use ngauge::swarm_analytics::{
     ReplicationConfig, ReplicationRecommendation, ReplicationTrigger, SwarmAnalytics,
 };
 
-use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, ProofType};
+use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, ProofType, DEFAULT_NETWORK};
 
 // ---------------------------------------------------------------------------
 // Simulation infrastructure
@@ -465,6 +465,7 @@ async fn test_privacy_scoped_dedup_anonymous() {
         Arc::clone(&cp_store),
         Arc::clone(&cp_index),
         "anon-node".to_string(),
+        DEFAULT_NETWORK,
     );
     let cp_result = manager
         .process_fetched_shards_with_policy(
@@ -479,7 +480,7 @@ async fn test_privacy_scoped_dedup_anonymous() {
         "Anonymous mode must NOT generate announcements"
     );
     assert!(
-        cp_index.get_providers(&hash).await.is_empty(),
+        cp_index.get_providers_in_network(DEFAULT_NETWORK, &hash).await.is_empty(),
         "Anonymous mode must NOT register providers in ShardLocationIndex"
     );
 }
@@ -517,6 +518,7 @@ async fn test_consumer_becomes_provider_demand_tracking() {
         Arc::clone(&node5.shard_store),
         Arc::clone(&node5.shard_index),
         node5.node_id.clone(),
+        DEFAULT_NETWORK,
     );
 
     let result = cp_manager.process_fetched_shards(fetched_shards.clone()).await;
@@ -535,7 +537,7 @@ async fn test_consumer_becomes_provider_demand_tracking() {
 
     // Verify node 5 is registered as provider for all fetched shards
     for (hash, _) in &fetched_shards {
-        let providers = node5.shard_index.get_providers(hash).await;
+        let providers = node5.shard_index.get_providers_in_network(DEFAULT_NETWORK, hash).await;
         assert!(
             providers.contains(&node5.node_id),
             "Node 5 should be provider for shard {}",
@@ -548,13 +550,13 @@ async fn test_consumer_becomes_provider_demand_tracking() {
     for i in 0..5 {
         node5
             .demand_tracker
-            .record_fetch(popular_shard, &format!("requester-{}", i))
+            .record_fetch_in_network(DEFAULT_NETWORK, popular_shard, &format!("requester-{}", i))
             .await;
     }
 
     let entry = node5
         .demand_tracker
-        .get(&popular_shard)
+        .get_in_network(DEFAULT_NETWORK, &popular_shard)
         .await
         .expect("test: demand entry should exist");
     assert_eq!(entry.request_count, 5);
@@ -630,6 +632,7 @@ async fn test_end_to_end_intelligence_loop() {
             Arc::clone(&node.shard_store),
             Arc::clone(&node.shard_index),
             node.node_id.clone(),
+            DEFAULT_NETWORK,
         );
         cp.process_fetched_shards(vec![(target_hash, target_shard.data.clone())])
             .await;
@@ -638,7 +641,7 @@ async fn test_end_to_end_intelligence_loop() {
     // Step 3: Verify 4 additional providers registered
     let providers_count = harness.nodes[2]
         .shard_index
-        .get_providers(&target_hash)
+        .get_providers_in_network(DEFAULT_NETWORK, &target_hash)
         .await
         .len();
     assert_eq!(

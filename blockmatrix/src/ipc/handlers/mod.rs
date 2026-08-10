@@ -160,6 +160,7 @@ pub(crate) mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "test-node".to_string(),
+            network_id: "trustnet-test".to_string(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".to_string(),
             started_at: Instant::now(),

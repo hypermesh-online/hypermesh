@@ -120,17 +120,6 @@ impl SwarmDemandTracker {
         }
     }
 
-    /// Record a fetch request for a shard from a specific peer in
-    /// [`hypermesh_lib::DEFAULT_NETWORK`] (the default network).
-    pub async fn record_fetch(
-        &self,
-        shard_id: hypermesh_lib::ContentHash,
-        requester_node_id: &str,
-    ) {
-        self.record_fetch_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id, requester_node_id)
-            .await;
-    }
-
     /// Record a fetch request for a shard within a specific network.
     pub async fn record_fetch_in_network(
         &self,
@@ -150,10 +139,11 @@ impl SwarmDemandTracker {
         entry.requester_ids.insert(requester_node_id.to_string());
     }
 
-    /// Get a snapshot of all demand entries for feeding into ngauge, flattened
-    /// to `shard -> entry`. Only
-    /// [`hypermesh_lib::DEFAULT_NETWORK`] is present, so this equals the pre-network
-    /// snapshot exactly.
+    /// Get a snapshot of all demand entries across every network, flattened to
+    /// `shard -> entry`. Retained for network-agnostic consumers
+    /// (`NGaugeBridge::metrics_to_transmit`); the network-attributed feed path
+    /// uses [`snapshot_in_network`](Self::snapshot_in_network) instead so demand
+    /// is fed into `SwarmAnalytics` under the shard's own network.
     pub async fn snapshot(&self) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
         self.entries
             .lock()
@@ -163,9 +153,22 @@ impl SwarmDemandTracker {
             .collect()
     }
 
-    /// Get demand entry for a specific shard in [`hypermesh_lib::DEFAULT_NETWORK`].
-    pub async fn get(&self, shard_id: &hypermesh_lib::ContentHash) -> Option<DemandEntry> {
-        self.get_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id).await
+    /// Get a `shard -> entry` snapshot of the demand recorded for a single
+    /// network. This is the network-attributed feed input: the replication feed
+    /// iterates the node's joined networks and records each network's demand into
+    /// `SwarmAnalytics` under that same network, so demand never flattens across
+    /// networks.
+    pub async fn snapshot_in_network(
+        &self,
+        network_id: hypermesh_lib::NetworkId,
+    ) -> HashMap<hypermesh_lib::ContentHash, DemandEntry> {
+        self.entries
+            .lock()
+            .await
+            .iter()
+            .filter(|((network, _shard), _)| *network == network_id)
+            .map(|((_network, shard), entry)| (*shard, entry.clone()))
+            .collect()
     }
 
     /// Get demand entry for a specific shard within a network.
@@ -181,6 +184,35 @@ impl SwarmDemandTracker {
 impl Default for SwarmDemandTracker {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Test-only ergonomic wrappers keyed on [`hypermesh_lib::DEFAULT_NETWORK`].
+///
+/// Production code MUST name the network explicitly via the `*_in_network`
+/// methods so demand cannot silently flatten to the default network. These
+/// `#[cfg(test)]` helpers keep the single-network test suite terse.
+#[cfg(test)]
+impl SwarmDemandTracker {
+    pub(crate) async fn record_fetch(
+        &self,
+        shard_id: hypermesh_lib::ContentHash,
+        requester_node_id: &str,
+    ) {
+        self.record_fetch_in_network(
+            hypermesh_lib::DEFAULT_NETWORK,
+            shard_id,
+            requester_node_id,
+        )
+        .await;
+    }
+
+    pub(crate) async fn get(
+        &self,
+        shard_id: &hypermesh_lib::ContentHash,
+    ) -> Option<DemandEntry> {
+        self.get_in_network(hypermesh_lib::DEFAULT_NETWORK, shard_id)
+            .await
     }
 }
 

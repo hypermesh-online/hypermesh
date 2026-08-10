@@ -490,6 +490,26 @@ async fn authorize_shard_fetch(
         return false;
     }
 
+    // (3) Per-asset-network gate — "shards belong to their network" (torrent
+    // rule). The operative cross-network check TODAY is requester-network ==
+    // serving-node-network, ALREADY enforced above by `verify_shard_proof_binding
+    // → verify_peer_access` (`peer.network_id == ours`): the asset is registered
+    // on THIS node's chain, so the asset's network IS this node's network, and a
+    // peer authenticated for a different network is refused here. See
+    // `tests/e3_network_scope_gate.rs`.
+    //
+    // The finer per-asset-SCOPE gate (a node holding assets from several
+    // networks, serving a PUBLIC/Global asset to any authenticated peer in that
+    // asset's network while a BOUNDED asset requires a grant) is DEFERRED to the
+    // asset_id.rs migration (STEP 7): the asset's network is encoded today as the
+    // pre-migration `NetworkScope` 4-variant enum (Global / Registry / Federated
+    // / Private, carrying opaque [u8;32] ids) with NO clean mapping to the
+    // requester's `NetworkId`. Comparing them requires reshaping `NetworkScope`
+    // to carry a `NetworkId`, which is off-limits here. Under the single-network
+    // model every registration is `Global`, so that finer gate is a strict no-op
+    // today — mounting it now would be redundant with the network check above,
+    // not additive. It lands with the reshape.
+
     true
 }
 
