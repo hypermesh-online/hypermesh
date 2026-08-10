@@ -1,0 +1,1546 @@
+[
+  {
+    "cluster": "E",
+    "concern_owner": "lib/src/types.rs owns the ONE NetworkId type (BLAKE3(domain)[..16]); blockmatrix/src/network/peer_auth.rs owns the ONE isolation gate, mounted at the message_handlers dispatch seam (peer_connection.rs requires-authenticated-peer + shard-serve gate)",
+    "consolidations": [
+      {
+        "concern": "network identity type (String / NetworkId / NetworkScope collapse)",
+        "keeper": "hypermesh_lib::NetworkId ([u8;16], lib/src/types.rs:80) derived as BLAKE3(domain)[..16] — exactly what dns/domain.rs:76-79 derive_network_id already computes before hex-encoding to String. String survives ONLY as the wire/display encoding (hex of NetworkId); NetworkScope survives ONLY as the per-asset scope field, re-keyed on NetworkId (owner decision on variants, see open_questions).",
+        "removed": [
+          "String-typed network identity: blockmatrix/src/network/peer_auth.rs::AuthenticatedPeer.network_id (line 29), network/mod.rs::PeerContext.network_id (:210) / NetworkManager.network_id (:330) / HandshakeData.peer_network_id (:284), blockchain/sync_manager.rs::NetworkMembership.network_id (:107) + HashMap<String,_> keys (:71), reflector_pool String keys, dns/domain.rs::derive_network_id -> String",
+          "blockmatrix/src/network/trust/mod.rs::new_random_network_id + network_id_as_uuid (uuid-flavored constructors, die with trust/)",
+          "blockmatrix/src/assets/core/asset_id.rs::NetworkScope as an independent identity taxonomy (Registry/Federated variants are the retired 4-tier model; collapse onto NetworkId per owner decision)"
+        ],
+        "evidence": "domain.rs:76-79 hex-encodes BLAKE3(domain)[..16] — the exact NetworkId bytes — into a String that then flows through sync_manager.rs:243 join_network, PeerContext (network/mod.rs:210), the handshake (network/mod.rs:294-298), and peer_auth.rs:29; meanwhile the shard indexes key on lib NetworkId (swarm_provider.rs:82) and validation keys on NetworkScope (network_rules.rs:73). sync_manager.rs:122 parent_network_id is Option<NetworkId> inside a String-keyed membership — type-incompatible, and join_network_nested has zero external callers (only self-call at :247), so parents are never populated.",
+        "callers_to_repoint": [
+          "blockmatrix/src/dns/domain.rs:49-60,140-174 (derive_network_id returns NetworkId; join/leave/is_member take NetworkId)",
+          "blockmatrix/src/blockchain/sync_manager.rs:70-71,105-122,241-289 (memberships keyed by NetworkId; parent finally populated from domain.rs:53-54)",
+          "blockmatrix/src/network/peer_auth.rs:29,110-150,192 (AuthenticatedPeer + verify_peer_access/verify_shard_proof_binding compare NetworkId)",
+          "blockmatrix/src/network/mod.rs:210,284,294-298,441-478,529-549 (PeerContext/handshake: NetworkId internally, hex String on the JSON wire)",
+          "blockmatrix/src/network/message_handlers/peer_connection.rs:297,473,587-615",
+          "blockmatrix/src/network/message_handlers/sync_and_reflection.rs:436 (chain_id = BLAKE3(network_id) — preserve derivation explicitly), :580-597 (reflector keys)",
+          "blockmatrix/src/bin/node/cli.rs:69-70 + node_bringup.rs:154-199,270,316,367 (CLI string -> NetworkId at the boundary)",
+          "blockmatrix/src/proof_of_state/network_rules.rs:73,97-126 (resolver re-keyed)"
+        ]
+      },
+      {
+        "concern": "isolation gate — 'may this traffic cross a network boundary' (4 impls, zero mounted)",
+        "keeper": "peer_auth gate + network-keyed indexes, mounted where traffic actually flows: peer_connection.rs:236 requires_authenticated_peer dispatch gate, :448-484 shard-serve gate (verify_shard_proof_binding + authorizes_shard), extended to also check the asset's network scope against the peer's authenticated NetworkId (salvaged can_exist_in_network semantics, asset_id.rs:542-560), plus ShardLocationIndex (NetworkId,ContentHash) keying (swarm_provider.rs:82) fed with the REAL peer network instead of DEFAULT_NETWORK. This is the only impl on the daemon path today.",
+        "removed": [
+          "blockmatrix/src/network/isolation/::DefaultIsolationManager + IsolationManager trait + Packet/ConnectionPool/violation machinery (whole isolation/ dir, 1167 lines)",
+          "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs::StoqIsolationManager (:51-128, naming lie — a blockmatrix HashMap that never touches stoq) + IsolationStack (:41-133) + CrossNetworkValidator (fake structural cross-network validation, :215+)",
+          "stoq/src/network_isolation.rs::NetworkIsolationManager (609 lines, SoC violation in the pure-transport crate) + stoq/src/lib.rs:55 re-exports + multipath/connection.rs:131,158 _isolation_manager field/builder (underscore-dead)",
+          "blockmatrix/src/intelligence/mod.rs::IntelligenceLayer's _network_isolation (:108,170) + network_coordinator (:119,194) holders — IntelligenceLayer is tests-only (sole external consumer: tests/phase2_integration_tests.rs:13); keep intelligence/ngauge_bridge.rs + intelligence/ebpf_feedback.rs which ARE live (replication_service/propagation.rs:42,84, connect.rs:186)"
+        ],
+        "evidence": "DefaultIsolationManager's only non-test consumer is multi_network.rs:20,178-212, whose NetworkConnectionCoordinator is itself consumed only by tests/quality_gates.rs:28. tests/p5_network_isolation.rs:8-9 states in its own doc comment 'the enforcer is unmounted (no live isolation is wired)' while task #59 'P5 Mount IsolationManager' reads completed. The live serve path is peer_connection.rs:470-484 (verify_shard_proof_binding + blockchain.authorizes_shard) — a String network compare in peer_auth.rs:143-146, nothing per-asset, nothing per-index.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/message_handlers/sync_and_reflection.rs:61 record_fetch -> record_fetch_in_network(peer.network_id), :99 register_provider -> register_provider_in_network(peer.network_id)",
+          "blockmatrix/src/network/replication_service/poll.rs:53,99,153,160,168,223 + propagation.rs:101 + feed.rs:61 — replace hardcoded DEFAULT_NETWORK with the node's own joined network(s) from SyncManager memberships",
+          "blockmatrix/src/network/swarm_provider.rs:101-170 — delete the DEFAULT_NETWORK convenience wrappers (register_provider/get_providers) once all callers pass a network",
+          "blockmatrix/src/network/mod.rs:127-171 — same for SwarmDemandTracker flat wrappers",
+          "blockmatrix/tests/p5_network_isolation.rs — retarget its two real assertions (cross-network rejection; B-only shard invisible to A) at the mounted gate instead of the deleted DefaultIsolationManager",
+          "task #59 status — correct the record: mount was reverted by de-worlds; the mount lands here"
+        ]
+      },
+      {
+        "concern": "network taxonomy (retired 4-tier model: two NetworkType enums + four Tier structs)",
+        "keeper": "hypermesh_lib::PrivacyMode (two-axis scope×tracked) — the canonical transport dimension, already re-exported by bootstrap (bootstrap/mod.rs:27-31) and used on every live path. stoq's certificate-strategy selection keeps working but consumes PrivacyMode directly.",
+        "removed": [
+          "blockmatrix/src/network/trust/ entire module (2606 lines): NetworkType {Anonymous,P2P,Federated,Public} (mod.rs:39-49), Anonymous/Federated/P2P/PublicNetworkHandler, its private StateProof dup (yet another divergent proof type), PeerId/Certificate/StoqTransport shadows",
+          "blockmatrix/src/privacy/tiers.rs four Tier structs (AnonymousTier :111, PrivateP2PTier :164, FederatedTier :244, PublicTier :319) — consumed only by privacy/switching.rs:8 inside the tests-only privacy/ island",
+          "stoq/src/transport/certificate_strategy.rs::NetworkType (:330-339) — LIVE, so removed LAST: replace the four call sites (transport/manager/pos.rs:55,101,105, manager/constructors.rs:125, protocol/pos_integration.rs:19, certificates/types.rs:30) with a PrivacyMode->CertificateStrategy mapping; the strategies themselves are the live keepers"
+        ],
+        "evidence": "blockmatrix trust::NetworkType's complete consumer set is dead/tests: network/config.rs:13 (config.rs has ZERO consumers itself), isolation/mod.rs:25, isolation/tests.rs:10, multi_network.rs:21, tests/p5_network_isolation.rs:22. stoq's NetworkType by contrast is on the live bootstrap path (certificate_strategy.rs:359-380 strategy construction; comment at :330 admits it is 'kept for PrivacyMode mapping' — i.e. it is already just an encoding of PrivacyMode).",
+        "callers_to_repoint": [
+          "stoq/src/transport/manager/pos.rs:55,101-105 (Anonymous check -> PrivacyMode.scope)",
+          "stoq/src/transport/manager/constructors.rs:125",
+          "stoq/src/protocol/pos_integration.rs:19",
+          "stoq/src/transport/certificates/types.rs:30,94 + certificates/manager.rs:68,200-201"
+        ]
+      },
+      {
+        "concern": "multi-network membership record",
+        "keeper": "blockchain/sync_manager.rs::NetworkMembership (:105-122) — the only membership the daemon writes (node_bringup.rs:197 join_network, dns/domain.rs:155 join_network) and reads (is_member, sync states). Fix in place: key by NetworkId, populate parent_network_id from domain.rs's parent derivation, and make privacy_mode real (reflector_handler.rs:36 must look up the membership's mode instead of hardcoding PrivacyMode::PUBLIC).",
+        "removed": [
+          "blockmatrix/src/assets/multi_node/network_membership.rs (521 lines): MultiNetworkMembership, ParticipationMembership, NetworkCredentials, SessionToken, NetworkRole, JoinRequirements, GeoRestriction, ApprovalProcess — placeholder-crypto membership stack",
+          "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs (817 lines): MultiNetworkCoordinator + NetworkEngagementMetrics (hardcodes NetworkId([0u8;16]) at :328)"
+        ],
+        "evidence": "network_membership.rs:28's own doc: 'NOT the same concern as blockchain::sync_manager::NetworkMembership'. Consumers of the multi_node stack: intelligence/mod.rs:82,189-194 (IntelligenceLayer, tests-only) + intelligence/validation/mod.rs:21 + tests/multi_network_integration_tests.rs, tests/multi_node_integration.rs. Nothing in bin/, ipc/, or network/ touches it. The live join is node_bringup.rs:188-199 -> sync_manager.join_network.",
+        "callers_to_repoint": [
+          "blockmatrix/src/intelligence/validation/mod.rs:21 (dies or is trimmed with IntelligenceLayer)",
+          "blockmatrix/src/assets/mod.rs:15,35 (drop multi_node re-exports for the deleted files)",
+          "blockmatrix/src/network/sync_dispatch/reflector_handler.rs:17-40 (privacy_mode from membership lookup, not PUBLIC)"
+        ]
+      },
+      {
+        "concern": "NetworkConfig (three unrelated structs claiming the name)",
+        "keeper": "none — live node configuration is bin/node/cli.rs + ipc/config.rs; no network-crate NetworkConfig is consumed anywhere",
+        "removed": [
+          "blockmatrix/src/network/config.rs (whole file — zero consumers)",
+          "blockmatrix/src/network/multi_network.rs::NetworkConfig (:30-98, dies with the file)",
+          "blockmatrix/src/network/trust/mod.rs::NetworkConfig (:237, dies with trust/)"
+        ],
+        "evidence": "grep for network::config consumers across src+tests returns nothing; multi_network.rs's NetworkConnectionCoordinator/NetworkConfig appear only in tests/quality_gates.rs:28.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/mod.rs:17,21,25,43 (drop pub mod config/isolation/multi_network/trust)"
+        ]
+      },
+      {
+        "concern": "default-network constant ownership",
+        "keeper": "hypermesh_lib::DEFAULT_NETWORK (lib/src/types.rs:94)",
+        "removed": [
+          "blockmatrix/src/intelligence/ebpf_feedback.rs:44 literal NetworkId([0u8; 16]) (live via propagation.rs:42)",
+          "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs:328 literal (dies with file)",
+          "stoq/src/transport/multipath/connection.rs:415 zero-NetworkId used as an 'unknown path' sentinel inside PathRejectionReason::TunnelNotConfigured — replace with a distinct UnknownPath rejection variant (internal enum, not serialized to wire)"
+        ],
+        "evidence": "ebpf_feedback.rs:38-45 documents the hardcode; lib/src/types.rs:91-93 documents why the constant must be the single owner. connection.rs:407-417 fabricates from: NetworkId([0u8;16]) when the path is unknown, colliding with the real default network's byte value.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/replication_service/propagation.rs:42 (constructor unchanged, value now DEFAULT_NETWORK)",
+          "stoq/src/transport/multipath/connection.rs:407-417"
+        ]
+      },
+      {
+        "concern": "DNS popularity tracking",
+        "keeper": "none — delete until NGauge actually consumes the signal (NGauge owns popularity/replication intelligence per canon)",
+        "removed": [
+          "blockmatrix/src/dns/popularity.rs::DnsPopularityTracker (both live instances: bin/node/commands/connect.rs:178 and node_bringup.rs:283 construct SEPARATE trackers; ipc/state.rs:48 holds a third reference)"
+        ],
+        "evidence": "popularity.rs:20-42: unbounded HashMap<String,u64> with a remote write path (record_resolution fed from peer DNS queries via PeerContext, network/mod.rs:227-229) and ZERO readers of top_names/resolution_count outside its own tests — write-only remote-fed unbounded growth. The module doc (:4-9) promises an ngauge feed that does not exist.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/mod.rs:229 (drop field)",
+          "blockmatrix/src/ipc/state.rs:8,48 (drop field)",
+          "blockmatrix/src/dns/mod.rs:47 (drop re-export)",
+          "bin/node/commands/connect.rs:178 + node_bringup.rs:283 (drop construction)"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "blockmatrix/src/network/isolation/ (default.rs, mod.rs, tests.rs — 1167 lines)",
+        "reason": "Unmounted isolation manager #1; validate_packet has zero live callers; the Packet/ConnectionPool/violation machinery validates metadata the caller fabricates itself",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/network/multi_network.rs (602 lines)",
+        "reason": "NetworkConnectionCoordinator/AssetVisibilityControl/VisibilityPolicy — dormant join/leave stack; sole external consumer is tests/quality_gates.rs:28; per-asset visibility is owned by registration.network_scope on the real path",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/network/trust/ (2606 lines, 6 files)",
+        "reason": "Retired 4-tier NetworkType + four per-tier handlers + a divergent private StateProof; consumers are exclusively the other dead files (config.rs, isolation/, multi_network.rs) and one test import",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/network/config.rs",
+        "reason": "NetworkConfig/NodeConfig with zero consumers anywhere in src or tests; exists only to import trust::StateProof",
+        "reachable_from": "dead(uncompiled-in-effect: compiled but unreferenced)"
+      },
+      {
+        "path": "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs (817 lines)",
+        "reason": "Isolation manager #2+#3 (StoqIsolationManager naming lie :51-128 + IsolationStack :41-133), fake CrossNetworkValidator, NetworkEngagementMetrics with hardcoded zero NetworkId; reachable only through tests-only IntelligenceLayer",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/assets/multi_node/network_membership.rs (521 lines)",
+        "reason": "Parallel membership stack with placeholder crypto (NetworkCredentials/SessionToken); the live membership is sync_manager::NetworkMembership",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "stoq/src/network_isolation.rs (609 lines) + lib.rs:55 re-exports + multipath/connection.rs:131,158 _isolation_manager field/builder",
+        "reason": "Isolation manager #4 in the 'pure transport' crate — SoC violation per canon (stoq = transport + bilateral PoS handshake ONLY); only consumers are tests-only IntelligenceLayer and an underscore-dead optional field",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/intelligence/mod.rs::IntelligenceLayer (struct + config + its multi_network/isolation wiring; KEEP submodules ngauge_bridge.rs, ebpf_feedback.rs)",
+        "reason": "Holder that stitches the three dormant stacks together; sole external consumer tests/phase2_integration_tests.rs:13; the live intelligence surface is ngauge_bridge + EbpfFeedbackAdapter via replication_service/propagation.rs:42,84",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/intelligence/validation/mod.rs (imports MultiNetworkCoordinator at :21)",
+        "reason": "Dies with the coordinator; trim or delete with IntelligenceLayer",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/dns/popularity.rs (143 lines) + its 5 wiring refs",
+        "reason": "Write-only, unbounded, remote-fed (DoS vector: peer DNS queries for random names grow node memory forever), split across two divergent instances; zero readers",
+        "reachable_from": "daemon (LIVE write path, dead read path — the deletion removes a live vulnerability)"
+      },
+      {
+        "path": "blockmatrix/src/privacy/tiers.rs four Tier structs (+ switching.rs dependency) — pending owner confirmation on the whole privacy/ island (2832 lines)",
+        "reason": "Retired 4-tier taxonomy (AnonymousTier/PrivateP2PTier/FederatedTier/PublicTier) contradicting 2-axis PrivacyMode; consumed only inside the privacy/ island whose external consumers are two test files (privacy_e2e_tests.rs, privacy_integration_tests.rs)",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/tests/quality_gates.rs, blockmatrix/tests/multi_network_integration_tests.rs, blockmatrix/tests/phase2_integration_tests.rs (+ multi_node_integration.rs arms exercising deleted files)",
+        "reason": "Tests that exist solely to exercise the deleted dormant stacks; p5_network_isolation.rs is NOT deleted — it is retargeted (salvage)",
+        "reachable_from": "tests-only"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix/src/assets/core/asset_id.rs:542-560 can_exist_in_network",
+        "what": "The per-asset scope-compatibility check (the only real 'does this asset belong in this network' logic in the tree) — mount it on the shard-serve gate so a scoped asset is only servable to a peer authenticated for that network (fixes W2-54)",
+        "destination": "blockmatrix/src/network/message_handlers/peer_connection.rs shard-serve gate (:448-484), alongside verify_shard_proof_binding + authorizes_shard"
+      },
+      {
+        "from": "blockmatrix/tests/p5_network_isolation.rs",
+        "what": "Its two genuine assertions — cross-network fetch rejected / same-network accepted, and a shard registered only in network B invisible to a network-A lookup — currently aimed at the deleted DefaultIsolationManager",
+        "destination": "retargeted integration test over the mounted peer_connection.rs gate + network-keyed ShardLocationIndex"
+      },
+      {
+        "from": "blockmatrix/src/network/swarm_provider.rs:82 + network/mod.rs:140-180",
+        "what": "The (NetworkId, ContentHash) keying of ShardLocationIndex and SwarmDemandTracker — already correct structure, currently decorative; becomes the enforcement substrate once fed the peer's real network",
+        "destination": "stays in place; callers repointed (this is keep-and-wire, not move)"
+      },
+      {
+        "from": "blockmatrix/src/dns/domain.rs:69-92",
+        "what": "derive_chain_id / derive_network_id / extract_parent_domain — the ONLY live producer of network identity and parents; retyped to return NetworkId and finally feed join_network_nested's parent parameter",
+        "destination": "stays in dns/domain.rs; return type becomes hypermesh_lib::NetworkId"
+      },
+      {
+        "from": "blockmatrix/src/network/isolation/mod.rs:124-166 IsolationViolation/ViolationType",
+        "what": "The violation-audit vocabulary (only if the owner wants an audit trail beyond warn! logs — see open_questions; otherwise dies with the module)",
+        "destination": "peer_auth.rs rejection path, as a structured log/metric"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "HandshakeMetadata.network_id (blockmatrix/src/network/mod.rs:294-298, JSON on the post-handshake wire)",
+        "change": "Value semantics: free-form string (default \"trustnet-test\", cli.rs:69-70) becomes canonical hex of NetworkId = BLAKE3(domain)[..16]. Serde SHAPE unchanged (still a String field with #[serde(default)]).",
+        "kind": "wire-serde",
+        "migration_note": "No serde(rename) needed — shape survives. But old and new nodes will compute different network_id values and refuse to sync (peer_auth.rs:143 same-network compare fails), so ALL nodes of a network must upgrade in the same batch. Pin the default network's canonical domain so every upgraded node derives the same bytes. Remote wipe not required for this field alone."
+      },
+      {
+        "target": "Advertised chain_id = BLAKE3(network_id) (blockmatrix/src/network/message_handlers/sync_and_reflection.rs:436)",
+        "change": "Chain-id derivation input changes when the network_id value changes — the node's advertised chain identity on the sync wire shifts.",
+        "kind": "wire-serde",
+        "migration_note": "Same coordinated-upgrade batch as HandshakeMetadata; mixed-version peers see each other as foreign chains. Decide whether chain_id becomes BLAKE3(NetworkId bytes) or BLAKE3(hex string) — pick one and freeze it in the migration."
+      },
+      {
+        "target": "Reflector/sync-dispatch messages keyed by network_id string (reflector heartbeats, TAG_* sync messages; reflector_handler.rs:19, sync_and_reflection.rs:580-597)",
+        "change": "Key value changes with the canonical NetworkId encoding (field stays a String on the wire).",
+        "kind": "wire-serde",
+        "migration_note": "Rides the same batch; reflector pools are in-memory (no disk migration), they simply re-form after the coordinated restart."
+      },
+      {
+        "target": "AssetRegistration.network_scope (blockmatrix/src/assets/core/asset_id.rs:26-35, :335) — serialized inside BlockAssetEntry in blocks (wire via block propagation, disk via durable block persistence)",
+        "change": "Collapse the 4-variant NetworkScope {Global, Registry(RegistryId), Federated(FederationId), Private(NodeFingerprint)} onto the NetworkId model (proposed: Device(NodeFingerprint) | Network(NetworkId) | Global — final shape is an owner decision). Enum variant removal/reshape = serde wire+disk break.",
+        "kind": "disk-serde",
+        "migration_note": "Old persisted blocks will NOT deserialize — requires the standard wipe (rm -rf /var/lib/hypermesh/blockmatrix/node_* remote, ~/.blockmatrix local). serde(rename) cannot bridge variant removal. MUST be batched with every other pending Block-adjacent struct change in the one migration."
+      },
+      {
+        "target": "AssetId content-hash preimage (asset_id.rs:476-530 generate_content_hash — domain-separation tags b\"GLOBAL\"/b\"REGISTRY\"/b\"FEDERATED\"/b\"PRIVATE\" + scope bytes feed the hasher)",
+        "change": "Reshaping NetworkScope changes the bytes fed into every asset's content hash — ALL asset identities change, invalidating dedup keys, shard mappings, and any chain entry referencing an AssetId.",
+        "kind": "hash-preimage",
+        "migration_note": "No compat path exists — this is identity-breaking by construction and is the single strongest reason the whole cluster's format changes must land in ONE batched migration with a full data wipe. Note: Block::calculate_hash preimage itself is FROZEN and untouched — registration rides outside it (confirmed by the received-block-path finding) — but asset self-identity is a preimage all the same."
+      },
+      {
+        "target": "NetworkMembership / Reflector structs (sync_manager.rs:105, reflector_pool.rs:37 — both derive Serialize)",
+        "change": "network_id String -> NetworkId; privacy_mode becomes real (looked up, not PUBLIC-hardcoded).",
+        "kind": "disk-serde",
+        "migration_note": "VERIFIED in-memory only today (no save/persist call sites, no IPC handler exposes them) — listed defensively: if any snapshot/IPC surface serializes them before this lands, it joins the batch; otherwise NO migration needed for these two."
+      },
+      {
+        "target": "CLI/config surface: --network-id (bin/node/cli.rs:69-70) and any config-file network_id",
+        "change": "Semantics change from opaque sync-tag to domain name that is hashed into NetworkId (or raw 32-hex, owner decision).",
+        "kind": "wire-serde",
+        "migration_note": "User-facing compat, not serde: deployment scripts and systemd units carrying --network-id trustnet-test keep working only if the flag keeps accepting a domain string and hashing it. Document in the migration notes; no data wipe implication."
+      }
+    ],
+    "plan_steps": [
+      "STEP 1 (behavior-preserving, mechanical): dedup the default-network constant — ebpf_feedback.rs:44 -> DEFAULT_NETWORK (live via propagation.rs:42, value identical so zero behavior change); replace stoq multipath/connection.rs:415 zero-NetworkId sentinel with a distinct UnknownPath rejection variant (internal enum). Closes W2-6 + the stoq sentinel finding.",
+      "STEP 2 (behavior-preserving, pure deletion — nothing here is on the daemon path): delete network/isolation/, network/multi_network.rs, network/trust/, network/config.rs, assets/multi_node/{multi_network_coordinator,network_membership}.rs, stoq/src/network_isolation.rs (+ lib.rs:55 re-exports + multipath _isolation_manager field), IntelligenceLayer from intelligence/mod.rs (keeping ngauge_bridge + ebpf_feedback), intelligence/validation trim, the retired Tier structs (pending owner call on the full privacy/ island), and tests quality_gates.rs / multi_network_integration_tests.rs / phase2_integration_tests.rs. Update network/mod.rs and assets/mod.rs module decls. Correct task #59's record: the P5 mount was reverted by de-worlds; no isolation manager is mounted — the real mount is STEP 6.",
+      "STEP 3 (behavior-preserving, removes a live DoS vector): delete DnsPopularityTracker + its 5 wiring refs (network/mod.rs:229, ipc/state.rs:48, dns/mod.rs:47, connect.rs:178, node_bringup.rs:283). Read path is provably dead; write path is remote-fed and unbounded.",
+      "STEP 4 (behavior-preserving, compile-time unification): retype network identity internally — dns/domain.rs derive_network_id returns NetworkId; NetworkMembership/SyncManager keys, AuthenticatedPeer, PeerContext, NetworkManager, reflector_pool keys all become NetworkId; String survives only at the CLI parse boundary and as hex on the JSON wire. Keep the WIRE VALUE unchanged in this step (encode the legacy string pass-through behind the boundary) so mixed-version peers still sync — the value flip happens only in STEP 7's batch. Populate NetworkMembership.parent_network_id from domain.rs's parent derivation (join_network_nested finally gets a caller).",
+      "STEP 5 (behavior-preserving in the single-network world, byte-identical keying today): thread the peer's authenticated NetworkId into the indexes — sync_and_reflection.rs:61,99 use peer.network_id instead of the flat wrappers; replication_service poll.rs/propagation.rs/feed.rs iterate the node's joined networks instead of hardcoding DEFAULT_NETWORK; delete the DEFAULT_NETWORK convenience wrappers in swarm_provider.rs and network/mod.rs so no future caller can silently flatten. With one network, lookups remain byte-identical (lib/src/types.rs:91-93 argument).",
+      "STEP 6 (the mount — first behavior change, gated): enforce per-network scope at the single live gate: peer_connection.rs shard-serve gate additionally checks the asset's network scope against the requester's authenticated NetworkId (salvaged can_exist_in_network semantics); fix reflector_handler.rs:36 to record the membership's real privacy_mode instead of PrivacyMode::PUBLIC. Retarget p5_network_isolation.rs at this gate. This is the point where 'shards belong to their NETWORK' becomes true.",
+      "STEP 7 (THE batched format migration — coordinate with the other clusters' inventory, ONE migration total): flip the wire network_id value to canonical hex(BLAKE3(domain)[..16]) + the chain_id derivation (sync_and_reflection.rs:436); collapse AssetRegistration.network_scope onto the NetworkId model per the owner's variant decision (wire+disk+asset-hash-preimage break); re-key NetworkRuleSet resolver (network_rules.rs:73) accordingly. Requires full data wipe on all nodes and simultaneous deploy of every node in a network.",
+      "STEP 8 (post-migration cleanup + re-audit): replace stoq certificate_strategy NetworkType consumption with direct PrivacyMode mapping (live path — done last, after the network model is stable); update crate-status.toml entries that claim multi-network isolation is working; re-run the retargeted isolation tests + two-node E2E; verify zero remaining String network-identity sites and zero literal NetworkId([0u8;16]) outside DEFAULT_NETWORK's definition."
+    ],
+    "open_questions": [
+      "NetworkScope final shape (blocks STEP 7): collapse to Device(NodeFingerprint) | Network(NetworkId) | Global? Does Global survive as a variant, or is Global just DEFAULT_NETWORK making the field a plain NetworkId + optional device-pin? Are Registry(RegistryId) and Federated(FederationId) confirmed retired (both are the 4-tier taxonomy's fingerprints)? This decides the asset content-hash preimage layout.",
+      "CLI semantics: does --network-id become a domain name that is hashed (consistent with DNS-derived membership per done_means), a raw 32-hex NetworkId, or is it replaced by --domain entirely? And what is the canonical domain of the default/test network currently spelled \"trustnet-test\"?",
+      "chain_id derivation after unification (sync_and_reflection.rs:436): BLAKE3(NetworkId bytes) or BLAKE3(hex string)? Must be frozen in the migration; also — is a network's chain_id supposed to equal derive_chain_id(domain) (the full 32-byte BLAKE3 the NetworkId truncates), which would unify the two derivations for free?",
+      "The rest of assets/multi_node/ (coordinator/, discovery, fault_tolerance, load_balancer, migration, resource_sharing, state_verification — reachable only from tests/multi_node_integration.rs): delete in this cluster or leave for the dead-code cluster? This plan only claims the two multi-network files.",
+      "privacy/ island (2,832 lines, tests-only): W2-16 mandates deleting the four Tier structs, which breaks switching.rs — confirm deleting the whole island here (it overlaps a separate needs-owner finding) vs. tiers-only surgical removal.",
+      "Violation audit trail: does the owner want structured isolation-violation records (salvaged IsolationViolation vocabulary) surfaced via IPC/metrics at the mounted gate, or is warn!-level rejection logging sufficient?",
+      "DnsPopularityTracker: plan says delete (write-only + remote-fed unbounded). If the owner wants the popularity signal, the correct home is an NGauge-side bounded tracker fed like SwarmDemandTracker — confirm delete vs. rebuild-in-ngauge.",
+      "Multi-network membership target: when a node joins N networks (post-migration), do the replication/poll loops iterate ALL joined networks per cycle (STEP 5's assumption), and does a shard stored under network A ever get counted toward replication health for network B? (Canon says no — confirming the strict reading.)",
+      "Task #59 correction mechanics: reopen the task, or annotate completed-with-revert and track the mount under this cluster's new task?"
+    ]
+  },
+  {
+    "cluster": "G",
+    "concern_owner": "trustchain::proof_of_state (four-proof logic + FALCON envelope, operating on lib::proof types) with blockmatrix::proof_of_state::{ValidationService, NetworkRuleSet} as the single threshold seam and blockmatrix::blockchain::asset_index as the single on-chain authorization source",
+    "consolidations": [
+      {
+        "concern": "Canonical proof type + envelope",
+        "keeper": "lib/src/proof.rs::StateProof + StateRequirements + WireSignedProof — already the single type (trustchain re-exports at trustchain/src/proof_of_state/mod.rs:50,200; live on handshake via TrustChainProofProvider and on every chain write)",
+        "removed": [
+          "trustchain/src/proof_of_state/mod.rs:297-401::SignedStateProof (zero users workspace-wide; lossy From at mod.rs:374 `to_bytes().unwrap_or_default()` can emit an unverifiable empty envelope)"
+        ],
+        "evidence": "grep SignedStateProof → only trustchain/src/proof_of_state/mod.rs (def + its own tests). Live envelope path: blockmatrix/src/network/mod.rs:907 constructs TrustChainProofProvider; stoq/src/protocol/bilateral.rs:207,324 call validate_proof on it.",
+        "callers_to_repoint": []
+      },
+      {
+        "concern": "Handshake proof validation (bilateral admission)",
+        "keeper": "trustchain/src/proof_of_state/mod.rs:210-295::TrustChainProofProvider (FALCON verify over BLAKE3(proof_bytes||nonce), rejects unsigned) — live via blockmatrix/src/network/mod.rs:907 + stoq bilateral.rs. FIX in place: mod.rs:280 currently ends at `Ok(proof.validate())` (structural only, W2-44); add the WHEN-freshness bar via proof.validate_with_requirements(resolved StateRequirements).",
+        "removed": [
+          "stoq/src/protocol/pos_validator.rs (674L, PosToken + PosTokenValidator, SHA-256 keying at :395-566)",
+          "stoq/src/protocol/pos_integration.rs (659L, StoqPosIntegration)",
+          "stoq/src/protocol/pos_fast_validator.rs (604L, PosFastValidator)",
+          "stoq/src/transport/pos_extension_validator.rs (191L, StoqPosExtensionValidator — only constructed in its own tests)",
+          "stoq/src/transport/manager/pos.rs::validate_connection_with_pos + validate_connection_bilateral + pos_integration accessors (:56-222; zero external callers, SHA-256 eBPF keying at :69-77)",
+          "stoq/src/transport/multipath/connection.rs:130,145-153::_pos_fast_validator (underscore-dead field + with_pos_validator)"
+        ],
+        "evidence": "grep validate_connection_with_pos → zero callers outside stoq/src/transport/manager/pos.rs. W2-93/95/147: PosValidationState permanently Pending; stack constructed at startup (manager/constructors.rs:311, manager/mod.rs:61-63) but its gate is never invoked. Canonical: stoq = transport + bilateral PoS handshake ONLY.",
+        "callers_to_repoint": [
+          "stoq/src/transport/manager/mod.rs:20-21,51,61-63,103-104 (drop pos_integration/pos_fast_validator/handshake_extension fields)",
+          "stoq/src/transport/manager/constructors.rs:27-28,311 (drop construction)",
+          "stoq/src/transport/mod.rs:26,46 (drop module + re-export)",
+          "stoq/src/transport/ebpf.rs:57-58 (comment referencing StoqPosExtensionValidator)"
+        ]
+      },
+      {
+        "concern": "Certificate issuance PoS validation",
+        "keeper": "trustchain/src/ca/trustchain_ca.rs::issue_certificate_local (:204-230) → FourProofValidator::validate_state_proof (trustchain/src/proof_of_state/validator.rs:269) — the ONLY issuance path reached on the daemon (blockmatrix/src/network/ca_enrollment.rs:55,216). Rename to issue_certificate once the network path is deleted.",
+        "removed": [
+          "trustchain/src/proof_of_state/hypermesh_client.rs (566L: HyperMeshStateProofClient calls STOQ service 'hypermesh' method 'state_proof/validate_certificate' at :410 — no such handler exists anywhere; every call fails 'Handler not found' after retries)",
+          "blockmatrix/src/proof_of_state/mod.rs:145-336::stoq_handlers (ValidateCertificateHandler is an always-valid echo stub at :205-210 'valid': true; registered path '/api/proof-of-state/validate-certificate' would not match the client's method string even if the server ran)",
+          "blockmatrix/src/api/proof_of_state_api.rs (129L: create_proof_of_state_api_server* — zero callers)",
+          "trustchain/src/ca/trustchain_ca.rs:120-180 network-validated issue_certificate path + :236-260 fabricated BFT metadata (ByzantineFaultToleranceStatus violates no-consensus vocabulary)",
+          "hypermesh_client-only result types (StateProofValidationResult/ValidationDetails/ProofValidationResults/ByzantineFaultToleranceStatus/PerformanceStatistics) — replace the internal use in generate_certificate_with_state_proof with the FourProofValidator's StateProofResult"
+        ],
+        "evidence": "W2-40 + trustchain_ca.rs:126-129 (hypermesh_client.validate_certificate_request) vs hypermesh_client.rs:410 method string vs blockmatrix mod.rs:198 handler path — structurally disconnected on three levels (no server started, path mismatch, echo stub). Live daemon path is issue_certificate_local (ca_enrollment.rs:55).",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/ca_enrollment.rs:55,216 (rename target only)",
+          "trustchain/src/bin/trustchain_ca.rs:414,564 + trustchain/src/bin/trustchain-stoq-server.rs:78 (switch issue_certificate → local/renamed path)",
+          "trustchain/src/ca/federation.rs + certificate_authority.rs + security/mod.rs (keep FourProofValidator; drop hypermesh_client imports)",
+          "trustchain/src/proof_of_state/mod.rs:37-43 (drop hypermesh_client re-exports)"
+        ]
+      },
+      {
+        "concern": "The one threshold-parameterized four-proof bar (W2-45, W1-12)",
+        "keeper": "blockmatrix ValidationService + NetworkRuleSet (validation_service.rs:23-142, network_rules.rs) resolving lib::StateRequirements per NetworkScope — already live on both chain-write paths (mutations.rs:174 local, mutations.rs:496 received). Thresholds live ONLY in StateRequirements; deep per-proof logic ONLY in trustchain validation.rs/validator.rs, parameterized by the resolved requirements.",
+        "removed": [
+          "hardcoded 300s PoTime bound inside trustchain/src/proof_of_state/validation.rs:257 (verify_all_proofs must be purely structural; freshness comes only from verify_proof_with_requirements/StateRequirements)",
+          "FourProofValidator's private SecurityConfig durations as an independent bar (validator.rs:98-109 maximum_time_variance 30s / production 15s) — accept StateRequirements instead",
+          "trustchain/src/proof_of_state/validator.rs:20-27::struct StateAuthenticator (dead struct, third thing named StateAuthenticator — zero external users; FourProofValidator is the used type)",
+          "blockmatrix/src/proof_of_state/mod.rs:127-139::StateProofConfig (300s default, only user is the dead state_proof_impl island + integration/config.rs)"
+        ],
+        "evidence": "W2-97 conflicting bars: anchor default 60s (lib proof.rs:724), production 30s (:731), localhost 300s (:736), verify_all_proofs hardcoded 300s (validation.rs:257), SecurityConfig 30s/15s (validator.rs:107,263), handshake no bar (trustchain mod.rs:280), received structural-only (validation_service.rs:96-112). Same proof passes/fails depending on entry path.",
+        "callers_to_repoint": [
+          "trustchain/src/proof_of_state/mod.rs:29-34 (drop StateAuthenticator re-export)",
+          "blockmatrix/src/integration/config.rs:7,23 (drop StateProofConfig)",
+          "trustchain/src/ca/*.rs FourProofValidator::new() → new(StateRequirements) form"
+        ]
+      },
+      {
+        "concern": "Received-block validation seam — third site (#52 / W2-118)",
+        "keeper": "ValidationService::validate_received (validation_service.rs:96-112) — the scope seam; already used at mutations.rs:496.",
+        "removed": [
+          "blockmatrix/src/network/message_handlers/block_handlers.rs:115 intrinsic `entry.state_proof.validate()` announce pre-filter (bypasses the D4 resolver — repoint through validate_received; byte-identical today since both are structural, so this is behavior-preserving)"
+        ],
+        "evidence": "block_handlers.rs:115 (read above) vs mutations.rs:489-498 comment documenting the seam unification that this site missed.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/message_handlers/block_handlers.rs:115"
+        ]
+      },
+      {
+        "concern": "Placement WHO/authorization gate (W2-39/51 — the HIGH)",
+        "keeper": "The asset's own chain: NodeBlockchain::authorizes_shard / asset_index (blockmatrix/src/blockchain/asset_index.rs:314) — already the live serve-side gate (peer_connection.rs:483, F6). Placement must consult the SAME chain authority: registration owner + grant/share entries per asset, per NetworkId.",
+        "removed": [
+          "blockmatrix/src/distribution/pos_validator.rs:254-301 impl StateAuthenticator for DefaultStateAuthenticator — the allow-all stub (`let can_store = true; // Testing mode allows all` at :266) on the live store path",
+          "the name collision: rename distribution/pos_validator.rs::StateAuthenticator trait → PlacementAuthorizer (W2-112: DefaultStateAuthenticator on the placement path conceals that the real validating trait is not in play)",
+          "network/placement.rs:116 constructing DefaultStateAuthenticator::new() internally — the authorizer must be injected from the store handler's chain context"
+        ],
+        "evidence": "pos_validator.rs:266 hardcoded true; place_shards → distribute_shards_pos_aware → get_eligible_nodes (placement.rs:117, distribution/mod.rs:164) reached live from ipc/handlers/store.rs:112. The chain-backed alternative already exists and is live on serve: peer_connection.rs:483 blockchain.authorizes_shard.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/placement.rs:41,116-117 (accept an injected PlacementAuthorizer built over the blockchain)",
+          "blockmatrix/src/ipc/handlers/store.rs (pass chain-backed authorizer into place_shards)",
+          "blockmatrix/src/distribution/redistribution.rs:14 (trait rename)",
+          "blockmatrix/src/distribution/mod.rs:161 (trait bound rename)"
+        ]
+      },
+      {
+        "concern": "Dead proof-of-state vestiges (W2-47)",
+        "keeper": "n/a — pure deletion",
+        "removed": [
+          "blockmatrix/src/proof_of_state/mod.rs:108-111::ProofOfState trait (zero impls, zero users)",
+          "blockmatrix/src/proof_of_state/proof.rs (26L re-export shim)",
+          "blockmatrix/src/proof_of_state/state_proof_impl.rs (111L AsyncStateProof/DefaultStateProof — only user is assets/blockchain.rs)",
+          "blockmatrix/src/assets/blockchain.rs (zero users workspace-wide)",
+          "blockmatrix/src/proof_of_state/mod.rs:346-373::proof_of_state_integration (ProofOfStateIntegration unit struct + ClientCredentials — one re-export at assets/core/mod.rs:161, no functional user)",
+          "trustchain/src/proof_of_state/asset_integration.rs (313L — only users are examples/pos_validation_example.rs and the StateProofOps::validate_for_asset method with no production caller; delete method + example together)"
+        ],
+        "evidence": "greps above: ProofOfState only re-exported via the shim; assets/blockchain.rs has zero importers; asset_integration used only from the example and mod.rs:121-126.",
+        "callers_to_repoint": [
+          "blockmatrix/src/assets/matrix_blockchain.rs:329-336 (proof_of_state::proof:: → proof_of_state:: direct)",
+          "blockmatrix/src/assets/core/mod.rs:161 (drop ClientCredentials re-export)",
+          "trustchain/src/proof_of_state/mod.rs:18,24,74-78,121-126 (drop asset_integration module + trait method)",
+          "blockmatrix/src/integration/config.rs (drop StateProofConfig field)"
+        ]
+      },
+      {
+        "concern": "Confidence float on canonical type (W2-50)",
+        "keeper": "ProofValidationResult::is_valid + failed_proofs (binary + diagnostic list)",
+        "removed": [
+          "lib/src/proof.rs:805-816::confidence() and its Display use at :841-844 (replace with failed_proofs list) — banned graded-trust vocabulary on the single-source-of-truth type"
+        ],
+        "evidence": "Only callers are lib's own tests (:1027,:1040); ngauge organic_detection.rs confidence is a different type, out of scope.",
+        "callers_to_repoint": [
+          "lib/src/proof.rs:837-846 Display impl",
+          "lib tests :1016-1050"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "trustchain/src/proof_of_state/hypermesh_client.rs",
+        "reason": "CA→HyperMesh 'network validation' client whose every request fails: calls STOQ method 'state_proof/validate_certificate' (:410) that no server registers anywhere (registered-but-never-started handler uses a different path string). Carries fabricated BFT metadata types violating the no-consensus model.",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "blockmatrix/src/proof_of_state/mod.rs (stoq_handlers module, lines 145-336)",
+        "reason": "ValidateCertificateHandler is an always-valid echo stub (:205-210); server that would register it (api/proof_of_state_api.rs) has zero callers.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/api/proof_of_state_api.rs",
+        "reason": "create_proof_of_state_api_server* has zero callers — the PoS STOQ API server is never started.",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "stoq/src/protocol/pos_validator.rs",
+        "reason": "PosToken line-rate stack dead on every live path; SHA-256 keying (banned — BLAKE3 everywhere).",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "stoq/src/protocol/pos_integration.rs",
+        "reason": "StoqPosIntegration constructed at startup (constructors.rs:311) but validate_connection gate never called; second divergent notion of PoS + shard placement inside the transport crate.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "stoq/src/protocol/pos_fast_validator.rs",
+        "reason": "PosFastValidator only reachable via the dead extension validator and the underscore-dead multipath field.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "stoq/src/transport/pos_extension_validator.rs",
+        "reason": "StoqPosExtensionValidator never constructed outside its own tests; the real 0x484D substrate lives in hypermesh-ebpf/blockmatrix, not on PosToken.",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "stoq/src/transport/manager/pos.rs (PoS methods :50-222; keep falcon_* helpers if still used)",
+        "reason": "validate_connection_with_pos / bilateral wrapper: zero callers; would feed eBPF with SHA-256-derived keys if ever wired.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "trustchain/src/proof_of_state/mod.rs::SignedStateProof (lines 297-401)",
+        "reason": "Unused duplicate envelope of WireSignedProof with a lossy infallible From (unwrap_or_default → empty proof_bytes).",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "trustchain/src/proof_of_state/validator.rs::struct StateAuthenticator (lines 20-27)",
+        "reason": "Dead struct; one of three colliding StateAuthenticator names. FourProofValidator is the used type in the same file.",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "trustchain/src/proof_of_state/asset_integration.rs",
+        "reason": "Per-asset proof requirements shim with no production caller (example + unused trait method only); per-network rules (D4 NetworkRuleSet) is the canonical owner of this concern.",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/proof_of_state/state_proof_impl.rs",
+        "reason": "AsyncStateProof/DefaultStateProof island; only user is assets/blockchain.rs which itself has zero users.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/blockchain.rs",
+        "reason": "Zero importers workspace-wide.",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "blockmatrix/src/proof_of_state/proof.rs",
+        "reason": "26-line re-export shim; repoint the two importers and delete.",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "blockmatrix/src/proof_of_state/mod.rs::ProofOfState trait (:108-111) + proof_of_state_integration (:346-373) + StateProofConfig (:127-139)",
+        "reason": "Dead trait shadowing the real validation traits; dead integration unit struct; config type whose only consumers are the deleted island + one config field.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/distribution/pos_validator.rs:254-301 (allow-all impl)",
+        "reason": "'Testing mode allows all' hardcoded can_store=true on the live store path — replaced by chain-backed PlacementAuthorizer, not deleted-without-replacement.",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "trustchain/src/ca/trustchain_ca.rs network issue_certificate path (:120-180) + fabricated BFT result construction (:236-260)",
+        "reason": "Depends on the dead hypermesh_client loop; if the route were fixed the echo stub would rubber-stamp. issue_certificate_local (real FourProofValidator) becomes the single issuance path.",
+        "reachable_from": "daemon"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix/src/verification/ (shard_commitment.rs, probe.rs, response.rs, min_spec.rs, types.rs — fully dormant, W2-42/85/94/137)",
+        "what": "R12 BLAKE3(sorted placements) shard-commitment (create_from_distribution/verify_commitment), PoSPing epoch probe protocol, R13 min-spec check. R12 is a HARD protocol requirement — do NOT delete; wire the commitment into block build/accept during the batched format migration. PoSPing/min_spec activation can follow separately.",
+        "destination": "blockmatrix::blockchain (block build + received-block accept) for shard_commitment; network admission path for min_spec; NGauge VerificationSnapshot feed for PoSPing results"
+      },
+      {
+        "from": "trustchain/src/proof_of_state/asset_integration.rs::AssetProofRequirements",
+        "what": "The which-of-the-four-proofs-required concept (space/stake/work/time booleans) — the only idea worth keeping from the deleted file. Networks, not assets, own validation rules.",
+        "destination": "blockmatrix/src/proof_of_state/network_rules.rs — as a future field on StateRequirements/NetworkRuleSet published rulesets (do not port the file)"
+      },
+      {
+        "from": "trustchain/src/proof_of_state/validator.rs::MisbehaviorDetector",
+        "what": "Binary reject-list of nodes with repeatedly-failing proofs (used inside FourProofValidator::validate_state_proof :283-296). Keep — it is binary authentic-or-not bookkeeping, not a reputation float.",
+        "destination": "stays in trustchain validator.rs with FourProofValidator"
+      },
+      {
+        "from": "blockmatrix/src/proof_of_state/network_rules.rs::resolve_strict + NetworkRuleSet::publish",
+        "what": "The fail-closed hook and publisher API (W1-12) — built, tested, inactive by design. Keep intact; activation is gated on network-genesis rulesets existing.",
+        "destination": "stays; flip resolve→resolve_strict at validation_service.rs:69-74 when publishers exist"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "blockmatrix Block (blockchain/block.rs)",
+        "change": "ADD R12 shard-commitment field (BLAKE3 of sorted placements per block) if the owner elects to wire verification/shard_commitment.rs rather than delete it",
+        "kind": "hash-preimage",
+        "migration_note": "Block::calculate_hash preimage is FROZEN — this is exactly the class of change that must ride the ONE batched migration. Old persisted blocks lack the field: either Option<[u8;32]> with #[serde(default)] (keeps old data deserializing, commitment enforced only for new blocks) or full wipe (rm -rf /var/lib/hypermesh/blockmatrix/node_* + local ~/.blockmatrix). If added to the hash preimage, cross-version block verification breaks — must land with the other batched preimage changes, never alone."
+      },
+      {
+        "target": "stoq PosToken / STOQ_TOKEN extension frames (protocol/pos_validator.rs)",
+        "change": "DELETE wire-shaped type + 0xfe000001 frame handling",
+        "kind": "wire-serde",
+        "migration_note": "No migration needed: never transmitted on any live path (gate never called, PosValidationState permanently Pending). Confirm no peer ever sends STOQ_TOKEN frames before removal — expected none."
+      },
+      {
+        "target": "bilateral handshake acceptance (TrustChainProofProvider::validate_proof, trustchain mod.rs:280)",
+        "change": "TIGHTEN: add WHEN-freshness bar (validate_with_requirements) on top of FALCON envelope + structural check",
+        "kind": "wire-serde",
+        "migration_note": "Not a serde change — an acceptance-policy change on an existing wire message. Peers presenting stale network_time_offset (> resolved max_time_offset) will be refused admission after upgrade. Deploy both ends together (bootstrap-phase network is small); no data migration."
+      },
+      {
+        "target": "trustchain SignedStateProof (JSON to_bytes/from_bytes)",
+        "change": "DELETE type",
+        "kind": "wire-serde",
+        "migration_note": "Zero producers/consumers on any path — safe, no compat shim needed."
+      },
+      {
+        "target": "IssuedCertificate / certificate_store persistence (trustchain/src/ca/)",
+        "change": "Deleting hypermesh_client result types (StateProofValidationResult, ByzantineFaultToleranceStatus, etc.) that generate_certificate_with_state_proof consumes",
+        "kind": "disk-serde",
+        "migration_note": "VERIFY before deleting: if certificate_store serializes StateProofValidationResult (or metadata derived from it) into stored certs, old CA stores won't deserialize. Bootstrap-phase certs are self-sovereign and regenerable — a CA-store wipe is acceptable; otherwise keep a tolerant deserializer. Include in the batched migration inventory either way."
+      },
+      {
+        "target": "lib::proof::ProofValidationResult",
+        "change": "REMOVE confidence() method + Display format change",
+        "kind": "wire-serde",
+        "migration_note": "Method-only removal — serde fields (space/stake/work/time_valid) unchanged, so NO wire/disk impact. Listed to record that the serde shape was checked and deliberately untouched."
+      },
+      {
+        "target": "lib::proof::StateProof / StakeProof / StateRequirements",
+        "change": "NONE — cluster G deliberately makes no field changes to the canonical proof types; placement grants live in chain entries (asset_index), not in the proof",
+        "kind": "wire-serde",
+        "migration_note": "Explicit no-op entry so the batched-migration owner knows G adds nothing here beyond the Block commitment decision above."
+      }
+    ],
+    "plan_steps": [
+      "1 (behavior-preserving) Dead-code sweep, no wire impact: delete SignedStateProof (trustchain mod.rs:297-401), validator.rs struct StateAuthenticator (:20-27), asset_integration.rs (+ StateProofOps::validate_for_asset + example), blockmatrix ProofOfState trait / proof.rs shim (repoint assets/matrix_blockchain.rs:329-336) / state_proof_impl.rs / assets/blockchain.rs / proof_of_state_integration / StateProofConfig (+ integration/config.rs field), lib confidence() (+ Display). cargo check + tests green after each crate.",
+      "2 (behavior-preserving) Delete the stoq PosToken stack: protocol/pos_{validator,integration,fast_validator}.rs, transport/pos_extension_validator.rs, manager/pos.rs PoS methods, multipath _pos_fast_validator, constructors/manager wiring. stoq keeps: bilateral.rs + StateProofProvider seam + falcon transport helpers.",
+      "3 (behavior-preserving) Repoint block_handlers.rs:115 through ValidationService::validate_received (closes #52; byte-identical bar today — both structural — so purely structural unification).",
+      "4 Collapse cert issuance to one path: delete hypermesh_client.rs, blockmatrix stoq_handlers, api/proof_of_state_api.rs, TrustChainCA network issue_certificate (:120-180) + fabricated BFT result (:236-260); rename issue_certificate_local → issue_certificate; repoint ca_enrollment.rs and trustchain bins; FourProofValidator remains the sole cert-issuance bar.",
+      "5 Unify the threshold bar: remove hardcoded 300s from verify_all_proofs (trustchain validation.rs:257 — structural only); parameterize FourProofValidator by StateRequirements (replacing SecurityConfig durations); all quantitative bounds now live only in lib::StateRequirements resolved through NetworkRuleSet (D4 seam).",
+      "6 Enforce handshake WHEN-freshness (W2-44): TrustChainProofProvider::validate_proof applies validate_with_requirements with the anchor StateRequirements (per open question 4, pending owner choice of rule source). Deploy both ends together.",
+      "7 Replace the placement allow-all stub (the HIGH): rename distribution::pos_validator::StateAuthenticator → PlacementAuthorizer; implement it over the node's chain (asset registration owner + grant/share entries via asset_index — same authority as the live serve-side authorizes_shard gate at peer_connection.rs:483); inject from ipc/handlers/store.rs into place_shards (drop the internal DefaultStateAuthenticator::new() at placement.rs:116). Private/Bounded assets place only on chain-granted peers; document the Public-tier rule the owner selects (open question 5).",
+      "8 (batched migration, owner-gated) Wire R12 shard commitment from verification/shard_commitment.rs into block build + received-block accept — rides the ONE batched format migration with the Block field addition; PoSPing/min_spec activation scheduled separately.",
+      "9 (deferred, owner-gated) Flip validation_service.rs:69-74 resolve → resolve_strict once network-genesis rulesets publish (W1-12) — both local and received paths gain fail-closed rejection together."
+    ],
+    "open_questions": [
+      "verification/ disposition: wire R12 shard-commitment into Block during the batched migration (recommended — R12 is a hard requirement) or delete the module and reopen R12 later? If wired: Option<commitment> with serde(default) vs full data wipe?",
+      "Handshake freshness rule source (step 6): at admission time there is no asset scope — should the bar be the anchor StateRequirements, or per-network rules once the peer declares which network it joins? (Affects whether step 6 waits on D4 publishers.)",
+      "Received-block bar: keep structural-only forever (historical-replay tolerance documented at validation_service.rs:89-95), or add per-network freshness with a historical/sync-pool exemption once resolve_strict activates?",
+      "Placement rule for Public/Unbounded assets after the stub is replaced: is every handshake-authenticated peer eligible (PoS-authenticated = authorized to mirror public assets, torrent model), with chain grants required only for Bounded/Private? Recommended, but it is a policy call.",
+      "distribution/redistribution.rs (handle_pos_revocation — no live caller): delete with the stub, or keep as the seam for grant-revocation-triggered re-placement once the chain-backed authorizer exists?",
+      "NetworkRuleSet::publish producer: which cluster owns emitting network-genesis rulesets (the D4 activation dependency for step 9)? G only preserves the hook.",
+      "Does certificate_store persist StateProofValidationResult-derived data (disk-serde check in format_changes)? If yes: tolerant deserializer vs CA-store wipe."
+    ]
+  },
+  {
+    "cluster": "H",
+    "concern_owner": "blockmatrix::assets::pipeline (execution seam: StreamingAssetPipeline calling ngauge::sharding::Sharder as the only RS engine; shard identity = hypermesh_lib::ContentHash; placement stays in network/placement.rs → distribution/)",
+    "consolidations": [
+      {
+        "concern": "asset→shards sharding+encryption stack (the ONE stack)",
+        "keeper": "blockmatrix::assets::pipeline calling ngauge::sharding::Sharder (engine) — pipeline/sharding.rs:18 is already a re-export shim `pub use ngauge::sharding::{Sharder, ShardingConfig}`; Compressor/Encryptor stay in pipeline/{compression,encryption}.rs; shard types are hypermesh_lib::{Shard,ShardMetadata}",
+        "removed": [
+          "blockmatrix::assets::adapters::storage::sharding (ShardingConfig/ShardingAlgorithm dup, 85L config-only, adapters/storage/sharding.rs:12) + adapters/storage/{distribution,encryption,adapter}.rs stack",
+          "blockmatrix::assets::proxy::sharding::{ShardedDataAccess, ShardManager, EncryptedShard} — 874L fourth stack with its OWN kyber1024+AES-GCM impl (proxy/sharding.rs:9-14), only re-exported via assets/core/proxy.rs:445 and core/mod.rs:67, zero live callers"
+        ],
+        "evidence": "Live daemon store path: ipc/handlers/store.rs:97-107 uses AssetPipeline (whose Sharder IS ngauge via pipeline/sharding.rs:18). Grep for proxy::sharding / adapters::storage::sharding callers outside assets/ returns nothing. Streaming pipeline uses the same engine (streaming_pipeline.rs:17 imports orchestrator::DecryptionKey, shards via pipeline Sharder).",
+        "callers_to_repoint": [
+          "none — the removed stacks have zero live callers; drop re-exports at assets/core/mod.rs:53-71 (ShardedDataAccess) and assets/mod.rs:28-30"
+        ]
+      },
+      {
+        "concern": "shard-identity scheme (the ONE identity)",
+        "keeper": "hypermesh_lib::ContentHash — bare BLAKE3 [u8;32]. It is what actually keys everything live: ShardStore (store.rs:265-266 `state.shard_store.store(ContentHash, ...)`), on-chain StoragePointer::Sharded.shard_hashes (store.rs:222-225), the serve/re-seed gate authorizes_shard(&[u8;32]) (store.rs:425), TAG_SHARD_* wire, and ShardMap.shard_hashes hex (sharing/shard_map.rs:39)",
+        "removed": [
+          "lib::AssetAddress-as-shard-identity — the 4-bit shard nibble (lib/src/types.rs:529-530,567-568, max 15 shards) structurally cannot encode R14 adaptive RS counts; deprecate/remove `with_shard` semantics. AssetAddress has ZERO live consumers: only genesis_assessor.rs:200,236 (itself dead — zero callers outside blockchain/mod.rs:56 re-export) and transfer/mod.rs (test-only island, other cluster)",
+          "blockmatrix::assets::storage::{ContentAddress, Hash, ContentAddressedStorage} — parallel content-address vocabulary used only by the retrieval/ and intelligence/ islands (assets/storage/*, 2,919L)"
+        ],
+        "evidence": "AssetAddress consumer grep: transfer/mod.rs (24, island), genesis_assessor.rs (4, dead — no caller grep hits in src/bin, src/ipc, src/network), ngauge placement doc-comments only. Live shard flow never constructs an AssetAddress.",
+        "callers_to_repoint": [
+          "retrieval/* users of assets::storage::Hash die with retrieval/ (below)",
+          "genesis_assessor.rs: dead — delete or leave to the genesis cluster; do not wire AssetAddress here as part of H"
+        ]
+      },
+      {
+        "concern": "streaming vs whole-blob pipeline (R13)",
+        "keeper": "blockmatrix::assets::pipeline::streaming_pipeline::StreamingAssetPipeline + segment::AssetManifest + SegmentShardSet + DecryptionKey::KyberSegmented (orchestrator.rs:76-79) — R13 mandates bounded-memory streaming; fully tested (tests/streaming_pipeline_integration.rs) but currently ZERO production consumers (grep: only tests + pipeline-internal)",
+        "removed": [
+          "AssetPipeline::process_asset/process_asset_with_privacy whole-blob path + reconstruct_asset (orchestrator.rs, 817L) — the CURRENT live path (ipc/handlers/store.rs:97-107, bin/node/commands/store.rs:82) — removed AFTER the batched cutover, not before",
+          "DecryptionKey::{Kyber, Aes} variants (orchestrator.rs:59-75) — removable only after the shard-map migration window (old KeyEnvelopes wrap these variants)",
+          "ProcessedAsset.proof_hash placeholder (orchestrator.rs:268-280 hashes the literal b\"proof-of-state:\"+id — commits to nothing; W2-59) and ProcessedAsset.distributed decorative field (orchestrator.rs:383-391 synthesized empty)"
+        ],
+        "evidence": "ipc/handlers/store.rs:97 `AssetPipeline::default()` is the live daemon path; streaming callers grep = {streaming_pipeline.rs itself, pipeline/mod.rs, 3 test files}. Both pipelines already share the DecryptionKey enum and ngauge Sharder, so the cutover is a call-site + ShardMap-format change, not a crypto change.",
+        "callers_to_repoint": [
+          "ipc/handlers/store.rs:97-107 (handle_store) → StreamingAssetPipeline::process (and pin the live-path test per W2-73)",
+          "ipc/handlers/share.rs travel-map build/read (share.rs:111,209,391,434) → segmented ShardMap",
+          "bin/node/commands/store.rs run_store:82 / run_fetch:333-336 → see CLI consolidation",
+          "shard.fetch reconstruction consumers of ShardMap"
+        ]
+      },
+      {
+        "concern": "per-asset chain (parallel blockchain layer in assets/)",
+        "keeper": "blockmatrix::blockchain — the real per-asset chain (NodeBlockchain + AssetLineage authoritative + asset_index derived cache, per Track D) with StoragePointer::Sharded registration as the shard-authorization source of truth (store.rs:219-232)",
+        "removed": [
+          "assets/blockchain.rs::AssetBlockchainManager (481L)",
+          "assets/matrix_blockchain.rs::{EntityBlockchain, MatrixBlockchainManager, BlockchainMatrixCoordinate} (691L)",
+          "assets/cross_chain/mod.rs::CrossChainValidationManager (zero callers) — KEEP cross_chain/receipt_validator.rs::CrossChainReceiptValidator + cross_chain/types.rs, which are LIVE (ipc/handlers/mod.rs:184, gateway/transfer_coordinator.rs:47, bin/node/commands/connect.rs:209, + 7 more ipc handlers); move them out of assets/cross_chain into gateway/ or blockchain/"
+        ],
+        "evidence": "Only external references to the dead layer are the public re-exports at assets/mod.rs:39-43 and a comment in proof_of_state/state_proof_impl.rs:88. CrossChainValidationManager caller grep outside assets/cross_chain: empty. CrossChainReceiptValidator caller grep: 10 live sites.",
+        "callers_to_repoint": [
+          "ipc/handlers/{mod.rs:184,trustchain.rs:678,domain.rs:256,dashboard.rs:317,topology.rs:248,system.rs:519,catalog.rs:453}, gateway/transfer_coordinator.rs:47, bin/node/commands/connect.rs:209 → new location of CrossChainReceiptValidator",
+          "delete re-exports assets/mod.rs:39-43"
+        ]
+      },
+      {
+        "concern": "instruction-based retrieval / shard map (R6)",
+        "keeper": "blockmatrix::sharing::shard_map::ShardMap (sharing/shard_map.rs:35 — the on-disk + travel-map record the daemon actually writes/reads: store.rs:306-319, share.rs:111/209/434) + ipc shard.fetch (ipc/handlers/shard.rs:21) + A6.6 registration-on-fetch (shard.rs:192-230)",
+        "removed": [
+          "blockmatrix/src/retrieval/ — entire 4,200L island (instruction_generator, location_resolver, client_assembly, fallback, streaming, its own shard_map.rs, transmission.rs): zero callers outside itself (grep `crate::retrieval` external = empty); its client_assembly/seeding.rs:88 duplicates ConsumerProviderSeeder",
+          "blockmatrix/src/assets/storage/ (2,919L: DeduplicationEngine, ContentAddressedStorage, hash_bucket, RetrievalInstructions) — reachable only from retrieval/ + intelligence/ islands + assets/mod.rs:49-53 re-export"
+        ],
+        "evidence": "External-caller grep for crate::retrieval:: — no hits. assets::storage callers outside itself: retrieval/* (island), intelligence/validation (island), assets/mod.rs re-export. Live dedup is network/shard_dedup.rs (consumer_provider.rs:18).",
+        "callers_to_repoint": [
+          "none live; intelligence/validation/mod.rs references die with the intelligence island (cluster for finding 134/138)"
+        ]
+      },
+      {
+        "concern": "consumer-becomes-provider + R4 privacy-scoped dedup",
+        "keeper": "network/consumer_provider.rs (ConsumerProviderSeeder.process_fetched_shards_with_policy) + network/shard_dedup.rs DedupPolicy (HashOnly suppresses provider announce at consumer_provider.rs:122)",
+        "removed": [
+          "retrieval/client_assembly/seeding.rs duplicate seeder (dies with retrieval/)"
+        ],
+        "evidence": "Live caller ipc/handlers/shard.rs:250 calls process_fetched_shards (hard-Full); DedupPolicy::from_privacy_mode (shard_dedup.rs:31-35) exists + tested but never selected live — W1-40. Fix is a one-line repoint, not new code.",
+        "callers_to_repoint": [
+          "ipc/handlers/shard.rs:250 → process_fetched_shards_with_policy(DedupPolicy::from_privacy_mode(node PrivacyMode)) so ANONYMOUS nodes stop broadcasting TAG_SHARD_ANNOUNCE"
+        ]
+      },
+      {
+        "concern": "shard wire handler",
+        "keeper": "network/shard_transport.rs::handle_shard_message — the production path (dispatched at network/message_handlers/sync_and_reflection.rs:32), which already accepts the legacy bare-shard framing (shard_transport.rs:726)",
+        "removed": [
+          "network/shard_transport.rs::handle_incoming_shard_stream — prod-dead legacy duplicate with divergent serve format; only caller is tests/two_node_shard_exchange.rs:62"
+        ],
+        "evidence": "grep: handle_incoming_shard_stream callers = tests/two_node_shard_exchange.rs only; handle_shard_message is the live dispatch target (sync_and_reflection.rs:32).",
+        "callers_to_repoint": [
+          "tests/two_node_shard_exchange.rs:16,62 → exercise handle_shard_message (so the E2E pins the variant production runs)"
+        ]
+      },
+      {
+        "concern": "ShardPlacement type (name collision)",
+        "keeper": "distribution::ShardPlacement (distribution/mod.rs:107 — node_id + octant + position) — the type the live path produces and registers on-chain: store.rs:121-123 → network/placement.rs:86-126 → distribute_shards_pos_aware",
+        "removed": [
+          "assets/pipeline/distribution.rs::ShardPlacement (line 83, network_id/routing_path shape) + DistributedAsset/DistributionMetadata — only consumers are the decorative ProcessedAsset.distributed field (orchestrator.rs:383) and CLI run_fetch's synthetic reconstruction (bin/node/commands/store.rs:308-316)"
+        ],
+        "evidence": "store.rs:173,342 and network/shard_distribution.rs:15 all use crate::distribution::ShardPlacement; the pipeline twin never crosses a live boundary.",
+        "callers_to_repoint": [
+          "orchestrator.rs (drop .distributed), bin/node/commands/store.rs:308-316 (drop synthetic DistributedAsset)"
+        ]
+      },
+      {
+        "concern": "StateAuthenticator trait (name collision concealing an allow-all stub)",
+        "keeper": "proof_of_state::validation::StateAuthenticator (validation.rs:20 — real StateProof deserialization + validate_comprehensive + requirements check) as the single trait name",
+        "removed": [
+          "distribution/pos_validator.rs::StateAuthenticator (line 47, validate_storage_access shape) — merge into one trait/module; CRITICALLY the blanket impl at pos_validator.rs:256-284 hard-codes `can_store = true` (line 266) — the LIVE placement gate (place_shards → get_eligible_nodes) validates nothing"
+        ],
+        "evidence": "network/placement.rs:116 instantiates DefaultStateAuthenticator, distribute_shards_pos_aware takes C: pos_validator::StateAuthenticator (mod.rs:161), and the impl satisfying it is the allow-all at pos_validator.rs:266. Two same-named traits, the real one never consulted for placement.",
+        "callers_to_repoint": [
+          "network/placement.rs:116-117, distribution/mod.rs:161-165, distribution/pos_validator.rs:89,147 → single trait; replace can_store=true with a real chain query (Grant/authorization from assets/core/authz.rs + NodeBlockchain) — behavior change, gate behind the owner decision below"
+        ]
+      },
+      {
+        "concern": "store/fetch entry path (CLI duplicate of daemon)",
+        "keeper": "ipc/handlers/store.rs::handle_store — the only path that satisfies the A6.1 invariant (persist → register on-chain (store.rs:141-143,219-232) → distribute), pinned by test at store.rs:388",
+        "removed": [
+          "bin/node/commands/store.rs run_store dead dist_ctx branch (lines 149-169; dispatch.rs:325,329 always pass None) — the branch distributes WITHOUT on-chain registration, i.e. the A6.1 bug reintroduced if ever activated; run_store/run_fetch themselves become thin IPC clients or stay explicitly local-only per owner decision"
+        ],
+        "evidence": "dispatch.rs:325 and :329 both call run_store(path, None, ...) — the ShardDistributionCtx branch is unreachable; the CLI also writes shard maps to a DIFFERENT dir (~/.hypermesh/shard_maps, store.rs:35) than the daemon (state.data_dir/shard_maps, ipc store.rs:285), so the two paths already drift.",
+        "callers_to_repoint": [
+          "bin/node/dispatch.rs:325,329,360,364"
+        ]
+      },
+      {
+        "concern": "self-healing distribution (dormant half of distribution/)",
+        "keeper": "distribution/ live half only: mod.rs distribute_shards_pos_aware + pos_validator + matrix_optimizer + audit_trail/audit_ledger (record_shard_placement called live at distribution/mod.rs:177)",
+        "removed": [
+          "distribution/redistribution.rs (handle_pos_revocation — triggers nothing)",
+          "distribution/migration.rs",
+          "distribution/swarm.rs (only ref: platform/user_contribution/distribution_bridge.rs:16 — itself an island)",
+          "distribution/rebalancing/ (~2.3kL incl. the 965L mod.rs)"
+        ],
+        "evidence": "Caller grep outside distribution/+islands for redistribute_shards/handle_pos_revocation/SwarmProtocol/Rebalanc*: only container/migration.rs (a DIFFERENT MigrationManager, unrelated) and platform island. The claimed revoke→redistribute loop does not exist on the shipped binary (W2-57).",
+        "callers_to_repoint": [
+          "drop re-exports distribution/mod.rs:68 (redistribution)"
+        ]
+      },
+      {
+        "concern": "AssetManager/adapter/proxy/privacy/multi_node universe",
+        "keeper": "assets/core SLIMMED to what the daemon actually uses: asset_id.rs (AssetCategory/AssetData/AssetRegistration/NetworkScope/NodeFingerprint/BaseSystemType — live in blockchain/mutations.rs, ipc store/shard/asset/domain, gateway/scope_bridge + transfer_coordinator, dns/registration, proof_of_state/network_rules) + authz.rs (Grant model, live) + AssetError/AssetResult",
+        "removed": [
+          "assets/core mod.rs AssetManager + adapter.rs (trait universe)",
+          "assets/core/proxy.rs + core/privacy.rs + core/status.rs (AssetState/AssetStatus — only external ref is lib.rs:240 re-export and src/privacy/ which defines its OWN AssetState at privacy/switching.rs:64)",
+          "assets/adapters/ (7,664L, 7 adapters incl. hardcoded 2001:db8/Google-DNS addresses at adapters/network/adapter.rs:61-206, container/adapter.rs:268-272)",
+          "assets/proxy/ (7,319L NAT/forwarding/routing/trust_integration)",
+          "assets/privacy/ (10,345L PrivacyManager/rewards/retention — live privacy semantics are hypermesh_lib::PrivacyMode)",
+          "assets/multi_node/ (4,527L coordinator/discovery/fault_tolerance)"
+        ],
+        "evidence": "External-caller grep for assets::{adapters,proxy,privacy,multi_node}, AssetManager: only lib.rs:244 re-export, intelligence/ (island, ~4.6kL), platform/ (island), extensions/ (island). The live daemon (ipc/state.rs, handlers) never constructs AssetManager or any adapter.",
+        "callers_to_repoint": [
+          "lib.rs:240-246 re-exports (trim)",
+          "assets/mod.rs:22-43 re-exports (trim to asset_id+authz+pipeline)",
+          "intelligence/, platform/user_contribution/, extensions/{cli,manager} — these island edges die with their own cluster (findings 134/138); coordinate deletion order: islands first, then assets universes"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "blockmatrix/src/retrieval/ (entire module, 4,200L)",
+        "reason": "R6 island: zero external callers; duplicates live sharing/ShardMap, ConsumerProviderSeeder, and streaming reconstruction; its tests pass while changes are prod no-ops",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/adapters/ (7,664L)",
+        "reason": "adapter universe unreachable from daemon; contains 3rd sharding stack + hardcoded doc/foreign IPv6 literals",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/proxy/ (7,319L incl. proxy/sharding.rs 874L 4th sharding+encryption stack)",
+        "reason": "NAT/proxy universe unreachable from daemon; own kyber1024+AES impl duplicates pipeline encryption",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/privacy/ (10,345L)",
+        "reason": "island; live privacy semantics are hypermesh_lib::PrivacyMode at transport + store-path AccessScope checks",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/multi_node/ (4,527L)",
+        "reason": "dormant triple-stack multi-network coordinator; live network membership is network/multi_network.rs (its doc-comment line 159 explicitly disambiguates)",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/storage/ (2,919L)",
+        "reason": "parallel dedup/content-address/hash-bucket vocabulary; live dedup is network/shard_dedup.rs, live identity is ContentHash",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/blockchain.rs (481L) + matrix_blockchain.rs (691L)",
+        "reason": "pre-unification parallel per-entity chains (AssetBlockchainManager/EntityBlockchain) contradicting node≡asset≡index; re-exported as public API at assets/mod.rs:39-43 inviting new code onto scar tissue",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/cross_chain/mod.rs::CrossChainValidationManager only (keep receipt_validator.rs + types.rs — live)",
+        "reason": "zero callers; the live piece of cross_chain is CrossChainReceiptValidator (10 call sites)",
+        "reachable_from": "dead(uncompiled-in-practice)"
+      },
+      {
+        "path": "blockmatrix/src/distribution/{redistribution.rs, migration.rs, swarm.rs, rebalancing/} (~2.3kL)",
+        "reason": "dormant self-healing half; PoS revocation triggers nothing on the shipped binary; only ref is the platform/ island",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/network/shard_transport.rs::handle_incoming_shard_stream",
+        "reason": "prod-dead duplicate of handle_shard_message with divergent serve format; keeper already accepts the legacy framing (shard_transport.rs:726)",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/bin/node/commands/store.rs dist_ctx branch (lines 149-169) + ShardDistributionCtx",
+        "reason": "dead branch (dispatch.rs:325,329 always pass None) that would ship unregistered shards — the A6.1 bug reintroduced",
+        "reachable_from": "dead(uncompiled-in-practice)"
+      },
+      {
+        "path": "blockmatrix/src/assets/core/{adapter.rs, proxy.rs, privacy.rs, status.rs, AssetManager in mod.rs}",
+        "reason": "dead halves of assets/core; live halves (asset_id.rs, authz.rs, AssetError) extracted to a slim module",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/assets/pipeline/distribution.rs (pipeline ShardPlacement/DistributedAsset, 148L)",
+        "reason": "decorative twin of distribution::ShardPlacement; never crosses a live boundary",
+        "reachable_from": "daemon (decorative field on ProcessedAsset only)"
+      },
+      {
+        "path": "blockmatrix/src/assets/pipeline/orchestrator.rs whole-blob process/reconstruct + DecryptionKey::{Kyber,Aes} (POST-cutover, after migration window)",
+        "reason": "R13-violating whole-blob path replaced by StreamingAssetPipeline; variants must outlive the on-disk KeyEnvelope migration",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "blockmatrix/src/blockchain/genesis_assessor.rs (or quarantine — only AssetAddress producer)",
+        "reason": "zero callers outside blockchain/mod.rs re-export; R1 hardware-assessed genesis never runs; owner may prefer quarantine since R1 is a paper requirement",
+        "reachable_from": "dead(uncompiled-in-practice)"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix/src/assets/core/asset_id.rs + authz.rs (+ AssetError/AssetResult)",
+        "what": "AssetRegistration/AssetCategory/AssetData/NetworkScope/NodeFingerprint/BaseSystemType + the Grant/AuthorizationSet model — LIVE across blockchain/mutations, ipc handlers, gateway, dns, proof_of_state",
+        "destination": "slim blockmatrix::assets::core (or blockmatrix::asset_types) kept when the rest of assets/core dies"
+      },
+      {
+        "from": "blockmatrix/src/assets/cross_chain/receipt_validator.rs + types.rs",
+        "what": "CrossChainReceiptValidator + receipt types — live at 10 call sites (ipc handlers, gateway/transfer_coordinator.rs:47, connect.rs:209)",
+        "destination": "blockmatrix::gateway (transfer concern) or blockmatrix::blockchain — move, do not delete"
+      },
+      {
+        "from": "blockmatrix/src/network/shard_dedup.rs DedupPolicy::HashOnly + consumer_provider.rs:122 announce suppression",
+        "what": "the R4 Anonymous-scope dedup policy — dormant but correct; becomes live via the shard.rs:250 repoint",
+        "destination": "stays in network/; wired into ipc/handlers/shard.rs fetch path"
+      },
+      {
+        "from": "blockmatrix/src/assets/pipeline/{segment.rs, streaming_pipeline.rs, key_derivation.rs}",
+        "what": "AssetManifest (versioned, flags for segmented-vs-legacy at segment.rs:26-31), SegmentShardSet, BLAKE3-HKDF per-segment keys — the R13 keeper being promoted, not deleted",
+        "destination": "stays; becomes the live store/fetch engine"
+      },
+      {
+        "from": "blockmatrix/src/distribution/redistribution.rs (concept only, not code)",
+        "what": "the revoke→redistribute REQUIREMENT (self-healing loop): record as an NGauge advisory-trigger + blockmatrix actuation roadmap item when the dormant code is deleted",
+        "destination": "ngauge replication-trigger path (roadmap note, no code kept)"
+      },
+      {
+        "from": "tests/two_node_shard_exchange.rs + tests/streaming_pipeline_integration.rs",
+        "what": "E2E coverage — retarget, don't drop: shard exchange onto handle_shard_message; streaming tests onto the LIVE ipc store handler (pins W2-73)",
+        "destination": "tests/ against the keeper paths"
+      },
+      {
+        "from": "blockmatrix/src/network/hash_bucket.rs (SpatialBucketAssigner)",
+        "what": "already-plumbed spatial block filtering (Option wired through block_handlers.rs:38, propagation.rs:502, mounted None at node_bringup.rs:276) — do NOT delete in this cluster; it is plumbing for the vector-space-regions direction",
+        "destination": "stays quarantined pending the owner decision below"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "sharing::shard_map::ShardMap (disk: <data_dir>/shard_maps/*.json AND wire: share.send invite.shard_map_json, share.rs:434)",
+        "change": "v2 segmented shape: add AssetManifest (content_hash, original_size, segment_size, segment_count) + per-segment shard-hash groups (SegmentShardSet sans data) replacing/augmenting the flat shard_hashes+shard_metadata pair; add an explicit version field",
+        "kind": "disk-serde",
+        "migration_note": "Also wire-serde (travel maps cross nodes in share invites). Old maps lack the new fields — additive #[serde(default)] + version tag keeps OLD maps readable by NEW code (legacy whole-blob reconstruct path retained during window); OLD binaries cannot read NEW maps. Alpha option: wipe shard_maps/ + re-store (owner call, batch with the migration)."
+      },
+      {
+        "target": "DecryptionKey enum as wrapped inside sharing::key_wrap::KeyEnvelope plaintext",
+        "change": "new stores write DecryptionKey::KyberSegmented instead of Kyber/Aes; eventual deletion of Kyber/Aes variants changes the serde enum",
+        "kind": "disk-serde",
+        "migration_note": "Envelope travels in share invites → also wire-serde. Variant ADDITION is read-compatible (KyberSegmented already exists in the enum); variant DELETION breaks unwrapping of pre-cutover envelopes — delete Kyber/Aes only after the shard_maps wipe/expiry, in the same batched migration."
+      },
+      {
+        "target": "blockchain::block::StoragePointer::Sharded { shard_hashes, placements }",
+        "change": "NO structural change — streaming cutover flattens per-segment shard hashes into the existing Vec<[u8;32]> (order: segment-major). This is a deliberate NON-change to keep the frozen Block::calculate_hash preimage intact; authorizes_shard scans the flat list unchanged",
+        "kind": "hash-preimage",
+        "migration_note": "Guard: any temptation to add a per-segment structure ON-CHAIN is forbidden without the batched migration — keep segment structure exclusively in the off-chain ShardMap/manifest."
+      },
+      {
+        "target": "TAG_SHARD_ANNOUNCE payload when DedupPolicy::HashOnly goes live (consumer_provider.rs:122)",
+        "change": "Anonymous-mode fetchers suppress/blank the provider announce — behavior change on an existing wire message, no serde shape change",
+        "kind": "wire-serde",
+        "migration_note": "No compat issue: receivers already handle both payload forms; this is activation of an existing branch."
+      },
+      {
+        "target": "CLI shard-map directory (~/.hypermesh/shard_maps, bin store.rs:35) vs daemon (<data_dir>/shard_maps, ipc store.rs:285)",
+        "change": "unify on the daemon's data_dir layout when CLI becomes an IPC client",
+        "kind": "disk-serde",
+        "migration_note": "Path/layout only, not serde; migrate or document abandonment of the CLI-side dir in the same batch."
+      },
+      {
+        "target": "ProcessedAsset.proof_hash (orchestrator.rs:100,268-280)",
+        "change": "delete the placeholder field (never serialized to disk/wire; real proof binding lives in BlockAssetEntry::new_bound at ipc store.rs:219)",
+        "kind": "wire-serde",
+        "migration_note": "NOT actually a format change — in-memory only; listed to record it was checked and excluded from the migration batch."
+      }
+    ],
+    "plan_steps": [
+      "1 (behavior-preserving) Pin the CURRENT live path first: add a test asserting ipc handle_store uses the (whole-blob) pipeline and store→fetch round-trips — closes the W2-73 'no test pins the live path' hole before anything moves.",
+      "2 (behavior-preserving) Dead-island deletions with zero live callers: retrieval/, assets/{adapters,proxy,privacy,multi_node,storage}, assets/blockchain.rs, assets/matrix_blockchain.rs, cross_chain::CrossChainValidationManager, distribution/{redistribution,migration,swarm,rebalancing}, dead dist_ctx branch in CLI run_store, handle_incoming_shard_stream (+ retarget two_node_shard_exchange.rs to handle_shard_message). Coordinate with the islands cluster (intelligence/, platform/, extensions/) — delete those edges first or in the same change.",
+      "3 (behavior-preserving) Extract survivors: slim assets/core to asset_id.rs + authz.rs + AssetError; relocate CrossChainReceiptValidator + types to gateway/ (repoint the 10 call sites); trim assets/mod.rs and lib.rs:240-246 re-exports to the live surface.",
+      "4 (behavior-preserving) Type dedup: delete assets/pipeline/distribution.rs ShardPlacement/DistributedAsset and ProcessedAsset.distributed + proof_hash placeholder; single ShardPlacement = distribution::ShardPlacement; merge the two StateAuthenticator traits into proof_of_state::validation (keep allow-all BEHAVIOR temporarily so placement output is unchanged — mark the stub loudly).",
+      "5 (small behavior fix, no format) Wire R4: ipc/handlers/shard.rs:250 → process_fetched_shards_with_policy(DedupPolicy::from_privacy_mode(...)) so Anonymous fetchers stop announcing themselves as providers.",
+      "6 (owner-gated behavior fix) Make placement gating real: replace pos_validator.rs:266 can_store=true with a chain-backed authorization query (authz Grant + NodeBlockchain), per the open question on which query is authoritative.",
+      "7 (THE batched format migration — one change) Streaming cutover: switch ipc handle_store + share travel maps + fetch/reconstruct + CLI to StreamingAssetPipeline; ShardMap v2 (manifest + segment groups, versioned) + KeyEnvelope wrapping KyberSegmented; StoragePointer::Sharded stays byte-identical (flat shard hashes, frozen preimage); execute the wipe-or-legacy-read decision; update the pinned live-path test to assert streaming + bounded memory (R13).",
+      "8 (post-migration) Delete the whole-blob process/reconstruct path and, after the migration window, DecryptionKey::{Kyber,Aes}; unify CLI store/fetch as IPC clients (per owner decision).",
+      "9 (cleanup) File-size passes on what remains (streaming_pipeline.rs 941L, asset_id.rs 800+); most W2-62 offenders are already gone via deletion. Re-audit: grep zero references to deleted modules, full test suite, two-node E2E store→fetch→re-seed over the streaming path."
+    ],
+    "open_questions": [
+      "AssetAddress (lib/src/types.rs:532): delete from lib entirely, or keep as the R10/R15 asset-level address with the 4-bit shard nibble deprecated (shard identity is ContentHash regardless)? Deleting contradicts the paper's IPv6-addressed-asset story; keeping ships a decorative type with no consumer. Its only producer (genesis_assessor.rs) is itself dead — same decision applies to it (delete vs quarantine as the future R1 assessed-genesis).",
+      "SpatialBucketAssigner (network/hash_bucket.rs): mount it for Public-mode block filtering (it is fully plumbed, just None at node_bringup.rs:276) or hold quarantined until the vector-space-regions coordinate work defines what spatial responsibility means? Not deleting either way — confirm.",
+      "Placement authorization query (replaces the pos_validator.rs:266 allow-all): what makes a peer eligible to HOLD shards of asset A — owner+grantee Grant set on A's chain, network membership (shards belong to their NetworkId), or both? This defines the real get_eligible_nodes.",
+      "Migration for existing stored assets at cutover: wipe shard_maps/ + shard data and re-store (alpha-acceptable, matches the existing block-format-change wipe convention), or ship a permanent legacy whole-blob read path? Determines when DecryptionKey::{Kyber,Aes} can die.",
+      "CLI store/fetch: keep as an explicitly offline, local-only ingest tool (current behavior, no on-chain registration), or convert to thin IPC clients of the daemon (one store path, A6.1 invariant everywhere)? Recommend IPC client; needs your call since it changes CLI offline semantics.",
+      "distribution/ dormant-half deletion removes the only (dead) revoke→redistribute implementation: confirm the self-healing loop is owned by NGauge (advisory trigger) + a future blockmatrix actuation phase so deleting here doesn't orphan the requirement.",
+      "retrieval/ (R6) deletion: confirm the R6 'transmit instruction map' target is considered owned by sharing/ travel-maps (+ future work), so the 4,200L island can go with zero salvage.",
+      "Ordering with the islands cluster (intelligence/, platform/, extensions/, api/): assets-universe deletion requires those edges gone first — same batch or strict ordering between clusters?"
+    ]
+  },
+  {
+    "cluster": "I",
+    "concern_owner": "ngauge::placement (placement geometry: RTT locality, distance, clustering) — with base::address::derive_cell remaining the sole identity-cell derivation it already is; blockmatrix consumes both, owns neither.",
+    "consolidations": [
+      {
+        "concern": "clustering/distance engine (demand clustering + euclidean distance)",
+        "keeper": "ngauge/src/swarm_analytics.rs::{matrix_distance (:620), cluster_positions (:630)} — the ONLY engine on the daemon path (DispersionAdvisor.recommend_placement_in_network → poll.rs:222, feed loop). Promote both from private fns into a small pub ngauge::placement geometry module so external callers stop inlining.",
+        "removed": [
+          "blockmatrix/src/matrix/geospatial/clustering.rs::GeographicClustering (843L: kmeans/dbscan/hierarchical — dormant; phantom-cluster + coordinate-keyed-membership bugs per W2-29)",
+          "blockmatrix/src/network/replication_service/poll.rs::inline euclidean at :240-245 (third distance transcription)",
+          "blockmatrix/src/network/locality.rs::locality_centroids (:64-83, the sole GeographicClustering caller — itself has ZERO callers)"
+        ],
+        "evidence": "Live: poll.rs:220-227 calls ngauge::DispersionAdvisor from the 30s E.2 loop; swarm_analytics.rs:586 cluster_positions is what actually clusters demand. Dead: grep for locality_centroids finds only its own definition+tests (blockmatrix/src/network/locality.rs:64,118,134); clustering.rs's only non-test import is locality.rs:31. Docs at locality.rs:19-22,58-60 claim 'promotion of GeographicClustering to a live caller' — false (W1-43/W2-20).",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/replication_service/poll.rs:240-245 (select_dispersion_source inline sqrt) → ngauge matrix_distance",
+          "blockmatrix/src/network/locality.rs — delete locality_centroids + the GeographicClustering import; KEEP provider_from_nodes (:41, live via placement.rs:99, poll.rs:77, feed.rs:42)"
+        ]
+      },
+      {
+        "concern": "placement coordinate space (one metric, never mixed)",
+        "keeper": "ngauge/src/placement/locality.rs::LocalityProvider RTT embedding (x = rtt/100µs, bounded BLAKE3 jitter y/z) — the proximity-real space done_means names. derive_cell output stays identity-only, never fed into geometric distance.",
+        "removed": [
+          "blockmatrix/src/network/placement.rs::peer_coordinate fallback (:64-77) — mixes RTT units with hash cells in one octant computation (W2-24)",
+          "blockmatrix/src/network/replication_service/poll.rs:84-90 — same mixed fallback (announced derive_cell cell cast to MatrixPosition beside RTT coords)"
+        ],
+        "evidence": "placement.rs:68-76: measured peers get RTT coords (~1-500 units), unmeasured fall back to peer.coordinate — an i16-range hash point (±32k units), so every unmeasured peer is a geometric outlier tens of thousands of units away; identical pattern at poll.rs:84-90. Replacement: unmeasured peers go in an explicit non-geometric bucket (deterministic id-ordered fallback, as select_dispersion_source's own fallback at poll.rs:257+ already does) instead of fake distance.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/placement.rs::place_shards (:86)",
+          "blockmatrix/src/network/replication_service/poll.rs::spawn peer_coords map (:78-93)",
+          "blockmatrix/src/network/replication_service/feed.rs:40-42 (same provider, verify no announced-cell mixing)"
+        ]
+      },
+      {
+        "concern": "propagation / neighbor queries coordinate space",
+        "keeper": "Proximity coordinates from provider_from_nodes over the connected-peer set — propagation target selection and IPC topology.neighbors move onto the same RTT space placement uses (done_means: ONE coordinate space).",
+        "removed": [
+          "blockmatrix/src/blockchain/propagation.rs::select_propagation_targets over identity-hash cells (:255-292) — Broadcast/DistanceThreshold with radius 1.5/threshold over uniform-random i16 cells select ZERO peers (silent no-propagation); NearestN(6) is hash-distance dressed as topology (W2-23)",
+          "blockmatrix/src/blockchain/propagation.rs::select_routed_targets/find_relay_nodes (:294+) — decorative 'relay corner' geometry over hash cells"
+        ],
+        "evidence": "propagation.rs:262 find_neighbors(...,1.5) and :275 threshold run over get_connected_coordinates (network/mod.rs:665) which returns announced identity cells; two derive_cell points are within distance 1.5 with probability ~0. ipc/handlers/topology.rs:62 same input → neighbors always empty.",
+        "callers_to_repoint": [
+          "blockmatrix/src/blockchain/propagation.rs:262,267,275,286,617,645",
+          "blockmatrix/src/ipc/handlers/topology.rs:62 (topology.neighbors)",
+          "blockmatrix/src/network/hash_bucket.rs::SpatialBucketAssigner (mod.rs:58, block_handlers.rs:14) — consumes peer coordinates; must take the verified/derived cell, not the claimed one"
+        ]
+      },
+      {
+        "concern": "matrix-cell derivation + verification (P2 device-auth invariant)",
+        "keeper": "base/src/address.rs::derive_cell (:65) — already the single construction; blockmatrix/src/matrix/coordinate.rs::derive_cell (:160) correctly delegates. ADD the missing enforcement: at handshake ingest (blockmatrix/src/network/mod.rs:580-585) compute the cell FROM result.peer_node_id via derive_cell and use THAT as NetworkNode.coordinate; the wire-claimed tuple is checked for equality and logged/rejected on mismatch.",
+        "removed": [
+          "Trust in the wire-claimed coordinate: stoq/src/protocol/bilateral.rs Msg1/Msg2 coordinate (:89,:109) is currently accepted verbatim at network/mod.rs:580 (W2-19)",
+          "blockmatrix/src/bin/node/cli.rs::--coord-x/y/z operator override (:21-35) — lets the local operator claim any cell; restrict to a test-only build or delete"
+        ],
+        "evidence": "network/mod.rs:580-585 constructs NetworkNode.coordinate straight from result.peer_coordinate with only a bounds check; grep shows zero derive_cell verification sites anywhere on the receive path. Forged cells flow into propagation.rs:267, hash_bucket, placement.rs:75, poll.rs:86.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/mod.rs:580 (both initiator and responder HandshakeData construction)",
+          "blockmatrix/src/bin/node/main.rs:107 (already derives — keep)"
+        ]
+      },
+      {
+        "concern": "neighbor-query surface",
+        "keeper": "blockmatrix/src/matrix/neighbors.rs::{find_neighbors (:37), find_k_nearest (:75)} — live via propagation.rs:22, peer_discovery.rs:15, chunk.rs:28, cli/executor.rs:17, ipc/handlers/topology.rs:62.",
+        "removed": [
+          "blockmatrix/src/matrix/neighbors.rs::find_neighbors_cubic (:129)",
+          "blockmatrix/src/matrix/neighbors.rs::find_neighbors_spherical (:164)",
+          "blockmatrix/src/matrix/neighbors.rs::find_neighbors_manhattan (:191)",
+          "blockmatrix/src/matrix/neighbors.rs::find_neighbors_chebyshev (:222)"
+        ],
+        "evidence": "Workspace grep: the 4 variants have zero callers outside neighbors.rs tests and the matrix/mod.rs:47 re-export (find_neighbors_cubic re-exported but never called).",
+        "callers_to_repoint": [
+          "blockmatrix/src/matrix/mod.rs:47 re-export line"
+        ]
+      },
+      {
+        "concern": "NetworkTopology type (5 duplicates → 0 ambiguous)",
+        "keeper": "None — the live 'topology' fact is the connected-peer set (network/mod.rs::get_connected_nodes) + LocalityProvider; no reified NetworkTopology struct is on the daemon path. Two die with their subsystems, three get concern-specific renames.",
+        "removed": [
+          "blockmatrix/src/matrix/geospatial/topology.rs::NetworkTopology (:123) — DELETE with GPS layer",
+          "blockmatrix/src/persistence/topology_backup.rs::NetworkTopology (:29) — DELETE with topology_backup",
+          "RENAME (not delete): blockmatrix/src/orchestration/service_mesh/routing.rs:36 → ServiceMeshTopology; blockmatrix/src/assets/multi_node/mod.rs:81 → MultiNodeTopology (feature 'multi-node', NOT in default features per Cargo.toml:214-217); catalog/src/sharing/topology/mod.rs:24 → SharingTopology (live inside catalog's P2P sharing, catalog/src/sharing/mod.rs:198,238)"
+        ],
+        "evidence": "geospatial topology.rs consumed only by topology_backup.rs:17 + persistence/test_integration.rs:62; topology_backup's create_topology_backup (manager.rs:345) has ZERO external callers — constructed at bootstrap (bootstrap.rs:144) but never invoked, so both types are dead. Renames are in-memory only (no serde on wire for the surviving three within blockmatrix; catalog's is intra-crate).",
+        "callers_to_repoint": [
+          "blockmatrix/src/persistence/manager.rs:22,26,205,246,263,345 (remove topology_backup field + method)",
+          "blockmatrix/src/lib.rs:266 (TopologyBackup export)",
+          "blockmatrix/src/persistence/test_integration.rs:54,60,62",
+          "catalog/src/sharing/mod.rs:27,198,238 (rename)"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "blockmatrix/src/matrix/geospatial/ (entire dir: clustering.rs 843L, converter.rs 452L, hierarchy.rs 746L, topology.rs 770L, mod.rs 344L)",
+        "reason": "GPS/geographic-region layer contradicts the canonical emergent-vector-space-region model (regions are emergent clusters, never geographic, never reified — vector-space-regions memory); test-only reachability; GeographicClustering is the dormant duplicate of the live ngauge engine (W2-21/W2-26/W2-29). GpsConverter/GeographicZone have zero callers outside the dir except topology_backup.rs (also deleted).",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/persistence/topology_backup.rs (658L) + manager.rs topology_backup field/method (:22,:26,:205,:246,:263,:345) + lib.rs:266 export + test_integration.rs:54-62",
+        "reason": "create_topology_backup has zero production callers — an on-disk backup format never written; carries GeographicZone + the second dead NetworkTopology.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/matrix/transforms.rs (353L) + matrix/mod.rs:43",
+        "reason": "translate/scale/rotate on MatrixCoordinate: zero callers anywhere (the .scale hits in tensor/ are Vector3D::scale, a different type). Violates P7's own decorative-cleanup bar (chunk.rs:21-25) — W2-27.",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/matrix/tensor/routing.rs::{routing_similarity (:101), find_aligned_nodes (:123), calculate_orthogonal_routes (:171), calculate_load_balanced_routes (:205)} + tensor/mod.rs:36-37 re-exports",
+        "reason": "4 of 7 tensor routing fns have zero callers (calculate_orthogonal_routes only feeds calculate_load_balanced_routes internally). Live keepers: calculate_routing_vector, calculate_routing_path, score_route_quality (cli/executor.rs:18, ipc/handlers/topology.rs:13).",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/matrix/neighbors.rs::{find_neighbors_cubic, find_neighbors_spherical, find_neighbors_manhattan, find_neighbors_chebyshev} + matrix/mod.rs:47",
+        "reason": "Zero callers outside own tests; 4 redundant variants of the two live queries (W2-27).",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/src/network/locality.rs::locality_centroids (:64-83) + GeographicClustering import (:31) + false 'promotion to live' module docs (:19-22)",
+        "reason": "Zero callers (W1-43/W2-20); the doc claims a live capability that never executes. provider_from_nodes in the same file STAYS (live).",
+        "reachable_from": "dead(uncompiled-in-effect: no caller)"
+      },
+      {
+        "path": "ngauge/src/placement/lease.rs (164L PlacementLease) + ngauge/src/lib.rs:67 + placement/mod.rs:19 re-exports + doc pointers in base/src/address.rs:61, blockmatrix/src/matrix/coordinate.rs:17,158",
+        "reason": "ZERO consumers (docs + own unit tests only) despite P1-P4 marked complete; the identity/location boundary it names is actually implemented by LocalityProvider + NetworkId-parameterized ngauge APIs (recommend_placement_in_network). Never serialized on any wire/disk path, so deletion is format-free. RECOMMEND DELETE — final call is the owner's (open_questions).",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/blockchain/propagation.rs::select_routed_targets + find_relay_nodes (RoutedPath machinery, :294+)",
+        "reason": "Relay-corner geometry over locality-free hash cells — decorative; RoutedPath is unreachable via default config and meaningless in the identity-hash space (W2-23/W2-27).",
+        "reachable_from": "daemon (reachable but no-op-equivalent; only via non-default config)"
+      },
+      {
+        "path": "blockmatrix/src/intelligence/mod.rs placeholder shard-retrieval (~:485-489, the fn shaped like instruction-based retrieval) — and note integration/phase1_foundation.rs::find_k_nearest_nodes duplicate (:287) rides the same island",
+        "reason": "Dead code that will be mistaken for the claimed instruction-based-retrieval feature (W2-27); phase1_foundation is reachable only via the lib.rs:316 re-export, no daemon caller.",
+        "reachable_from": "island(self-refs)"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix/src/matrix/geospatial/clustering.rs::initialize_kmeans_centroids (k-means++ init, ~:198)",
+        "what": "The k-means++ seeding strategy — ngauge's live cluster_positions uses naive even-index sampling (swarm_analytics.rs:638-641), which is weaker for skewed demand maps.",
+        "destination": "ngauge/src/swarm_analytics.rs::cluster_positions (or the promoted ngauge placement-geometry module)"
+      },
+      {
+        "from": "blockmatrix/src/network/locality.rs",
+        "what": "provider_from_nodes (:41-54) — the live RTT ingest — plus its cold-start semantics; must survive the deletion of locality_centroids in the same file.",
+        "destination": "stays in blockmatrix/src/network/locality.rs (file shrinks, keeps the live half)"
+      },
+      {
+        "from": "ngauge/src/placement/lease.rs module docs (:6-32)",
+        "what": "The identity-vs-location doctrine (derive_cell = identity fingerprint, placement = elastic NGauge decision; priority is a scheduler hint never a PoS magnitude) — load-bearing prose worth keeping when the type dies.",
+        "destination": "ngauge/src/placement/mod.rs module docs (and the corrected doc pointers in base/src/address.rs + blockmatrix coordinate.rs point at LocalityProvider/DispersionAdvisor instead of the deleted type)"
+      },
+      {
+        "from": "blockmatrix/src/network/chunk.rs::{Chunk, most_central}",
+        "what": "Live proximity-cell primitives (poll.rs:276 fallback) — in-scope neighbors of the deletions; explicitly NOT delete targets.",
+        "destination": "stays in blockmatrix/src/network/chunk.rs"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "stoq/src/protocol/bilateral.rs HandshakeMsg1/Msg2 `coordinate` field (:89,:109; wire JSON, flat)",
+        "change": "Field becomes redundant once the receiver derives the cell from peer_node_id (verify-then-ignore). OPTIONAL removal of the field from both messages in the batched migration; short-term the field stays and is verified, which is format-free.",
+        "kind": "wire-serde",
+        "migration_note": "Removal breaks handshake with old nodes (field is required on deserialize today). Compat path: first ship verify-and-ignore (no format change), then drop the field in the ONE batched migration alongside the other wire changes; serde(default) on the receiver for one release makes it tolerant of both. No disk data involved.",
+        "target_note": "the struct/field"
+      },
+      {
+        "target": "blockmatrix/src/blockchain/sync_protocol.rs::PropagationStrategyConfig enum (:24) — serialized node config",
+        "change": "If the owner approves pruning the no-op variants (Broadcast/DistanceThreshold/RoutedPath), removing enum variants changes the config-file serde surface.",
+        "kind": "disk-serde",
+        "migration_note": "Config-file only (not chain/wire). serde(alias)/fallback-to-NearestN on unknown variant gives zero-wipe compat; old configs naming a pruned variant deserialize to the default. Batch with the migration anyway to keep one flag day.",
+        "target_note": ""
+      },
+      {
+        "target": "persistence topology_backup on-disk backup format (blockmatrix/src/persistence/topology_backup.rs)",
+        "change": "Deleted outright.",
+        "kind": "disk-serde",
+        "migration_note": "create_topology_backup has zero production callers — no production data ever written in this format; deletion needs NO wipe and NO reader. Verify no stray files under the storage dir on the remote before calling it clean.",
+        "target_note": ""
+      },
+      {
+        "target": "on-chain placement records (register_sharded_asset_onchain placements — ipc/handlers/store.rs)",
+        "change": "NO schema change, but switching the recorded placement coordinate source (announced identity cell vs proximity cell) changes the VALUES entering new blocks' hash preimages. Old blocks stay valid (preimage frozen, values are per-block).",
+        "kind": "hash-preimage",
+        "migration_note": "Value-level only — no migration, no wipe. Listed so the owner knows the batched migration boundary: coordinate-source switch must land atomically with the distribute_to_peers repoint (the sibling cluster's finding) or chain placements and actual shard holders diverge further.",
+        "target_note": ""
+      }
+    ],
+    "plan_steps": [
+      "1 (behavior-preserving, security): Enforce the P2 invariant at ingest — in blockmatrix/src/network/mod.rs:580 both handshake directions, set NetworkNode.coordinate = MatrixCoordinate::derive_cell(&result.peer_node_id); compare against the wire-claimed tuple, warn on mismatch (hard-reject once soak-verified). Restrict/remove --coord-x/y/z (cli.rs:21-35). No wire format change.",
+      "2 (behavior-preserving deletions, zero callers): delete matrix/transforms.rs, the 4 dead tensor routing fns + tensor/mod.rs:36-37, the 4 neighbors.rs variants + matrix/mod.rs:47, locality_centroids + its false docs in network/locality.rs, intelligence placeholder retrieval, phase1_foundation::find_k_nearest_nodes duplicate. cargo check + full test filter after each file.",
+      "3 (delete the GPS island): remove blockmatrix/src/matrix/geospatial/ entirely, persistence/topology_backup.rs, manager.rs topology_backup field/method, lib.rs:266 export, test_integration.rs references. This simultaneously resolves W2-21 (duplicate engine), W2-26, W2-29, W2-30 (2 of 5 types), and fixes blockmatrix/CLAUDE.md's false 'Geospatial integration implemented' claim.",
+      "4 (single engine): promote ngauge matrix_distance + cluster_positions into a pub ngauge placement-geometry module (salvage kmeans++ init from the deleted clustering.rs); repoint poll.rs:240-245 inline euclidean to it.",
+      "5 (one coordinate space — placement): replace the mixed derive_cell fallback in placement.rs:64-77 and poll.rs:84-90 with an explicit unmeasured-peer bucket (deterministic id-ordered fallback, never fake geometry); verify feed.rs:40-42.",
+      "6 (one coordinate space — propagation/neighbors): feed provider_from_nodes proximity coords into select_propagation_targets and ipc topology.neighbors; delete select_routed_targets/find_relay_nodes; prune or rewire Broadcast/DistanceThreshold per owner decision (config disk-serde note).",
+      "7 (rename pass): NetworkTopology → ServiceMeshTopology (orchestration/service_mesh/routing.rs:36), MultiNodeTopology (assets/multi_node/mod.rs:81 + assets/mod.rs:36 export), SharingTopology (catalog/src/sharing/topology/mod.rs:24 + mod.rs:27). In-memory only.",
+      "8 (owner-gated): delete PlacementLease + re-exports; rewrite the doc pointers in base/src/address.rs:61 and matrix/coordinate.rs:17,158 to name LocalityProvider/DispersionAdvisor; correct the P1-P4/P6 PDL status claims (lease unconsumed, centroid promotion false).",
+      "9 (batched migration handoff): contribute the two real format items to the ONE migration — handshake coordinate-field removal (wire-serde, after step 1 soak) and PropagationStrategyConfig variant pruning (config disk-serde). Nothing in this cluster requires a chain wipe.",
+      "10 (QA gate): E2E two-node — forged-cell handshake is derived-over-claimed (step 1), placement/poll rankings contain no >10^3-unit outlier coordinates for unmeasured peers, topology.neighbors non-empty with ≥2 connected peers, grep proves single NetworkTopology name per concern and zero GeographicClustering references."
+    ],
+    "open_questions": [
+      "PlacementLease: DELETE (recommended — zero consumers, concept already served by NetworkId-parameterized ngauge APIs) or WIRE as the placement-record type when on-chain placement records land? Deleting also falsifies the P1/P2/P3/P4 'complete' claims — PDL correction either way.",
+      "Claimed-cell mismatch policy: silently derive-and-ignore (robust, no reject churn, wire field becomes vestigial) vs hard-reject the handshake (strict P2, risks bricking peers after any derivation change)? Recommendation: derive-and-warn now, hard-reject after one release.",
+      "Remove the handshake `coordinate` wire field entirely in the batched migration, or keep it permanently as a verified redundancy? (Removal = wire-serde change inventoried above.)",
+      "PropagationStrategy surface: prune Broadcast/DistanceThreshold/RoutedPath (all no-ops or decorative over hash cells) down to NearestN + ContentInterested, or rewire radius strategies over the RTT space? Pruning is a config disk-serde change; rewiring gives radius semantics a real metric for the first time.",
+      "orchestration/ and integration/phase1_foundation are compiled islands with no daemon callers — full module deletion is beyond this cluster's scope but their geometry consumers keep dead matrix fns alive; does the owner want them queued for their own cluster?",
+      "IPC topology.neighbors / routing_cost switching from identity-hash space to RTT space is a user-visible semantic change to a shipped IPC surface — version the response or just change it while the SDK surface is alpha?",
+      "--coord-x/y/z: delete outright, or keep behind a cfg(test)/env-gated escape for local multi-node testing (the HYPERMESH_SOCK-style isolation workflow)?"
+    ]
+  },
+  {
+    "cluster": "K",
+    "concern_owner": "blockmatrix/src/network (NetworkManager + message_handlers/protocol.rs) is the single stoq-glue owner in blockmatrix; stoq/src/transport+protocol keeps only transport + bilateral PoS handshake; hypermesh-ebpf owns the one kernel gate instance, constructed once at the daemon composition root and injected into stoq",
+    "consolidations": [
+      {
+        "concern": "Block/chain sync transport over STOQ (reflector sync) [W2-94]",
+        "keeper": "blockmatrix/src/blockchain/stoq_transport.rs::StoqBlockTransportAdapter + blockmatrix/src/network/reflector_pool.rs + network/sync_dispatch — the live daemon path",
+        "removed": [
+          "stoq/src/transport/reflector/sync_protocol.rs::SyncProtocol",
+          "stoq/src/transport/reflector/block_transport.rs::StoqBlockTransport",
+          "stoq/src/transport/reflector/bridge.rs::ReflectorBridge/BridgedMatrixMessage",
+          "stoq/src/transport/reflector/message.rs::ReflectorMessage",
+          "stoq/src/transport/reflector/mod.rs"
+        ],
+        "evidence": "Live: node_bringup.rs:169 constructs StoqBlockTransportAdapter, :184 constructs ReflectorPool; adapter sends over handshake connections (blockchain/stoq_transport.rs:141-153). Dead: stoq reflector has ZERO consumers outside stoq — only re-exports at stoq/src/lib.rs:63 and stoq/src/transport/mod.rs:22,47 (grep for stoq::transport::reflector/stoq::SyncProtocol across repo: no hits). Canon violation: sync_protocol.rs:37-52 replication_threshold 0.67 quorum-fraction model contradicts PoS binary authentication.",
+        "callers_to_repoint": [
+          "none — delete the re-exports at stoq/src/lib.rs:62-63 and stoq/src/transport/mod.rs:22,47; no live caller exists"
+        ]
+      },
+      {
+        "concern": "App-layer request/response API over STOQ (bincode ApiRequest/ApiResponse + service discovery) [W2-99]",
+        "keeper": "The module itself survives but RELOCATES out of stoq (new crate e.g. stoq-api, or hypermesh-lib) with byte-identical struct definitions — it has live service consumers and cannot be deleted",
+        "removed": [
+          "stoq/src/api/mod.rs (as a stoq module — moved, not kept)",
+          "stoq/src/api/service_discovery.rs (moved)",
+          "blockmatrix/src/api/mod.rs::create_api_server + api/ipc_bridge.rs + api/proof_of_state_api.rs + api/extensions.rs (island — no consumer outside blockmatrix/src/api/; delete or replace per open question)"
+        ],
+        "evidence": "Live consumers of stoq::api: trustchain/src/bin/trustchain-stoq-server.rs:16, catalog/src/bin/catalog_server.rs:13, trustchain/src/api/stoq_api.rs:569, catalog/src/api/stoq_api/server.rs:73, caesar/src/api/stoq_api.rs, ngauge/src/api/stoq_api.rs; service_discovery used by trustchain/src/stoq_client/*, dns_over_stoq.rs, ct/, ca/. Dead island: blockmatrix::api has zero importers outside itself (grep crate::api::/blockmatrix::api:: → no hits); create_api_server never called from any bin. Silent gap: blockmatrix/src/ipc/handlers/catalog.rs:325 constructs CatalogPeerClient whose requests target a stoq::api::StoqApiServer no daemon ever starts (peer_client.rs:20-25 admits it). Reputation-float vocabulary: stoq/src/extensions.rs:122-123 SeedNode.reliability u8 score.",
+        "callers_to_repoint": [
+          "trustchain/src/api/stoq_api.rs:569 (StoqApiServer import path)",
+          "trustchain/src/proof_of_state/hypermesh_client.rs",
+          "trustchain/src/stoq_client/{operations.rs,types.rs}",
+          "trustchain/src/dns/dns_over_stoq.rs",
+          "trustchain/src/ct/stoq_ct_client.rs",
+          "trustchain/src/ca/stoq_ca_client.rs",
+          "catalog/src/api/stoq_api/{server.rs:73,handlers.rs}",
+          "caesar/src/api/{stoq_api.rs,ui_handlers.rs}",
+          "ngauge/src/api/{stoq_api.rs,ui_handlers.rs}",
+          "blockmatrix/src/catalog/peer_client.rs",
+          "blockmatrix/src/integration/{stoq_bridge.rs:16,services.rs}"
+        ]
+      },
+      {
+        "concern": "Transport-layer implementation (QUIC connections/auth/pooling) [W2-84, W2-98]",
+        "keeper": "stoq crate StoqTransport (stoq/src/transport/manager/, connection.rs, operations.rs) — the only real QUIC implementation, on every live path",
+        "removed": [
+          "blockmatrix/src/transport/mod.rs::HyperMeshTransport (all-stub: connect_to_node/send_data/listen return Ok(()) at mod.rs:135-171; accept() fabricates empty PeerIdentity at mod.rs:154-155 — auth hazard)",
+          "blockmatrix/src/transport/auth.rs::AuthManager/NodeAuthenticator (no external callers)",
+          "blockmatrix/src/transport/pool.rs::ConnectionPool/StoqConnection (no external callers; network/isolation/default.rs ConnectionPool is a different local type)",
+          "blockmatrix/src/transport/monitoring.rs::TransportMonitor (no external callers)"
+        ],
+        "evidence": "mod.rs:10 self-declares 'IMPLEMENTATION STATUS: Structures Only (~10%)'. Only live exports: types.rs::PeerIdentity (17 importers incl. proof_of_state/state_proof_impl.rs:11, assets/multi_node/mod.rs:76), error.rs::TransportError (network/shard_transport.rs:21, platform/user_contribution/distribution_bridge.rs:18), config.rs::TransportConfig (integration/config.rs:11). Grep for HyperMeshTransport/AuthManager/ConnectionPool/TransportMonitor outside blockmatrix/src/transport/: zero live hits. 2177 total lines, only ~3 files' types live.",
+        "callers_to_repoint": [
+          "blockmatrix/src/orchestration/lib.rs:169",
+          "blockmatrix/src/proof_of_state/state_proof_impl.rs:11",
+          "blockmatrix/src/assets/multi_node/mod.rs:76 + 9 sibling multi_node files",
+          "blockmatrix/src/assets/blockchain.rs:291",
+          "blockmatrix/src/intelligence/mod.rs:190",
+          "blockmatrix/src/privacy/{mod.rs,policies.rs}",
+          "blockmatrix/src/network/shard_transport.rs:21",
+          "blockmatrix/src/platform/user_contribution/distribution_bridge.rs:18",
+          "blockmatrix/src/integration/config.rs:11"
+        ]
+      },
+      {
+        "concern": "eBPF orchestrator — the single kernel gate [W2-93]",
+        "keeper": "ONE hypermesh_ebpf::HyperMeshEbpf instance constructed at the daemon composition root (node_bringup.rs) and INJECTED into stoq's StoqTransport constructor, which performs the sole attach_xdp on it; PeerContext.ebpf shares the same Arc so peer_connection.rs mirror writes hit the attached instance",
+        "removed": [
+          "stoq/src/transport/manager/constructors.rs:339 internal StoqEbpfTransport::new() private construction (becomes injected-or-fallback: standalone services like gateway/trustchain keep the fallback)",
+          "blockmatrix/src/bin/node/commands/node_bringup.rs:253-260 separate detached HyperMeshEbpf construction (becomes the injected shared instance)"
+        ],
+        "evidence": "Two disjoint instances today: node_bringup.rs:253-254 constructs HyperMeshEbpf that NEVER attaches XDP (comment :252 'no-op unless an XDP program is actually attached'), yet peer_connection.rs:516 writes set_peer_pos_validated into it; meanwhile stoq constructors.rs:339-345 constructs its own StoqEbpfTransport and DOES attach_xdp, but nothing ever writes peer validations into it (hypermesh-ebpf/src/lib.rs:306-315: writes require xdp_manager Some, else debug-log no-op). Net effect: the attached kernel gate can never admit an authenticated peer. StoqEbpfTransport is a thin wrapper (ebpf.rs:214-232) — the wrapper can accept an injected inner. Mutability note: attach_xdp needs &mut (RwLock at manager/mod.rs:57), set_peer_pos_validated takes &self — the shared handle must be Arc<RwLock<HyperMeshEbpf>> or hypermesh-ebpf grows interior mutability for xdp_manager.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/message_handlers/peer_connection.rs:504-520 mirror_peer_auth_to_kernel (unchanged semantics, now hitting the attached instance)",
+          "blockmatrix/src/bin/node/commands/node_bringup.rs:305,397 (PeerContext.ebpf + ngauge feedback loop take the shared handle)",
+          "stoq/src/transport/manager/constructors.rs:332-363 (accept Option<Arc<...>> from TransportConfig)"
+        ]
+      },
+      {
+        "concern": "Wire-tag constants — single protocol module [W2-101]",
+        "keeper": "blockmatrix/src/network/message_handlers/protocol.rs (canonical tag registry, TAG_SHARD_SEND 0x01 … TAG_DNS_RESPONSE 0x51), exported pub so the bin crate can use it",
+        "removed": [
+          "blockmatrix/src/network/stoq_transfer_transport.rs:61-64 local TAG_TRANSFER_LOCK/REGISTER_REQ/RELEASE/ROLLBACK consts (self-acknowledged lockstep hazard at :57-60)",
+          "blockmatrix/src/bin/node/commands/background.rs:208 literal 0x10u8 // TAG_SYNC_MESSAGE",
+          "blockmatrix/src/blockchain/stoq_transport.rs:21 BLOCK_ANNOUNCE_TAG 0x03 (duplicates TAG_BLOCK_ANNOUNCE protocol.rs:14)"
+        ],
+        "evidence": "protocol.rs consts are pub(crate) and the module is private (`mod protocol` at message_handlers/mod.rs:23 with selective pub(crate) re-export :28) — background.rs lives in the bin crate and physically cannot import them today, which is why the literals exist. Values are identical everywhere; dedup is a pure repoint after making the tag registry pub (e.g. network::wire_tags).",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/stoq_transfer_transport.rs (4 consts)",
+          "blockmatrix/src/bin/node/commands/background.rs:208",
+          "blockmatrix/src/blockchain/stoq_transport.rs:21,90"
+        ]
+      },
+      {
+        "concern": "'Unknown network' sentinel colliding with DEFAULT_NETWORK [W2-7]",
+        "keeper": "explicit PathRejectionReason::UnknownPath { path_id: u32 } variant in stoq/src/transport/multipath/policy.rs",
+        "removed": [
+          "stoq/src/transport/multipath/connection.rs:415 NetworkId([0u8; 16]) sentinel inside TunnelNotConfigured"
+        ],
+        "evidence": "connection.rs:411-418: unknown from_path_id is reported as TunnelNotConfigured{from: NetworkId([0u8;16]), ..} — byte-identical to lib/src/types.rs:94 DEFAULT_NETWORK, making 'unknown path' indistinguishable from 'default-network tunnel unconfigured'. PathRejectionReason (policy.rs:18-36) derives only Debug/Clone, NOT serde — adding a variant is not a wire change.",
+        "callers_to_repoint": [
+          "stoq/src/transport/multipath/connection.rs:406-428 validate_send_to_network (return the new variant)",
+          "any match on PathRejectionReason (policy.rs Display impl :37)"
+        ]
+      },
+      {
+        "concern": "Network isolation enforcement [W2-99 part]",
+        "keeper": "blockmatrix/src/network/isolation/ (the substrate-side enforcer — its mounting is another cluster's finding; stoq keeps NO isolation policy per transport-only canon)",
+        "removed": [
+          "stoq/src/network_isolation.rs (609L: NetworkIsolationManager/NetworkStack/NetworkTunnel/IsolationConfig/TrafficType)",
+          "stoq/src/transport/config.rs:327-329 deprecated enable_network_isolation shim",
+          "stoq/src/transport/multipath/connection.rs:131 dead _isolation_manager field + :158 with_isolation_manager builder",
+          "blockmatrix/src/intelligence/mod.rs:169-170,253 dead construction stored as _network_isolation"
+        ],
+        "evidence": "Every consumer stores it underscored-unused: multipath/connection.rs:131 `_isolation_manager`, intelligence/mod.rs:108 `_network_isolation`. No enforcement call site exists anywhere (grep NetworkIsolationManager: only construction + re-exports at stoq/src/lib.rs:54-57). errors.rs:133 IsolationViolation(String) is a plain error variant and can stay.",
+        "callers_to_repoint": [
+          "none live — delete stoq/src/lib.rs:53-57 re-exports and the two dead fields"
+        ]
+      },
+      {
+        "concern": "STOQ protocol extensions — transport-relevant vs app-layer [W2-99 part]",
+        "keeper": "stoq/src/extensions.rs trimmed to PacketToken (BLAKE3 per-packet work hash — LIVE: feeds hypermesh_pos_prefix → 0x484D cleartext header, protocol/mod.rs:335-340, the A4-CORRECT XDP datapath) + PacketShard (live on StoqTransport::send apply_extensions path, operations.rs:44, used by trustchain/src/stoq_client/operations.rs:111,183,252 and blockmatrix/src/runtime/phoenix/mod.rs:239)",
+        "removed": [
+          "stoq/src/extensions.rs::HopInfo (multi-hop routing — app-layer, no producer)",
+          "stoq/src/extensions.rs::SeedInfo/SeedNode/SeedPriority (seeding/mirroring — NGauge's concern; SeedNode.reliability u8 at :122-123 is forbidden reputation-score vocabulary)",
+          "StoqProtocolExtension::add_hop_info/get_seed_info trait methods (extensions.rs:37,40)",
+          "protocol/frames.rs:68,76,121-122 Hop/Seed frame variants + frame_codec.rs:59,81 encode_hop_frame/encode_seed_frame + decode arms"
+        ],
+        "evidence": "No code constructs a Hop or Seed frame outside frame_codec.rs round-trip tests (:251,:308); encode_hop_frame/encode_seed_frame reachable only via the frame-encode match on variants nobody builds. Token/shard paths ARE live via operations.rs:34,44.",
+        "callers_to_repoint": [
+          "stoq/src/lib.rs:40-43 re-export list (drop HopInfo/SeedInfo/SeedNode/SeedPriority)",
+          "stoq/src/protocol/{frames.rs,frame_codec.rs,mod.rs:347-369} (remove dead arms; keep remaining frame-type IDs at their current byte values)"
+        ]
+      },
+      {
+        "concern": "Matrix-STOQ glue in blockmatrix — the ONE owner [related W2-84/W2-98; finding 148]",
+        "keeper": "blockmatrix/src/network::NetworkManager (handshake at connect_to_peer network/mod.rs:404+, peer message loops, authenticated_peers) + message_handlers — already the only live glue",
+        "removed": [
+          "blockmatrix/src/network/stoq_integration.rs::MatrixStoqIntegration (husk: constructed at network/mod.rs:354 but its connection map has no writers; connect_to_peer explicitly bypasses it — mod.rs:412 comment 'incompatible with handle_incoming_handshake'; broadcast_position/mod.rs:739-740 and :803-804 no-op into the empty map)"
+        ],
+        "evidence": "network/mod.rs:412: 'Always use the NetworkManager handshake path (flat JSON). MatrixStoqIntegration::connect_to_node sends MatrixMessage::Announcement which is incompatible…'. The LIVE part of the file is the MatrixMessage enum (serde_json wire type: sync_and_reflection.rs:464,537,705 parse it off TAG_SYNC_MESSAGE streams; background.rs:200 serializes ReflectorHeartbeat) and MatrixNodeInfo — salvage, not delete.",
+        "callers_to_repoint": [
+          "blockmatrix/src/network/mod.rs:63,322,354,364,376,739-740,803-804 (delete husk field + dead broadcast paths)",
+          "blockmatrix/src/network/message_handlers/{message_utils.rs:13,sync_and_reflection.rs:12},network/sync_dispatch/{dispatcher.rs:12,sync_manager_handler.rs:11,transport_sync_driver.rs:17,tests.rs:18} (import MatrixMessage from its new home)",
+          "blockmatrix/src/bin/node/commands/background.rs:200 (MatrixMessage path)"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "stoq/src/transport/reflector/ (sync_protocol.rs, block_transport.rs, bridge.rs, message.rs, mod.rs — ~1620L)",
+        "reason": "Dead duplicate blockchain-sync subsystem inside the transport crate; 2/3 replication-threshold quorum model (sync_protocol.rs:37-52) contradicts PoS binary authentication; duplicates live blockmatrix reflector_pool/sync_dispatch",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "stoq/src/network_isolation.rs (609L)",
+        "reason": "Zero enforcement call sites; all consumers store it underscored-unused (multipath/connection.rs:131, intelligence/mod.rs:108); isolation policy belongs to blockmatrix per transport-only canon",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/src/transport/mod.rs (HyperMeshTransport impl), auth.rs, pool.rs, monitoring.rs (~1100L of the 2177L)",
+        "reason": "Self-declared 10% stub; every method returns Ok(()) fabricated values; accept() at mod.rs:154-155 fabricates an empty PeerIdentity (auth hazard by construction); shadows the real stoq crate",
+        "reachable_from": "dead(uncompiled-in-effect: no live callers)"
+      },
+      {
+        "path": "blockmatrix/src/network/stoq_integration.rs::MatrixStoqIntegration (struct + impl; NOT MatrixMessage/MatrixNodeInfo)",
+        "reason": "Husk — connection map has no writers since F2; live handshake path explicitly bypasses it (network/mod.rs:412); broadcast_position/find_optimal_route no-op over an empty map",
+        "reachable_from": "daemon (constructed at network/mod.rs:354 but functionally inert)"
+      },
+      {
+        "path": "blockmatrix/src/api/ (mod.rs, ipc_bridge.rs, proof_of_state_api.rs, extensions.rs)",
+        "reason": "Island: no importer outside blockmatrix/src/api/; create_api_server has no caller in any bin; duplicates the live IPC daemon surface",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "stoq/src/extensions.rs::HopInfo/SeedInfo/SeedNode/SeedPriority + protocol frames.rs/frame_codec.rs Hop/Seed variants and codecs",
+        "reason": "App-layer routing/seeding surface with no producers; SeedNode.reliability (extensions.rs:122-123) is forbidden reputation-score vocabulary; seeding/mirroring is NGauge's concern",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "stoq/src/transport/config.rs:327-329 enable_network_isolation deprecated shim",
+        "reason": "Deprecation shim for the deleted network_isolation module",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "stoq/src/transport/manager/constructors.rs:339 private StoqEbpfTransport construction (replaced by injected-or-fallback seam)",
+        "reason": "One of the two disconnected eBPF orchestrators; replaced by injection of the single shared instance on the daemon path",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "blockmatrix/src/bin/node/commands/node_bringup.rs:253-260 detached HyperMeshEbpf construction (replaced by the shared injected instance)",
+        "reason": "The second disconnected orchestrator — never attaches XDP, so P5 mirror writes silently no-op",
+        "reachable_from": "daemon"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix/src/transport/types.rs::PeerIdentity",
+        "what": "The full transport-context peer identity (name + 32-byte id + IPv6 + pubkey) with 17 live importers incl. proof_of_state/state_proof_impl.rs and all of assets/multi_node/",
+        "destination": "hypermesh-lib (shared-types canon) or blockmatrix/src/network/peer_identity.rs — keep serde field NAMES AND ORDER byte-identical (owner picks destination, see open questions)"
+      },
+      {
+        "from": "blockmatrix/src/transport/error.rs::TransportError",
+        "what": "Error enum used by live shard transport",
+        "destination": "blockmatrix/src/network/ (co-located with shard_transport.rs:21 and distribution_bridge.rs:18 consumers)"
+      },
+      {
+        "from": "blockmatrix/src/transport/config.rs::TransportConfig/HyperMeshTransportConfig",
+        "what": "Config structs consumed by integration/config.rs:11",
+        "destination": "blockmatrix/src/integration/config.rs (inline into its only consumer)"
+      },
+      {
+        "from": "blockmatrix/src/network/stoq_integration.rs::MatrixMessage + MatrixNodeInfo",
+        "what": "LIVE serde_json wire enum parsed off TAG_SYNC_MESSAGE streams (sync_and_reflection.rs:464,537,705; background.rs:200-206) — variant/field names are the wire format",
+        "destination": "blockmatrix/src/network/messages.rs (or message_handlers/), preserving every variant and field name verbatim"
+      },
+      {
+        "from": "stoq/src/api/mod.rs + service_discovery.rs",
+        "what": "Live bincode request/response layer + service discovery used by trustchain-stoq-server, catalog_server, caesar, ngauge, blockmatrix catalog peer client",
+        "destination": "New app-layer crate (e.g. stoq-api) or hypermesh-lib — module moved verbatim so bincode field order is untouched (owner picks destination)"
+      },
+      {
+        "from": "stoq/src/extensions.rs::PacketToken + tokenize_packet (BLAKE3 per-packet work hash)",
+        "what": "LIVE: feeds hypermesh_pos_prefix → 0x484D cleartext XDP header (protocol/mod.rs:335-340, A4-CORRECT datapath). PoWork = BLAKE3 hash-validation per canon",
+        "destination": "STAYS in stoq (transport-relevant) — retained in the trimmed extensions.rs alongside PacketShard"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "stoq protocol frame codec (frames.rs/frame_codec.rs) — removal of Hop/Seed frame variants",
+        "change": "Delete the Hop and Seed frame types and their encode/decode arms from the QUIC-datagram frame codec",
+        "kind": "wire-serde",
+        "migration_note": "No migration needed IF remaining frame-type discriminator bytes keep their current values — Hop/Seed frames have zero producers so no old data/peers ever emitted them. MUST NOT renumber the surviving Token/Shard/Falcon frame IDs. Verify discriminator constants in frame_codec.rs before deleting."
+      },
+      {
+        "target": "stoq::api::{ApiRequest, ApiResponse} relocation out of stoq",
+        "change": "Module moves to a new crate; struct definitions must be byte-identical (bincode is field-ORDER sensitive)",
+        "kind": "wire-serde",
+        "migration_note": "No wire change if structs are moved verbatim — bincode encodes no type/module names. Any field add/remove/reorder during the move IS a breaking wire change for trustchain/catalog/caesar/ngauge services; forbid edits in the move commit."
+      },
+      {
+        "target": "blockmatrix MatrixMessage (stoq_integration.rs → network/messages.rs)",
+        "change": "Wire enum relocated; serde_json keys = variant/field names",
+        "kind": "wire-serde",
+        "migration_note": "No wire change if every variant and field name is preserved verbatim (serde_json is name-based, not path-based). Renames require #[serde(rename)] — avoid entirely. Deleting the never-sent variants (if any are confirmed dead, e.g. Announcement) is deferred to the batched migration, NOT this move."
+      },
+      {
+        "target": "stoq::ReflectorMessage (transport/reflector/message.rs) deletion",
+        "change": "Length-prefixed-bincode wire type removed with the reflector subsystem",
+        "kind": "wire-serde",
+        "migration_note": "Never transmitted (no live sender/receiver anywhere in the repo) — deletion is wire-inert; no old-data path, no wipe."
+      },
+      {
+        "target": "blockmatrix/src/transport/types.rs::PeerIdentity relocation",
+        "change": "Serialize/Deserialize struct moves modules",
+        "kind": "wire-serde",
+        "migration_note": "No live wire/disk serialization site found (consumers are in-memory maps in multi_node/privacy/proof_of_state), but the struct derives serde — preserve field names AND order verbatim on the move as a guard; audit multi_node persistence in the migration batch before any field edit."
+      },
+      {
+        "target": "PathRejectionReason (stoq multipath) — new UnknownPath variant",
+        "change": "Add UnknownPath{path_id} variant; stop using NetworkId([0u8;16]) sentinel",
+        "kind": "wire-serde",
+        "migration_note": "NOT actually serialized — derives Debug/Clone only (policy.rs:18); listed for completeness. Zero migration."
+      },
+      {
+        "target": "wire-tag constants dedup (TAG_* 0x01-0x51)",
+        "change": "Repoint duplicated consts/literals to the canonical protocol.rs registry",
+        "kind": "wire-serde",
+        "migration_note": "Byte values unchanged everywhere — zero wire change, zero migration. Pure compile-time dedup."
+      }
+    ],
+    "plan_steps": [
+      "1 (behavior-preserving) Wire-tag dedup: export the tag registry pub (network::wire_tags or make protocol.rs pub) so the bin crate can import it; repoint stoq_transfer_transport.rs:61-64, background.rs:208, blockchain/stoq_transport.rs:21 to it. Values untouched.",
+      "2 (behavior-preserving) W2-7: add PathRejectionReason::UnknownPath{path_id}; replace the NetworkId([0u8;16]) sentinel at multipath/connection.rs:415; update the Display impl.",
+      "3 (dead-code delete) Remove stoq/src/transport/reflector/* and its re-exports (stoq/src/lib.rs:62-63, transport/mod.rs:22,47). No caller exists; cargo check the workspace.",
+      "4 (dead-code delete) Remove stoq/src/network_isolation.rs, its lib.rs:53-57 re-exports, the config.rs:327 shim, the dead _isolation_manager field/builder in multipath/connection.rs, and the dead _network_isolation in blockmatrix/intelligence/mod.rs:169-170,253.",
+      "5 (dead-code trim) Trim stoq/src/extensions.rs to PacketToken+PacketShard; delete HopInfo/SeedInfo/SeedNode/SeedPriority, the two trait methods, and the Hop/Seed frame variants + codec arms — keeping surviving frame-type discriminator bytes at their current values.",
+      "6 (code motion, wire-frozen) Relocate stoq/src/api/{mod.rs,service_discovery.rs} out of stoq to the owner-chosen destination with struct definitions byte-identical; repoint trustchain/catalog/caesar/ngauge/blockmatrix imports; delete the stoq lib.rs:51 re-export.",
+      "7 (code motion + delete) blockmatrix/src/transport: move PeerIdentity → owner-chosen home (field names+order verbatim), TransportError → network/, TransportConfig → integration/config.rs; repoint all importers listed above; delete mod.rs stubs, auth.rs, pool.rs, monitoring.rs and the lib.rs:300 module decl.",
+      "8 (husk delete + salvage) Delete MatrixStoqIntegration; move MatrixMessage+MatrixNodeInfo verbatim to network/messages.rs; remove the dead stoq_integration field and broadcast_position/find-route paths in network/mod.rs:322,354-376,739-740,803-804; repoint the six MatrixMessage importers.",
+      "9 (the one real wiring fix) Single eBPF orchestrator: add an Option<Arc<RwLock<...>>> injection seam to stoq TransportConfig/constructors (fallback = current self-construction for standalone services); node_bringup constructs ONE instance, injects it into StoqTransport (which does the sole attach_xdp) and into PeerContext.ebpf; resolve the &mut attach vs &self write mutability (RwLock or interior mutability in hypermesh-ebpf).",
+      "10 (owner-gated) blockmatrix/src/api island: delete, OR mount a stoq-api responder on the daemon so CatalogPeerClient requests are answerable (open question 2) — do not leave the silent feature gap.",
+      "11 (verify) E2E two-node: handshake → confirm pos_header_map/policy_map on the ATTACHED instance learn the peer (hypermesh-ebpf lib.rs:306-312 path taken, not the :313 no-op branch); re-grep for quorum/replication_threshold/reflector in stoq; confirm block propagation + reflector heartbeat unchanged on the daemon path."
+    ],
+    "open_questions": [
+      "Destination for the relocated stoq::api + service_discovery: new `stoq-api` crate vs hypermesh-lib vs folding into each consumer? It has 5 consuming crates, so a shared crate seems right — owner call.",
+      "CatalogPeerClient (ipc/handlers/catalog.rs:325) sends requests no daemon can answer. Mount a stoq-api responder in the hypermesh daemon, or gate/disable the catalog peer-search IPC until the responder exists? (Either closes the silent gap; which is wanted for alpha?)",
+      "eBPF ownership direction: recommended composition-root injection (blockmatrix constructs, stoq accepts + attaches). Alternative is stoq exposing its internal instance for blockmatrix to write into. Injection keeps stoq usable standalone (gateway/trustchain construct their own fallback) — confirm this direction before step 9.",
+      "PeerIdentity's final home: hypermesh-lib (single-source-of-truth canon; but it drags name/IPv6/pubkey transport context into lib) vs blockmatrix::network. Also: from_name() fabricates identities and is used on quasi-live paths (assets/blockchain.rs:291, intelligence/mod.rs:190) — keep as #[cfg(test)]-only, or is a prod placeholder identity acceptable short-term?",
+      "MatrixMessage carries ReflectorHeartbeat{health_score: f64} hardcoded to 1.0 (background.rs:203) — float-health vocabulary adjacent to the forbidden reputation model. Drop the field in the batched wire migration, or keep as a liveness bit? (Field removal IS a wire-serde change — batch it.)",
+      "stoq/src/api deletion vs relocation for service_discovery's PoS-adjacent bits: service_discovery is used only by trustchain — should it move INTO trustchain rather than the shared api crate?"
+    ]
+  },
+  {
+    "cluster": "M",
+    "concern_owner": "lib (hypermesh-lib) owns the canonical vocabulary (attestation/lineage types are defined there and every consumer inherits the names); per-crate crate-status.toml owns status truth",
+    "consolidations": [
+      {
+        "concern": "Network-join genesis handling (two implementations of 'record another network's genesis')",
+        "keeper": "blockmatrix/src/blockchain/sync_manager.rs::SyncManager::record_network_genesis — non-destructive, on the live sync path (sync_manager.rs:294 'record a VERIFIED foreign genesis block for network_id'); consistent with canon: each asset has its own genesis, a node never replaces its chain",
+        "removed": [
+          "blockmatrix/src/blockchain/chain.rs::NodeBlockchain::adopt_genesis (chain.rs:705)"
+        ],
+        "evidence": "chain.rs:692 doc: '# NOT WIRED — it would desynchronise memory from disk (S3.0 QA note)... Nothing in production calls this today'. Only callers are its own 3 unit tests (chain.rs:1073,1103,1121) and test fixtures (tests/network_sync_e2e.rs:271,398; tests/scaling_integration.rs:71). Canonical model: adopt_genesis/shared-network-genesis is S3.4 scar — DELETE, not finish.",
+        "callers_to_repoint": [
+          "blockmatrix/tests/network_sync_e2e.rs:271 and :398 — rebuild the shared-genesis fixture with NodeBlockchain::from_genesis (chain.rs:214, live constructor)",
+          "blockmatrix/tests/scaling_integration.rs:71 — same from_genesis rewrite"
+        ]
+      },
+      {
+        "concern": "Reed-Solomon erasure engine (dependency implies a second engine in blockmatrix)",
+        "keeper": "ngauge/src/sharding.rs — the RS engine moved to NGauge in A1 (commit 2f032f85); ngauge/Cargo.toml:24 declares reed-solomon-erasure and uses it",
+        "removed": [
+          "blockmatrix/Cargo.toml:136 reed-solomon-erasure = { workspace = true } (dep declaration only — zero `use reed_solomon_erasure` in blockmatrix/src; retrieval/fallback.rs:26 FallbackStrategy::ReedSolomon is just an enum variant name, no crate use)"
+        ],
+        "evidence": "grep reed_solomon_erasure over blockmatrix/src returns nothing; ngauge/Cargo.toml:24 is the live consumer.",
+        "callers_to_repoint": []
+      },
+      {
+        "concern": "Publisher authentication module naming (banned 'reputation' concept at every import site)",
+        "keeper": "catalog/src/security/reputation.rs contents AS-IS renamed to catalog/src/security/publisher_auth.rs — the code is already canon-compliant (file doc lines 5-8: 'Binary publisher verification... No reputation scoring, no tiers, no decay, no float scores'; PublisherAuthenticator/PublisherVerification)",
+        "removed": [
+          "catalog/src/security/reputation.rs (the module PATH only — file rename, no code change)"
+        ],
+        "evidence": "catalog/src/security/mod.rs:11 `pub mod reputation;` and :21 `pub use reputation::{PublisherAuthenticator, PublisherVerification}` are the only import sites; internal use at mod.rs:36,278 goes through the re-export.",
+        "callers_to_repoint": [
+          "catalog/src/security/mod.rs:11 (pub mod reputation → pub mod publisher_auth)",
+          "catalog/src/security/mod.rs:21 (pub use path)"
+        ]
+      }
+    ],
+    "deletions": [
+      {
+        "path": "blockmatrix/src/blockchain/chain.rs:686-748 (adopt_genesis + its log line :739) and tests chain.rs:1073-1131",
+        "reason": "Canonical model: no shared network genesis; join-by-adopting-foreign-genesis is superseded S3.4 framing. Code itself says NOT WIRED and unsafe with a durable sink. Keeper is record_network_genesis (non-destructive).",
+        "reachable_from": "tests-only"
+      },
+      {
+        "path": "blockmatrix/Cargo.toml:136 (reed-solomon-erasure dependency)",
+        "reason": "A1 moved the RS engine to NGauge; no use of the crate anywhere in blockmatrix/src. Dead dep inflating the musl deploy build.",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "blockmatrix/src/assets/privacy/allocation_types/transitions.rs:74 (ValidationCriterion::StakeAmount variant)",
+        "reason": "Stake-as-magnitude is the rejected model (PoStake = authorization). Variant is defined once, never constructed or matched anywhere else in the tree.",
+        "reachable_from": "dead(uncompiled)"
+      },
+      {
+        "path": "blockmatrix/src/platform/user_contribution/pricing.rs:56 (reputation_bonus), :101 (min_reputation), :158 (default 1.1); session.rs:46 (reputation_bonus)",
+        "reason": "Reputation-as-float violates binary-PoS canon. Fields have no readers outside user_contribution; UserContributionPlatform is not constructed from bin/ or lib.rs (unmounted) — dead economics presenting as a live reputation system.",
+        "reachable_from": "island(self-refs)"
+      },
+      {
+        "path": "blockmatrix/crate-status.toml:152 ('Genesis adoption protocol — nodes join networks by adopting foreign genesis') and the false claim at :60 ('Module split — chain.rs, mutations.rs... all <500L')",
+        "reason": "Both are lies in [features.working]: adopt_genesis is documented NOT WIRED and is being deleted; chain.rs=1469L, mutations.rs=1479L. Line 20 already states the honest version ('destructive adopt_genesis deliberately not wired').",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "ngauge/crate-status.toml:13-19 [features.working] entries for receipt/metrics/compliance/organic_detection/throttle/trending (+ caesar_tracker, min_spec, node_metrics) and :44 'public reputation signals' wording",
+        "reason": "~2000L of pub-exported but unmounted modules (only external reference: a test import of organic_detection in blockmatrix ngauge_trust_adapter.rs:92) claimed as 'working'; NGaugeTrustAdapter itself has zero production constructors so the F.1 federation-gating claim is false. Move to in_development with 'dormant — not mounted' wording; rewrite 'reputation' as binary trust-band/authentication vocabulary.",
+        "reachable_from": "daemon"
+      },
+      {
+        "path": "caesar/src/api/ui_handlers.rs:104-372 (StakingInfo/StakingMetrics/StakingHandler fabricated APY economics)",
+        "reason": "CONDITIONAL — owner call (see open_questions). Mounted live at caesar/src/api/stoq_api.rs:479 and serves fabricated coin-staking APY (3.0/5.0) that conflates PoStake-as-authorization with coin staking.",
+        "reachable_from": "daemon"
+      }
+    ],
+    "salvage": [
+      {
+        "from": "blockmatrix adopt_genesis test fixtures (tests/network_sync_e2e.rs:271,398; tests/scaling_integration.rs:71)",
+        "what": "The multi-node shared-chain E2E scenarios themselves (block propagation, scaling) — the coverage is valuable, only the setup mechanism is scar",
+        "destination": "same test files, rebuilt on NodeBlockchain::from_genesis (chain.rs:214), which constructs a chain from a given genesis without the destructive in-place adopt"
+      },
+      {
+        "from": "lib/src/attestation.rs:82-105 (MAX_SPINE_POINT_BYTES cap + its rationale doc)",
+        "what": "The length-cap security invariant (the only unbounded attacker-chosen field, capped at the audit gate) — keep the bound and its test (attestation.rs:888-900, blockmatrix attestations.rs:137-166,223) verbatim through the rename",
+        "destination": "lib/src/attestation.rs as MAX_LINEAGE_ID_BYTES; blockmatrix/src/blockchain/attestations.rs charged-bytes accounting unchanged"
+      },
+      {
+        "from": "catalog/src/security/reputation.rs",
+        "what": "Entire module body — already canon-compliant binary authentication (revocation list, authentic-or-not)",
+        "destination": "catalog/src/security/publisher_auth.rs (pure file rename)"
+      }
+    ],
+    "format_changes": [
+      {
+        "target": "lib::attestation::MirrorAttestation.spine_point (lib/src/attestation.rs:231)",
+        "change": "Rename field to lineage_id (lib's own doc at :105 admits 'A spine_point is a lineage_id: hex(proof_hash)')",
+        "kind": "wire-serde",
+        "migration_note": "Wire-visible: MirrorAttestation is serde_json-encoded on the attestation wire (blockmatrix/src/network/attestation_wire.rs:129 to_vec, :181 from_slice) with DEFAULT serde names (no serde attrs in lib/src/attestation.rs). NOT signature-preimage: canonical_bytes (attestation.rs:254-269) is a value-only length-prefixed concat — field names never enter proof_bytes, so existing FALCON signatures stay valid. NOT block-hash: only the MirrorSeal {root,count,sealed_by} (attestation.rs:391-403, no spine names) goes on-chain; attestation pool is session-memory only. Compat: #[serde(alias=\"spine_point\")] gives one-way tolerance (new node reads old peers; old nodes cannot read new wire) — in alpha, batch as a hard rename with the ONE migration, wipe remote node_* data, deploy all nodes together."
+      },
+      {
+        "target": "lib::attestation::MirrorAttestation.spine_seq (lib/src/attestation.rs:236)",
+        "change": "Rename field to lineage_seq (it is the asset_seq of the lineage entry)",
+        "kind": "wire-serde",
+        "migration_note": "Same envelope as spine_point: JSON wire name only; value (u64 LE) enters canonical_bytes, name does not. Same batched-migration + wipe treatment. Update in the same commit: blockmatrix/src/blockchain/attestations.rs (pool/seal/checkpoint users), accept/store.rs doc, tests s3_3_mirror_attestations.rs, s3_4_attestation_wire.rs, and MirrorAttestation::new/canonical_bytes param names."
+      },
+      {
+        "target": "blockmatrix::platform::user_contribution PricingConfig/SessionConfig reputation fields (pricing.rs:56,101; session.rs:46)",
+        "change": "Delete reputation_bonus/min_reputation serde-derived fields",
+        "kind": "disk-serde",
+        "migration_note": "Technically serde-visible, but NO persisted instances exist: UserContributionPlatform is constructed only via PlatformConfig::default() in platform/mod.rs:45 and the platform is never mounted from bin/. No disk file, no wire message carries it → safe to remove outside the batch; listed here only for completeness of the serde inventory."
+      },
+      {
+        "target": "AcceptReject::AlreadyOnSpine (blockmatrix/src/blockchain/accept/presented.rs:104)",
+        "change": "Rename variant to AlreadyOnOwnChain — explicitly NOT a format change",
+        "kind": "wire-serde",
+        "migration_note": "NO migration needed: AcceptReject derives only Clone/Debug/PartialEq (presented.rs:67), never Serialize — in-memory refusal enum. Recorded here so the batch owner knows it was checked and is safe to rename mechanically now, ahead of the batch."
+      }
+    ],
+    "plan_steps": [
+      "1 (mechanical, safe now) Doc/comment vocabulary sweep — replace 'spine/off-spine' with 'asset lineage / own chain / off-chain accumulation' in doc comments only (no identifiers): blockmatrix/src/blockchain/attestations.rs (~40 sites), lineage.rs (6), mutations.rs:322-325,576, chain.rs, accept/mod.rs:42,104, accept/store.rs:38, network/message_handlers/asset_chain_handlers.rs, protocol.rs, lib/src/proof.rs:539-544, lib/src/attestation.rs module docs. Replace 'foreign' doc/log survivals: distribution/audit_ledger.rs:39 ('F1 pool / foreign store' — points at a dissolved module), sync_manager.rs:294 ('foreign genesis' → 'another network's genesis'), mutations.rs:592 log string ('foreign/forked' → 'forked/other-network'). Fix stale trust-score/reputation comments over canon-compliant code: assets/core/proxy.rs:303, assets/proxy/mod.rs:142, privacy/switching.rs:23,273,505, network/validation.rs:231.",
+      "2 (mechanical, safe now) Non-serialized identifier renames: AcceptReject::AlreadyOnSpine → AlreadyOnOwnChain (presented.rs:104 + accept/mod.rs:186,212 + doc refs in asset_chain_wire.rs:41, asset_chain_handlers.rs:14, accept/asset_chain.rs:19); MAX_SPINE_POINT_BYTES → MAX_LINEAGE_ID_BYTES (lib/src/attestation.rs:82, blockmatrix attestations.rs, tests/s3_4_attestation_wire.rs); canonical_bytes/new() parameter names. Rust field/struct internals that are NOT serde-visible only — the two serde fields wait for step 8.",
+      "3 (mechanical, safe now) catalog/src/security/reputation.rs → publisher_auth.rs; update mod.rs:11,21. Zero behavior change (module contents already canon-compliant).",
+      "4 (mechanical, safe now) Status truth: blockmatrix/crate-status.toml — delete :152 (genesis adoption protocol), fix :60 module-split '<500L' claim to reflect reality (or defer until step 7 makes it true again), reword :128-129 'cross-genesis insertion' to name what it actually is (tolerated other-genesis block recording) without presenting scar as a feature; ngauge/crate-status.toml — move :13-19 dormant modules from [features.working] to [features.in_development] with explicit 'dormant — code complete, not mounted' wording, rewrite :44 'public reputation signals' as binary trust-band signals AND mark the trustchain federation gating unmounted (NGaugeTrustAdapter has no production constructor). Run ./scripts/sync-status.sh (never edit output .ts).",
+      "5 (dead-code deletion, safe now) Remove blockmatrix/Cargo.toml:136 reed-solomon-erasure; remove ValidationCriterion::StakeAmount (transitions.rs:74); remove reputation_bonus/min_reputation fields from platform/user_contribution (pricing.rs:56,101,158; session.rs:46) — no readers, platform unmounted.",
+      "6 (deletion with test repoint) Delete NodeBlockchain::adopt_genesis (chain.rs:686-748) + its unit tests (chain.rs:1073-1131); rewrite tests/network_sync_e2e.rs:271,398 and tests/scaling_integration.rs:71 fixtures on NodeBlockchain::from_genesis (chain.rs:214). record_network_genesis (sync_manager.rs:294) is the surviving join-side record. This also removes chain.rs's largest 'foreign' vocabulary cluster.",
+      "7 (behavior-preserving file splits, pure moves) mutations.rs (1479L): accept gate (add_block :152, add_block_with_data :381, insert_received_block :443) → blockchain/accept_gate.rs; convenience producers (register_asset_record :717, register_dns_asset :747, add_key_rotation_block :803, register_asset_records :848) → blockchain/producers.rs; tests move with their subject. chain.rs (1469L, post step-6): read queries (:415-682) stay; header/partial-chain ops (insert_received_headers :751, get_header, prune_to_headers, participation range :751-830) → blockchain/headers.rs; tests split alongside. network/message_handlers/sync_and_reflection.rs (801L): shard handlers (:24-176) → shard_handlers.rs; DNS (:249-455) → dns_handlers.rs; block-fetch/sync (:456-626) → sync_handlers.rs; share/transfer/direct (:627-801) → share_transfer_handlers.rs — honoring mod.rs:7's own '<500 lines' contract. peer_connection.rs (899L): routing pure-fns (message_requires_auth :118, route_message :235, dispatch :281-455 + route_tests :763-899) → routing.rs; connection lifecycle (:456-762) stays. ngauge: swarm_analytics.rs (1383L) split along the four co-located units (separating the dead windowed API from the live cumulative path so the divergence is visible), api/stoq_api.rs (945L) per-handler-group, routing_intel.rs (857L) advisory vs state.",
+      "8 (FORMAT-SENSITIVE — batch into the ONE migration, do NOT apply piecemeal) Rename MirrorAttestation.spine_point → lineage_id and spine_seq → lineage_seq (lib/src/attestation.rs:231,236) plus every user: blockmatrix attestations.rs, attestation_wire.rs, accept/store.rs, tests s3_3/s3_4. Signature preimage and block hash are UNAFFECTED (value-only canonical_bytes; only MirrorSeal goes on-chain) — this is a JSON-wire break only. Ship with the batched migration: wipe /var/lib/hypermesh/blockmatrix/node_* on remote, deploy all nodes together (musl build).",
+      "9 Re-run scripts/sync-status.sh and verify crate-status regeneration; grep-verify zero remaining 'spine'/'foreign'(scar sense)/'reputation'/'stake amount' identifier hits outside plain-English uses."
+    ],
+    "open_questions": [
+      "Caesar StakingHandler (mounted live at caesar/src/api/stoq_api.rs:479, serving fabricated 3%/5% APY from ui_handlers.rs:344-372): delete the endpoint entirely, or replace with an honest 'not implemented' response so the UI contract survives? It conflates PoStake-as-authorization with coin staking — owner explicitly reserved this call (W2-9).",
+      "Dormant ngauge module cluster (receipt, min_spec, compliance, caesar_tracker, node_metrics, throttle, metrics, organic_detection, trending — ~2000L, pub-exported, zero production consumers): this plan only corrects their status to in_development/dormant. Keep them as intended Caesar-rewards groundwork, or delete outright?",
+      "trust_signals → TrustChain federation gating (NGaugeTrustAdapter unmounted, trustchain/src/ca/federation.rs admits peers ungated): M fixes the status wording only. Wire the adapter (a real gap fix, different cluster) or formally descope the F.1 claim?",
+      "Wire-compat strategy for the spine_point/spine_seq rename: hard break batched with the migration wipe (recommended in alpha, single deploy wave), or a #[serde(alias=\"spine_point\")] one-way tolerance window so a new node still reads old peers during rollout? Alias cannot protect old nodes reading new wire either way.",
+      "The 'cross-genesis insertion' tolerance inside insert_received_block (mutations.rs:443, advertised at crate-status:128-129) is the behavioral sibling of adopt_genesis under the same superseded framing — its removal is a behavior change beyond M's scope. Confirm which cluster owns retiring it, so step 4's rewording doesn't silently become the permanent record.",
+      "blockmatrix crate-status :60 claims the chain/mutations module split already happened at <500L. After step 7 makes it true, should the entry credit the original S-sprint or be rewritten as done-now? (Minor, but it is the falsified-progress pattern P0.0 exists to prevent.)"
+    ]
+  }
+]

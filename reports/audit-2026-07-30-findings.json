@@ -1,0 +1,1859 @@
+[
+  {
+    "title": "storage_pointer and registration are unauthenticated on the received-block path (outside both the block hash and the FALCON envelope)",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "critical",
+    "files": [
+      "blockmatrix/src/blockchain/block.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/asset_index.rs",
+      "blockmatrix/src/blockchain/attestations.rs",
+      "blockmatrix/src/assets/core/asset_id.rs"
+    ],
+    "failure": "Any gossip relay (repropagate_block is live, block_handlers.rs:287-299) can rewrite a validly-signed block in transit: swap shard_hashes/placements so the victim's chain 'authorizes' attacker-chosen shard IDs anchored to a legitimate asset (and A6.6 registration_for_shard then serves the forged registration onward); swap registration.network_scope to pick which network's D4 rules validate the proof; swap registration.authorization.owners to make the attacker the asset's owner for seal/distribution-right decisions. Every check in insert_received_block still passes."
+  },
+  {
+    "title": "Network-scope shared chain cannot converge in production: adopt_genesis unwired and a foreign genesis is uninsertable",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/blockchain/chain.rs",
+      "blockmatrix/src/blockchain/sync_manager.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/network/sync_dispatch/sync_manager_handler.rs"
+    ],
+    "failure": "Genesis is deterministic per (device, coordinate, epoch), so two distinct devices always have different geneses. A joiner records the network's root, then every fetched network block is orphaned (unknown predecessor) or hard-rejected, and the orphans can never link because their root genesis can never be inserted. CLAUDE.md's 'Network sync MVP working / cross-genesis insertion' is not achievable on the shipped accept path — sync converges only between nodes sharing a genesis, which production never creates. The S3.4 container that was supposed to hold device + adopted network chains side by side (chain.rs:700-703) shipped as ReceivedAssetStore, which holds asset chains, not network block chains."
+  },
+  {
+    "title": "Catch-up sync stalls: TransportSyncDriver flips SyncManager to Synchronized after every successful round regardless of remaining lag",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs",
+      "blockmatrix/src/blockchain/sync_manager.rs",
+      "blockmatrix/src/blockchain/sync_protocol.rs"
+    ],
+    "failure": "A node 500 blocks behind fetches 50, is marked Synchronized at the peer's height, and the 5s loop never pulls that network again. Re-entry requires a live Announce exceeding last_height + max_block_lag (100) — on a quiescent chain the node stays permanently 450 blocks behind; on a growing chain it catches up at most 50 blocks per 100-block-lag trigger, i.e. diverges. The driver conflates 'round succeeded' with 'chain synchronized'."
+  },
+  {
+    "title": "Received blocks bypass ChainValidator entirely, and the max_block_size cap is decorative because Block::size() is a fixed-formula estimate",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/block.rs",
+      "blockmatrix/src/blockchain/validation.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "A peer ships a block whose one entry carries a 200 MB Local{path} payload: it measures ~520 'bytes', passes every accept check, is fsync'd through the BlockSink, counted wrong in stats.total_data_size, and repropagated to other peers. The only actual bound is whatever the STOQ stream read imposes, which is a transport accident, not a chain rule."
+  },
+  {
+    "title": "proof_hash and the FALCON envelope are defined over non-canonical serde_json — every StateProof schema change invalidates all previously signed blocks cross-version",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "lib/src/proof.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/block.rs"
+    ],
+    "failure": "A verifier running code with one more StateProof field re-serializes an old proof WITH the new null/zero keys, producing different bytes than the producer hashed and signed → 'proof_hash mismatch (integrity violation)' and envelope rejection for every pre-upgrade block. Today this is masked by the wipe-all-data-on-format-change policy, which cannot survive a real multi-version network (roadmap J rolling upgrades) — the S3.2/S3.3 field additions already crossed this line once."
+  },
+  {
+    "title": "#52 confirmed: parse_and_verify_block is a duplicate received-block validation site using intrinsic validate() outside the D4 scope seam",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "Two transcriptions of the received-entry rule that can drift: once a network publishes a ruleset more permissive than intrinsic validate(), the announce pre-filter silently drops (returns None, no insert error) blocks the D4 resolver would accept — and the drop happens before the S3.2-F2 REJECTED warn, so it is also less observable. Today it is pure redundant work per announced block."
+  },
+  {
+    "title": "BlockPropagator.seen_blocks grows without bound on the live propagation path",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/propagation.rs",
+      "blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "blockmatrix/src/bin/node/commands/background.rs"
+    ],
+    "failure": "One map entry per block hash ever propagated, each holding a coordinate set, retained for process lifetime — a slow, monotonic leak on a long-running reflector, violating the substrate rule that network-fed maps must be bounded (the same class P6 fixed for the orphan buffer and S3.4 fixed for the pools)."
+  },
+  {
+    "title": "Received-entry mirror_seal authority is unchecked — a peer can deliver on-chain seals attributed to identities that never authorized them",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "A peer sends a block whose MirrorSeal.sealed_by is neither the FALCON-bound author nor an owner in the asset's AuthorizationSet; it becomes hash-committed mirror history under a forged sealer identity. (Partially subsumed by the registration-unauthenticated finding — authorization itself is forgeable in transit — but the gate is missing even for honest registrations.)"
+  },
+  {
+    "title": "Dead genesis-auth MFA subsystem (~770 lines) protecting a placeholder random-bytes 'keypair'",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/genesis_ops.rs",
+      "blockmatrix/src/blockchain/genesis_auth.rs",
+      "blockmatrix/src/blockchain/genesis_crypto.rs",
+      "blockmatrix/src/blockchain/chain.rs"
+    ],
+    "failure": "Reads as a shipped security feature (MFA-protected genesis credentials) but is unreachable, and if ever wired as-is it would MFA-protect cryptographically meaningless bytes — a claimed-security lie waiting to be believed."
+  },
+  {
+    "title": "genesis_assessor.rs is a dead parallel hardware-assessment/genesis-asset path (also the only producer of the decorative AssetAddress records)",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/genesis_assessor.rs",
+      "blockmatrix/src/blockchain/mod.rs",
+      "blockmatrix/src/bin/node/hardware.rs"
+    ],
+    "failure": "Two implementations own 'assess hardware for genesis' with different outputs (GenesisAssetRecord+AssetAddress vs HardwareAssessment→StateProof); readers and future R1 work can wire the dead one; it also keeps the decorative AssetAddress pipeline looking consumed when it is not."
+  },
+  {
+    "title": "errors.rs structured error types are dead — the entire blockchain API returns Result<T, String>",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/errors.rs",
+      "blockmatrix/src/blockchain/mod.rs"
+    ],
+    "failure": "The re-export advertises an error architecture that nothing implements; String errors make the accept-path rejections unmatchable by callers (block_handlers can only log, never branch on rejection kind)."
+  },
+  {
+    "title": "Two block-persistence stacks: live BlockSink/PersistenceManager vs ChainStateManager (state.rs) off the daemon path",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/state.rs",
+      "blockmatrix/src/blockchain/block_sink.rs",
+      "blockmatrix/src/bin/node/bootstrap.rs",
+      "blockmatrix/src/blockchain/mod.rs"
+    ],
+    "failure": "Two on-disk block formats/directory layouts that cannot see each other: blocks written by MatrixFoundation-based storage flows are invisible to a restart's from_blocks (which reads the PersistenceManager store), and doc-readers wire the wrong one (mod.rs presents create_node_blockchain as THE constructor)."
+  },
+  {
+    "title": "D4 fail-closed hook (resolve_strict) built but inactive, and NetworkRuleSet::publish has zero production callers",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/proof_of_state/validation_service.rs",
+      "blockmatrix/src/proof_of_state/network_rules.rs"
+    ],
+    "failure": "The canonical 'validation = the rules of the NETWORK for a given asset' is structurally routed (both local and received paths share the seam — good) but semantically inert: an unadopted/hostile network's assets validate against the default anchor forever, and nothing fails closed. Status claims of 'per-network validation (D4) complete' overstate what runs."
+  },
+  {
+    "title": "H3 unsigned-envelope debt in e2e tests: network_sync_e2e and scaling_integration build unsigned entries and expect insert_received_block to accept them",
+    "kind": "quality-bar",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/tests/scaling_integration.rs",
+      "blockmatrix/tests/network_sync_e2e.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "These integration tests fail by default and only pass with the migration flag exported externally — the flag intended as a one-release migration is now load-bearing test infrastructure, which is exactly how it survives into production deployment scripts."
+  },
+  {
+    "title": "Sync push/pull ownership split across two parallel message vocabularies with manual conversion",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/sync_protocol.rs",
+      "blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs",
+      "blockmatrix/src/network/sync_dispatch/sync_manager_handler.rs",
+      "blockmatrix/src/blockchain/stoq_transport.rs"
+    ],
+    "failure": "Adding or changing a sync message requires touching two enums plus two converters, and the pairs can silently diverge (Genesis/Header/Block variants already dispatch at different layers per sync_manager.rs:441-452); the dead trailing field wastes 40 bytes per announce and misleads readers into thinking a second integrity check exists."
+  },
+  {
+    "title": "'spine' vocabulary survives as serialized wire field names (spine_point/spine_seq) and as the primary doc vocabulary of the chain core",
+    "kind": "naming",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "lib/src/attestation.rs",
+      "blockmatrix/src/blockchain/chain.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "The canonical model bans the privileged-spine framing; a serialized field name is load-bearing (renaming changes the attestation wire/signing preimage since proof_bytes cover canonical fields), so the scar tissue is now baked into signatures — the longer it ships, the more expensive the rename."
+  },
+  {
+    "title": "Device-scope announce dedup keys on block INDEX across independent chains",
+    "kind": "misconnection",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/message_handlers/block_handlers.rs"
+    ],
+    "failure": "A spine-offset assumption surviving in exactly the scope where it is meaningless: a foreign device block at index <= our height is silently skipped as 'already have', while one above our height proceeds to insert_received_block only to be rejected/orphaned on linkage anyway — the gate does no valid work and reads as cross-chain index comparability, the exact confusion the unification removed elsewhere."
+  },
+  {
+    "title": "500-line bar: chain.rs (1469) and mutations.rs (1479) confirmed over, with real mixed-concern seams",
+    "kind": "quality-bar",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/chain.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/propagation.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "Not style: the accept gate and the lineage rules are the two most security-sensitive functions in the crate and currently share a file with the convenience producers (register_dns_asset etc.), which is how a duplicate site like #52 goes unnoticed — the single-gate property is invisible at file granularity."
+  },
+  {
+    "title": "D3/S3.4 accept-lineage subsystem is receive-only: zero production producers for asset-chain presentation, mirror attestation, and sealing",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/message_handlers/asset_chain_handlers.rs",
+      "blockmatrix/src/network/message_handlers/attestation_handlers.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "Two live HyperMesh nodes will never exchange an asset chain or a mirror attestation: nothing ever opens the sending stream, so accept_asset_chain and accept_wire_attestation are dead-on-arrival in the shipped binary despite task #48 ('D3 — Wire the accept path to the network (production caller)') being marked completed. The S3.5 car-title transfer story (hand the recipient the verified history) and the S3.3 mirror-evidence story (mirror attests after validating a fetch) have no producing call site — the feature is presented as wired but is dormant end-to-end."
+  },
+  {
+    "title": "Received-block mirror_seal accepted without any seal-authority check; local seal path rejects every real asset (ownerless), so on-chain seal attribution is unenforced",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "A peer can insert on-chain, hash-committed 'mirror history' attributed to an identity that never authorized it (seal forgery survives the H3 signer binding because sealed_by is not checked against stake_holder_id or the AuthorizationSet). Meanwhile the honest local seal path can never run for a real daemon-created asset, so S3.3's 'sealed into the spine by the owner' (commit eb073315) is unreachable in practice: the only seals that can exist on a live mesh are received, unauthorized ones."
+  },
+  {
+    "title": "#52 confirmed open: block_handlers.rs pre-validation is a second transcription of the received-block gate, using the intrinsic validate() instead of the D4 resolver",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "Two lists of the same rule — exactly the drift class the codebase's own S3.3 docs condemn ('one gate, not two', asset_chain_handlers.rs:7-17). The day a NetworkRuleSet publishes a bar different from the intrinsic StateProof::validate() (the whole point of D4/resolve_strict), announced blocks get dropped or passed by the announce pre-filter at :115 before the resolver ever sees them, and the announce path silently diverges from the sync-fetch path. Today it is also duplicate CPU (every announced block's proofs serialized+hashed twice)."
+  },
+  {
+    "title": "Stale deferral in accept_wire_attestation: 'no wire caller can reach the received side of holds_asset' is no longer true since D3 landed",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/attestations.rs",
+      "blockmatrix/src/network/message_handlers/asset_chain_handlers.rs"
+    ],
+    "failure": "An authenticated peer can adopt up to 1024 received chains (its own cheap self-signed assets), then flood attestations about those received-only assets into the SHARED 32 MiB MirrorAttestationPool. Reject-not-evict means nothing recorded is deleted, but the pool fills with statements about assets this container merely caches, and honest attestations for assets the container actually owns are refused (delay primitive) — the exact coupling the comment itself names as 'the gate S3.5 will need'."
+  },
+  {
+    "title": "Documented operator reclaim valves (forget/clear) are unreachable in the shipped binary; received store and attestation pool are memory-only",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/accept/asset_chain.rs",
+      "blockmatrix/src/blockchain/accept/store.rs",
+      "blockmatrix/src/blockchain/chain.rs"
+    ],
+    "failure": "The reject-not-evict design is sound only with a working release valve; without one, a store/pool at capacity refuses every newcomer until process restart — and restart wipes ALL adopted 'verified history that a caller may already have acted on' (store.rs:157-158) plus every pooled attestation, because nothing is durable. The docs' load-bearing operator story is fiction in the shipped binary."
+  },
+  {
+    "title": "'Spine' vocabulary survives the de-spine refactor as live type/field names, including a serialized wire field",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "lib/src/attestation.rs",
+      "blockmatrix/src/blockchain/accept/presented.rs",
+      "blockmatrix/src/blockchain/attestations.rs"
+    ],
+    "failure": "Load-bearing naming lie against the canonical model (no privileged linear spine; an attestation names a lineage_id — lib's own doc at attestation.rs:105 admits 'A spine_point is a lineage_id'). Every new reader re-imports the single-spine mental model from the type that is supposed to embody its replacement, and the refactor-complete claim is falsified by the surviving field."
+  },
+  {
+    "title": "F3 'capacity before FALCON' guarantee has a hole for extensions: early probe skipped when the chain is already held, but adopt can still refuse on bytes",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/accept/mod.rs",
+      "blockmatrix/src/blockchain/accept/store.rs"
+    ],
+    "failure": "At byte-capacity, an authenticated peer that holds one adopted chain can repeatedly present extensions of it; each attempt costs full re-verification of up to MAX_RECEIVED_CHAIN_ENTRIES (512) FALCON-1024 signatures and is then refused at adopt-time — exactly the steady-state CPU-exhaustion shape the F3 early probe was built to close for new chains (store.rs:251-266's O(1)-refusal claim does not hold for this case)."
+  },
+  {
+    "title": "Status verification: resolve_strict still inactive (as documented); insert_received_block no longer skips proof validation; H3 unsigned-block env flag still load-bearing in two test files",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/proof_of_state/network_rules.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "The fail-closed per-network seam remains a no-op: an asset scoped to an unseen network silently resolves to anchor requirements (resolve, network_rules.rs:97) instead of being refused, so 'the rules of the NETWORK' is aspirational until activation. The env flag remaining in tests means signing in library-mode chains is still not universal, keeping a production escape hatch alive."
+  },
+  {
+    "title": "Reflector sync-pull is inert: gated SYNC/BLOCK_FETCH sent over the never-authenticated CONN_TYPE_PEER_MESSAGE connection are always dropped by the receiver auth gate",
+    "kind": "misconnection",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs",
+      "blockmatrix/src/network/message_handlers/peer_connection.rs"
+    ],
+    "failure": "A node polling a reflector via TransportSyncDriver::run_sync_round opens a fresh unauthenticated connection; the reflector silently drops its SyncRequest and BlockFetchRequest, so run_sync_round always returns zero fetched blocks. Reflector-based catch-up sync cannot deliver against any peer that enforces the gate. Only push block-propagation and heartbeats — which ride the existing handshake connection's run_peer_message_loop (background.rs:211 uses node.connection) — actually function, masking the dead pull path."
+  },
+  {
+    "title": "Mirror-attestation and presented-asset-chain SEND paths have no production caller — the wire surface is receive-only",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/message_handlers/attestation_handlers.rs",
+      "blockmatrix/src/network/message_handlers/asset_chain_handlers.rs",
+      "blockmatrix/src/network/shard_transport.rs"
+    ],
+    "failure": "A node accepts and records attestations/asset-chains a peer sends, but never emits its own: after validating a fetched mirror it never signs and sends the 'I hold and validated asset A' attestation the owner needs, and a holder never presents an asset's sub-chain for adoption. The canonical mirror/attestation model's producing half is dormant; the seal-on-chain and adopt-off-spine machinery on the receiving side has no live source to consume in a real deployment."
+  },
+  {
+    "title": "#52 still open: block_handlers.parse_and_verify_block is a third per-entry validation site that bypasses the D4 ValidationService.validate_received seam",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/proof_of_state/validation_service.rs"
+    ],
+    "failure": "When network-genesis rulesets are published and resolve_strict is activated at the single ValidationService seam, the block_handlers pre-check will still admit entries against the raw structural bar, silently diverging from the received-path policy — exactly the drift D4 was structured to prevent. Today it is redundant duplicate work on every received block."
+  },
+  {
+    "title": "Two overlapping gossip subsystems: TAG_GOSSIP (0x20) is sent live but its handler only logs and discards; real gossip rides CONN_TYPE_GOSSIP",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/peer_discovery.rs",
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/bin/node/commands/background.rs",
+      "blockmatrix/src/bin/node/commands/node_bringup.rs"
+    ],
+    "failure": "In Public mode both loops run: one GossipProtocol's state is merged and used, the other's TAG_GOSSIP broadcasts are pure wasted bandwidth whose received copies are logged and dropped. Two GossipProtocol instances hold divergent membership state; a reader of the Handler::Gossip arm would wrongly believe TAG_GOSSIP is a functional receive path."
+  },
+  {
+    "title": "Ungated state-mutating tags are reachable with no handshake via CONN_TYPE_PEER_MESSAGE, into unbounded stores",
+    "kind": "unbounded",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs",
+      "blockmatrix/src/sharing/inbox.rs",
+      "blockmatrix/src/messaging/store.rs"
+    ],
+    "failure": "An anonymous QUIC client (TLS is encryption-only under AcceptAllVerifier) can open a CONN_TYPE_PEER_MESSAGE connection and inject arbitrary share invites, direct messages, and key-rotation entries with no PoS handshake, growing inbox/message_store/rotation_chains without bound — a memory-DoS and store-pollution vector. Signature verification for invites/messages is deferred to a later accept flow, so storage happens first."
+  },
+  {
+    "title": "SwarmDemandTracker demand map and per-shard requester_ids grow without bound",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/mod.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs",
+      "blockmatrix/src/network/replication_service/feed.rs"
+    ],
+    "failure": "A long-running node that serves many distinct shards to many distinct peers accumulates one permanent (network,shard) entry per shard and one permanent node_id string per requester, forever. Memory grows monotonically with lifetime shard/peer diversity; the intelligence signal is also skewed by fetches that were subsequently refused by F6."
+  },
+  {
+    "title": "Dead/orphan tag space: CRL tags never routed, distributed-CA + legacy-transfer + key-rotation tags handled but never sent",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/message_handlers/protocol.rs",
+      "blockmatrix/src/network/message_handlers/distributed_ca.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs"
+    ],
+    "failure": "The tag table advertises a distributed-CA/CRL/transfer/key-rotation protocol that is inert: readers and the route unit-test table treat these as live wiring, but no peer ever emits them, and the CRL constants are unreachable. TAG_TRANSFER (0x07) also duplicates the intent of the 0x40-0x44 transfer tags with an insecure auto-accept stub."
+  },
+  {
+    "title": "peer_connection.rs (899 lines) and sync_and_reflection.rs (801 lines) violate the module's own <500-line contract; sync_and_reflection is an unrelated-handler grab-bag",
+    "kind": "quality-bar",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs",
+      "blockmatrix/src/network/message_handlers/mod.rs"
+    ],
+    "failure": "The stated per-file bound is silently broken; the grab-bag file forces unrelated handlers to share a change surface, raising merge/regression risk and making ownership of each concern unclear."
+  },
+  {
+    "title": "Replication-poll actuation discards replica bytes and registers phantom providership",
+    "kind": "missing-impl",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/replication_service/poll.rs",
+      "blockmatrix/src/network/shard_transport.rs"
+    ],
+    "failure": "The loop 'converges' on phantom replicas: this node is handed out (via its own index, TAG_SHARD_LOCATE answers, and analytics replica counts) as a provider of a shard it never stored; peers directing fetches at it get empty responses. Replica accounting rises without any new copy existing anywhere — the popularity→replication loop is still open (2026-07-05 audit) but now actively corrupts provider data. A provider returning garbage is also 'fetched' successfully (no hash gate)."
+  },
+  {
+    "title": "H3 feed loop re-feeds the full cumulative demand snapshot every 10s, and the trigger reads cumulative counts — signal inflates forever",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/replication_service/feed.rs",
+      "blockmatrix/src/network/mod.rs",
+      "ngauge/src/swarm_analytics.rs"
+    ],
+    "failure": "One real fetch of one shard produces +1 request_count and +1 consumer_position every 10s forever (~8.6k/day per requester per shard). `needed = ceil(request_count/100)` grows without bound, so every shard ever requested once eventually signals urgent replication permanently — perpetual 30s fetch churn (compounded by the discard bug) and a demand map whose k-means clusters are dominated by replayed history, not current demand."
+  },
+  {
+    "title": "Demand/analytics state is unbounded and remotely drivable",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/mod.rs",
+      "ngauge/src/swarm_analytics.rs",
+      "blockmatrix/src/network/message_handlers/peer_connection.rs"
+    ],
+    "failure": "An authenticated peer looping TAG_SHARD_FETCH with random 32-byte ids grows two maps plus a Vec per entry without bound on the serving node (amplified 1-per-10s by the feed loop) — memory exhaustion on long-lived nodes; violates the substrate-memory rule that RAM working sets evict, never grow unbounded."
+  },
+  {
+    "title": "DispersionAdvisor anti-affinity is a live no-op (fresh advisor each call, register_replica never fed)",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/replication_service/poll.rs",
+      "ngauge/src/swarm_analytics.rs"
+    ],
+    "failure": "Replica-source recommendations never avoid positions already holding replicas, so fetches cluster onto already-served demand centroids instead of spreading — the documented dispersion behavior silently doesn't exist (confirms the suspected issue; cite-verified)."
+  },
+  {
+    "title": "distribute_to_peers ignores the placement authority's chosen node and re-picks by announced coordinate",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/shard_distribution.rs",
+      "blockmatrix/src/network/placement.rs"
+    ],
+    "failure": "When a peer's proximity cell differs from its announced cell (the normal case once RTT is measured), the shard is sent to a different peer than the one the PoS-eligibility+octant authority selected — and than the placement recorded on-chain by register_sharded_asset_onchain (ipc/handlers/store.rs:141-146), so the chain's placements point at cells whose nearest announced peer never received the shard."
+  },
+  {
+    "title": "Store/distribute path never populates ShardLocationIndex on any node",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/ipc/handlers/store.rs",
+      "blockmatrix/src/network/shard_transport.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs"
+    ],
+    "failure": "Immediately after publish+distribute, no node's index knows any provider: directed fetch ordering degrades to blind peer scans, TAG_SHARD_LOCATE answers only cover self-held shards (sync_and_reflection.rs:152 compensates for self only), and the E.2 poll loop logs 'no remote providers ... yet' for exactly the shards that were just placed."
+  },
+  {
+    "title": "R4 Anonymous HashOnly dedup policy built and tested but never selected live",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/shard_dedup.rs",
+      "blockmatrix/src/network/consumer_provider.rs",
+      "blockmatrix/src/ipc/handlers/shard.rs"
+    ],
+    "failure": "A node running PrivacyMode::ANONYMOUS that fetches a shard registers itself as a provider and broadcasts TAG_SHARD_ANNOUNCE — exactly the identity/location disclosure R4's HashOnly policy exists to prevent; the R4 'privacy-scoped dedup' feature claim is only half-true live."
+  },
+  {
+    "title": "SpatialBucketAssigner (hash_bucket.rs) is dead in production — spatial block filtering never runs",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/hash_bucket.rs",
+      "blockmatrix/src/bin/node/commands/node_bringup.rs",
+      "blockmatrix/src/blockchain/propagation.rs"
+    ],
+    "failure": "The 'Public mode block sync' spatial hash-bucket responsibility the module header claims is a fiction at runtime — Public nodes propagate NearestN(6) and accept without spatial bucketing; anyone reading the code or status assuming R12-style spatial responsibility is misled."
+  },
+  {
+    "title": "DefaultIsolationManager/MultiNetworkRegistry unmounted; NetworkId dimension is constant DEFAULT_NETWORK everywhere",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/multi_network.rs",
+      "blockmatrix/src/network/isolation/mod.rs",
+      "blockmatrix/src/network/replication_service/poll.rs"
+    ],
+    "failure": "Shards do not actually belong to their network (canonical torrent/mirror model): a Private-mode node's announcements land in the same flat DEFAULT_NETWORK namespace as Public peers', and no isolation check exists on the replication/fetch path to stop cross-network provider leakage once multiple networks are real. The completed-task status overstates reality."
+  },
+  {
+    "title": "locality_centroids + GeographicClustering 'promotion to live' is false — zero callers",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/locality.rs"
+    ],
+    "failure": "Doc asserts a live capability (locality centroids driving demand placement) that does not execute; next reader builds on centroids that are never computed. provider_from_nodes in the same file IS live — the dead half hides behind the live half's credibility."
+  },
+  {
+    "title": "ngauge CollectiveIntelligence orphaned (re-export only, no consumers)",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "ngauge/src/collective_intel.rs",
+      "ngauge/src/lib.rs"
+    ],
+    "failure": "350+ lines of aggregation logic present as a live subsystem in the crate API; per the vector-space-regions memory it is the intended substrate for emergent-region work, so silent rot here is a future correctness trap."
+  },
+  {
+    "title": "handle_incoming_shard_stream is a prod-dead duplicate of handle_shard_message with divergent serve format",
+    "kind": "duplication",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/shard_transport.rs",
+      "blockmatrix/tests/two_node_shard_exchange.rs"
+    ],
+    "failure": "Two owners of the shard wire protocol: a future edit to one (e.g., the envelope, or a size guard) silently misses the other, and the E2E test exercises the variant production never runs — green tests over dead code."
+  },
+  {
+    "title": "H4 propagation-weight computation runs on a fresh empty RoutingIntelligence every cycle (neutral by construction)",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/replication_service/propagation.rs"
+    ],
+    "failure": "A loop that logs 'Updated propagation weights from ngauge' machinery presents routing intelligence as live while the only real effect is the eBPF publish hook; MEMORY's 'PropagationWeight 15s' status overstates this."
+  },
+  {
+    "title": "Live demand feed re-ingests cumulative snapshot every 10s: unbounded consumer_positions + popularity inflates with uptime",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/replication_service/feed.rs",
+      "blockmatrix/src/network/mod.rs",
+      "ngauge/src/swarm_analytics.rs"
+    ],
+    "failure": "With ZERO new traffic, one past requester of one shard adds one MatrixPosition and +1 request_count every 10s forever: (a) memory leaks at ~(shards x requesters) positions per 10s and cluster_positions' k-means (swarm_analytics.rs:630-680) iterates the whole vector per poll, so CPU grows linearly with uptime; (b) request_count measures uptime, not demand — ReplicationTrigger's needed=ceil(count/100) (swarm_analytics.rs:488-492) ratchets to max_replicas=20 for any shard fetched once, so the P6 'converged' loop perpetually re-fires and over-replicates everything."
+  },
+  {
+    "title": "DispersionAdvisor anti-affinity is a live no-op (constructed fresh each cycle; register_replica never called)",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/replication_service/poll.rs",
+      "ngauge/src/swarm_analytics.rs",
+      "ngauge/crate-status.toml"
+    ],
+    "failure": "New replicas are steered purely by demand k-means and can land exactly on nodes already holding the shard; the documented/status-claimed anti-affinity dispersion property does not exist at runtime, silently degrading R12 dispersion."
+  },
+  {
+    "title": "H4 propagation-weight loop computes weights from a fresh, never-fed RoutingIntelligence — permanently neutral, presented as live intelligence",
+    "kind": "dead-code",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/replication_service/propagation.rs",
+      "ngauge/src/routing_intel.rs"
+    ],
+    "failure": "set_propagation_weights receives all-1.0 factors every cycle; the claimed intelligence-driven block propagation weighting (crate-status 'Routing intelligence feedback consumed by blockmatrix', MEMORY 'PropagationWeight 15s') is decorative, and the info log actively misreports it as working. Also doubly broken because the pipeline that would feed it receives no frames (see MetricsReporter finding)."
+  },
+  {
+    "title": "CLI `hypermesh ngauge marketplace|metrics|leases` call IPC methods the daemon never registers",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/bin/node/dispatch.rs",
+      "blockmatrix/src/ipc/handlers/ngauge.rs",
+      "blockmatrix/src/ipc/handlers/capability_registry.rs"
+    ],
+    "failure": "Three advertised CLI subcommands always fail at runtime with a method-not-found service_error against a healthy daemon — user-visible dead surface presenting as features."
+  },
+  {
+    "title": "blockmatrix still declares reed-solomon-erasure dependency it no longer uses (A1 leftovers)",
+    "kind": "duplication",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/Cargo.toml",
+      "ngauge/src/sharding.rs",
+      "blockmatrix/src/assets/pipeline/sharding.rs"
+    ],
+    "failure": "Dead dependency implies a second RS engine still exists in blockmatrix, confusing future audits and inflating the dependency tree/build of the deploy binary."
+  },
+  {
+    "title": "spine_point/spine_seq are wire-visible serde field names in the public signed MirrorAttestation type",
+    "kind": "naming",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "lib/src/attestation.rs",
+      "blockmatrix/src/network/attestation_wire.rs"
+    ],
+    "failure": "The one type third parties sign and every peer parses teaches the dead single-spine model; every new consumer of the attestation wire re-learns 'spine' as if it were authoritative, when the value is actually a lineage_id. The scar is now frozen into cross-version JSON wire compat, getting more expensive to remove with every deploy."
+  },
+  {
+    "title": "\"spine/off-spine\" vocabulary saturates the accept/attestation/lineage path docs despite the spine being declared non-authoritative",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/blockchain/attestations.rs",
+      "blockmatrix/src/blockchain/lineage.rs",
+      "blockmatrix/src/blockchain/mutations.rs",
+      "blockmatrix/src/blockchain/chain.rs",
+      "blockmatrix/src/network/message_handlers/asset_chain_handlers.rs",
+      "blockmatrix/src/network/message_handlers/protocol.rs",
+      "lib/src/proof.rs"
+    ],
+    "failure": "Docs present the deprecated container-chain as the system's backbone. A reader of the accept path concludes the linear chain is the authority and per-asset lineage is the satellite — the exact inversion of the D1 model — and designs new features against the wrong frame."
+  },
+  {
+    "title": "Reputation-as-float serde fields with live defaults in the mounted user-contribution platform config",
+    "kind": "naming",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/platform/user_contribution/pricing.rs",
+      "blockmatrix/src/platform/user_contribution/session.rs",
+      "blockmatrix/src/platform/mod.rs"
+    ],
+    "failure": "Directly violates the no-reputation-floats canon (PoS is binary authentic-or-not) in serde-visible config that ships in the mounted platform. Decorative today (nothing reads the values), so it is dead economics presenting as a live reputation system — the next contributor will 'finish' it by wiring reputation math."
+  },
+  {
+    "title": "crate-status.toml claims a working \"Genesis adoption protocol\" while adopt_genesis is documented NOT WIRED",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/crate-status.toml",
+      "blockmatrix/src/blockchain/chain.rs"
+    ],
+    "failure": "The status feed (generated scripts/output/status.ts:173 repeats it) advertises a joining mechanism that the code itself says must not be wired; anyone triaging network-join work trusts the status file and skips the real gap. Also perpetuates \"foreign genesis\" scar vocabulary in the shipped feature description."
+  },
+  {
+    "title": "audit_ledger doc cross-references the dissolved \"foreign store\"; other doc/log \"foreign\" survivals",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/distribution/audit_ledger.rs",
+      "blockmatrix/src/blockchain/chain.rs",
+      "blockmatrix/src/blockchain/sync_manager.rs",
+      "blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "audit_ledger points maintainers at a module that no longer exists; the doc/log uses of \"foreign\" keep the deleted foreign-chain concept alive in grep results and operator logs, blurring the line between the dead second-class-chain model and plain English \"another network's\"."
+  },
+  {
+    "title": "catalog module file security/reputation.rs survives the ReputationSystem->PublisherAuthenticator rename",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "catalog/src/security/mod.rs",
+      "catalog/src/security/reputation.rs",
+      "catalog/src/api/stoq_api/mod.rs"
+    ],
+    "failure": "The import path catalog::security::reputation::PublisherAuthenticator re-introduces the banned concept at every use site; the module name contradicts its own contents and the terminology canon (BinaryAuthenticator model)."
+  },
+  {
+    "title": "Prod code hardcodes NetworkId([0u8;16]) instead of DEFAULT_NETWORK",
+    "kind": "duplication",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/intelligence/ebpf_feedback.rs",
+      "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs",
+      "lib/src/types.rs"
+    ],
+    "failure": "The default-network fact is owned in two-plus places; if DEFAULT_NETWORK is ever changed or replaced by real network routing, these sites silently keep keying the zero network and the eBPF privacy-action / engagement-metrics paths diverge from the analytics keyed on the constant."
+  },
+  {
+    "title": "stoq reuses the DEFAULT_NETWORK byte value as an \"unknown network\" sentinel in rejection reasons",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "stoq/src/transport/multipath/connection.rs"
+    ],
+    "failure": "A rejection that means \"I don't know which path/network you came from\" is indistinguishable from \"tunnel from the default network to X is not configured\". Any diagnostic or policy consumer keying on `from == DEFAULT_NETWORK` misreads unknown-path errors as default-network tunnel misconfiguration."
+  },
+  {
+    "title": "Stale comments claim trust-score/reputation logic where the code is canon-compliant",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/assets/core/proxy.rs",
+      "blockmatrix/src/assets/proxy/mod.rs",
+      "blockmatrix/src/privacy/switching.rs",
+      "blockmatrix/src/network/validation.rs"
+    ],
+    "failure": "Comments assert the banned trust-score/reputation model over code that correctly implements binary authentication and capacity selection — a reviewer greps 'trust score', concludes a scoring system exists (or should), and either files false canon violations or builds one to match the comment."
+  },
+  {
+    "title": "Stake-as-magnitude vocabulary: dead StakeAmount criterion variant and Caesar mock staking-APY API",
+    "kind": "naming",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/assets/privacy/allocation_types/transitions.rs",
+      "caesar/src/api/ui_handlers.rs"
+    ],
+    "failure": "StakeAmount is a validation criterion that, if ever wired, would gate transitions on a stake magnitude — the exact rejected model; today it is dead weight contradicting the adjacent canon comments. Caesar's UI handler serves fabricated coin-staking economics (APY, lock periods) that conflate PoStake-as-authorization with coin staking and present as a real feature to any UI consumer."
+  },
+  {
+    "title": "DefaultIsolationManager confirmed unmounted — deliberately re-orphaned by de-worlds; no per-network fetch isolation exists live",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/isolation/default.rs",
+      "blockmatrix/src/network/isolation/mod.rs",
+      "blockmatrix/src/network/multi_network.rs"
+    ],
+    "failure": "The canonical claim 'shards belong to their NETWORK, complete isolation' has no live enforcement beyond a single-network handshake string compare; a node participating in two networks (the target model) has zero mechanism preventing cross-network shard/metadata flow. Task #59 'P5 Mount IsolationManager' reads completed but the mount was reverted — status is a lie relative to the tracker."
+  },
+  {
+    "title": "TAG_SHARD_ANNOUNCE and TAG_SHARD_LOCATE bypass the auth gate: unauthenticated index poisoning, provider-topology leakage, unbounded index growth",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs",
+      "blockmatrix/src/network/swarm_provider.rs"
+    ],
+    "failure": "An unauthenticated peer can (a) poison the location index so the E.2 replication loop (replication_service/poll.rs:97-137) fetches replicas from an attacker node, (b) enumerate which nodes — including this one — hold any content hash, leaking provider topology and 'I hold shard X' identity in Private networks (exactly ViolationType::IdentityLeakage the dormant isolation module was built to prevent), and (c) grow the index without bound by spamming unique hashes faster than the 30s cleanup_expired cadence reclaims them."
+  },
+  {
+    "title": "Live shard demand/location/replication all keyed to DEFAULT_NETWORK — the peer's authenticated network never reaches the (NetworkId, ContentHash) indexes",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs",
+      "blockmatrix/src/network/replication_service/poll.rs",
+      "blockmatrix/src/network/mod.rs",
+      "blockmatrix/src/network/swarm_provider.rs"
+    ],
+    "failure": "Per-network fetch isolation is structurally present but behaviorally absent: two networks served by one node pool their providers, demand, and replication targets in one bucket, so a shard private to network A can be selected as a replication source/target in the context of network B. The Track-P keying is currently decorative — the exact 'built-but-not-wired' pattern."
+  },
+  {
+    "title": "Network identity has three live representations that never convert: String (auth/sync/dns), lib NetworkId (placement), NetworkScope (validation); nesting APIs are type-incompatible and unwired",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/sync_manager.rs",
+      "blockmatrix/src/dns/domain.rs",
+      "blockmatrix/src/network/peer_auth.rs",
+      "blockmatrix/src/proof_of_state/network_rules.rs"
+    ],
+    "failure": "The same fact ('which network') is owned by four types with no bridge: a membership's parent can never be populated from the only live producer of parents (DNS), and any future code comparing a membership's String id to a placement NetworkId or a validation NetworkScope must invent an ad-hoc conversion, guaranteeing drift. Nested-network resolution ('walk the parent chain', sync_manager.rs:119-121 doc) cannot work because parents are never recorded."
+  },
+  {
+    "title": "Dormant triple-stack multi-network subsystem (trust/ + multi_network.rs + assets/multi_node coordinator): placeholder crypto, fake cross-network validation, doc claims it is live",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/trust/mod.rs",
+      "blockmatrix/src/network/multi_network.rs",
+      "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs",
+      "blockmatrix/src/intelligence/mod.rs"
+    ],
+    "failure": "Three parallel dormant implementations of 'join/leave networks with isolation' present as working multi-network participation (crate-status/docs), and the fake structural cross-network validation could be mistaken for the real dual-proof transfer path (the live TAG_TRANSFER_* handlers) and wired somewhere by a future contributor. StoqIsolationManager (multi_network_coordinator.rs:51-128) is additionally a naming lie — a blockmatrix HashMap that never touches stoq."
+  },
+  {
+    "title": "Four isolation-manager implementations across three modules/crates, zero mounted — one fact ('may traffic cross networks') with no owner",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/isolation/default.rs",
+      "blockmatrix/src/assets/multi_node/multi_network_coordinator.rs",
+      "stoq/src/network_isolation.rs",
+      "blockmatrix/src/intelligence/mod.rs"
+    ],
+    "failure": "Cross-network boundary enforcement has four competing definitions and no live one; any attempt to 'turn on isolation' must first litigate which of the four is real, and stoq carrying a full isolation subsystem violates 'stoq = transport only' separation."
+  },
+  {
+    "title": "Retired 4-tier taxonomy survives as two NetworkType enums plus four Tier structs, contradicting the canonical 2-axis PrivacyMode",
+    "kind": "naming",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "lib/src/types.rs",
+      "blockmatrix/src/network/trust/mod.rs",
+      "stoq/src/transport/certificate_strategy.rs",
+      "blockmatrix/src/privacy/tiers.rs"
+    ],
+    "failure": "Three surfaces claim to be 'the network type'; a contributor choosing which enum to consume (e.g. when mounting isolation) gets steered into the retired taxonomy, and the false '1:1' doc invites conflating CA-endpoint choice with PrivacyMode."
+  },
+  {
+    "title": "Top-level privacy/ module (2832 lines: tiers, switching, policies, ebpf bridge) has zero production consumers but is documented as the live tier-enforcement layer",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/privacy/mod.rs",
+      "blockmatrix/src/privacy/policies.rs",
+      "blockmatrix/src/privacy/switching.rs",
+      "blockmatrix/src/privacy/ebpf_integration.rs"
+    ],
+    "failure": "Tier/policy enforcement appears implemented (and is test-covered!) while the live node enforces nothing from this module — a reader auditing 'is Private mode enforced?' finds 2832 lines of green-tested machinery that never runs; the ebpf_integration bridge additionally overlaps the real hypermesh-ebpf policy path."
+  },
+  {
+    "title": "NetworkMembership.privacy_mode is decorative on the sync path; reflector heartbeats hardcode PrivacyMode::PUBLIC",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/sync_dispatch/reflector_handler.rs",
+      "blockmatrix/src/blockchain/sync_manager.rs"
+    ],
+    "failure": "A Private or Anonymous network's reflector pool records all members as PUBLIC; any privacy-aware reflector selection, reward computation, or disclosure decision built on the pool will treat bounded-network members as fully public — silent privacy-classification corruption in live state."
+  },
+  {
+    "title": "Peer-claimed matrix cell is never verified against derive_cell(node_id) — device-auth invariant (P2) unenforced on the wire",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/mod.rs",
+      "stoq/src/protocol/bilateral.rs",
+      "blockmatrix/src/bin/node/main.rs",
+      "blockmatrix/src/bin/node/cli.rs",
+      "base/src/address.rs"
+    ],
+    "failure": "Any peer (or local operator) claims an arbitrary cell. Forged cells flow into propagation target selection (propagation.rs:267 find_k_nearest over get_connected_coordinates), the spatial bucket assigner, placement fallback (placement.rs:75), and poll ranking fallback (poll.rs:86-89) — letting a malicious node position itself 'near' victims to attract block propagation and shard placement, defeating the completed-claimed P2 invariant."
+  },
+  {
+    "title": "locality_centroids has zero callers — GeographicClustering is still dormant while its docs claim live promotion",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/locality.rs",
+      "blockmatrix/src/matrix/geospatial/clustering.rs"
+    ],
+    "failure": "The status claim is false: the clustering engine the P3/P6 phases point at never runs at runtime. Anyone extending 'the live clustering' extends the wrong engine (the actually-live k-means is ngauge's private cluster_positions), and the P6 'world formation (emergent)' claim has no clustering execution behind it on this path."
+  },
+  {
+    "title": "Three parallel clustering/distance implementations (GeographicClustering k-means, ngauge cluster_positions k-means, inline euclidean in poll.rs)",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/matrix/geospatial/clustering.rs",
+      "ngauge/src/swarm_analytics.rs",
+      "blockmatrix/src/network/replication_service/poll.rs"
+    ],
+    "failure": "Two k-means engines own the same fact (demand clustering); fixes/tuning land in one and not the other. The dormant blockmatrix engine is the documented one, the live ngauge one is undocumented — the exact inversion that misleads future work."
+  },
+  {
+    "title": "SwarmAnalytics consumer_positions is unbounded AND the 10s feed re-records the full cumulative demand snapshot every tick",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "ngauge/src/swarm_analytics.rs",
+      "blockmatrix/src/network/replication_service/feed.rs",
+      "blockmatrix/src/network/mod.rs"
+    ],
+    "failure": "Even with CONSTANT demand (one shard, one requester), consumer_positions grows by 8,640 entries/day/requester/shard and request_count inflates by +1 per tick, corrupting popularity metrics; the 30s DispersionAdvisor k-means then iterates an ever-growing Vec — memory leak plus CPU creep on a long-lived node. Worse than the previously-believed 'unbounded under richer feeds'."
+  },
+  {
+    "title": "Live 'matrix topology' propagation and neighbor queries run over locality-free identity-hash cells — radius-based strategies are no-ops",
+    "kind": "misconnection",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/blockchain/propagation.rs",
+      "blockmatrix/src/bin/node/commands/node_bringup.rs",
+      "blockmatrix/src/bin/node/commands/background.rs",
+      "blockmatrix/src/ipc/handlers/topology.rs"
+    ],
+    "failure": "NearestN(6) is an arbitrary-but-deterministic peer pick wearing topology-aware clothing (harmless ≤6 peers, silently partitions gossip at scale by hash-distance, not proximity); Broadcast/DistanceThreshold, if ever configured (sync_protocol.rs exposes them as config), propagate to ZERO peers — a silent no-propagation failure; the background log and IPC topology.neighbors always report empty, presenting a fictitious capability."
+  },
+  {
+    "title": "Live placement mixes two incommensurable coordinate spaces in one distance computation (RTT embedding vs derive_cell fallback)",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/placement.rs",
+      "blockmatrix/src/network/replication_service/poll.rs"
+    ],
+    "failure": "An unmeasured peer sits tens of thousands of units from every measured peer, so geometric selection (octant optimizer, nearest-to-recommendation, most_central) systematically treats unmeasured peers as extreme outliers — not the documented 'deterministic graceful degradation' but a strong structural bias against exactly the peers that most need first placements (new joiners)."
+  },
+  {
+    "title": "DispersionAdvisor anti-affinity is a live no-op (advisor built fresh each poll, register_replica never called) — CONFIRMED still true",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/replication_service/poll.rs",
+      "ngauge/src/swarm_analytics.rs"
+    ],
+    "failure": "Replica recommendations can stack on top of existing replica positions; the documented dispersion guarantee silently does not exist, so replication converges on count but not on spread."
+  },
+  {
+    "title": "GPS geospatial layer (~2000 lines: converter/hierarchy/topology + persistence topology_backup) is test-only and contradicts the emergent-region model",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/matrix/geospatial/converter.rs",
+      "blockmatrix/src/matrix/geospatial/hierarchy.rs",
+      "blockmatrix/src/matrix/geospatial/topology.rs",
+      "blockmatrix/src/persistence/topology_backup.rs",
+      "blockmatrix/src/persistence/manager.rs"
+    ],
+    "failure": "~2000 lines of reified geographic-region structure (zones, continents, GPS conversion) present as a working subsystem (module docs, blockmatrix/CLAUDE.md 'Geospatial integration ... implemented') while being unreachable — and the canonical model says regions are EMERGENT vector-space clusters, never geographic and never reified. New contributors will build on the wrong region model."
+  },
+  {
+    "title": "P7 'decorative cleanup' left decorative geometry: transforms.rs, 4/7 tensor routing fns, 4 neighbor variants, and IntelligenceLayer's placeholder retrieval",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/matrix/transforms.rs",
+      "blockmatrix/src/matrix/tensor/routing.rs",
+      "blockmatrix/src/matrix/neighbors.rs",
+      "blockmatrix/src/intelligence/mod.rs",
+      "blockmatrix/src/integration/phase1_foundation.rs"
+    ],
+    "failure": "chunk.rs:21-25 explicitly defines the P7 bar ('an unconsumed operation is the decorative tensor code P7 removes') — these violate the completed phase's own contract; the IntelligenceLayer placeholder is dead code shaped exactly like the claimed 'instruction-based retrieval' feature and will be mistaken for it."
+  },
+  {
+    "title": "PlacementLease promised live in P2/P3/P4 (all marked complete) but has zero consumers; derive_cell docs point at it as the location authority",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "ngauge/src/placement/lease.rs",
+      "blockmatrix/src/matrix/coordinate.rs",
+      "base/src/address.rs"
+    ],
+    "failure": "The documented seam between identity and location does not exist at runtime — live placement (place_shards, poll.rs) passes raw coordinates and never issues/consumes a lease, so the load-bearing doc trail in the two canonical derivation files points at vapor."
+  },
+  {
+    "title": "GeographicClustering kmeans retains stale phantom clusters and coordinate-keyed membership loses node identity",
+    "kind": "missing-impl",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/matrix/geospatial/clustering.rs"
+    ],
+    "failure": "If GeographicClustering is ever promoted for real (finding 2), centroids can include stale phantoms and cluster→member mapping cannot answer 'which peers are in this locality' — the exact query emergent-region formation needs."
+  },
+  {
+    "title": "Five distinct NetworkTopology types across the workspace",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/matrix/geospatial/topology.rs",
+      "blockmatrix/src/persistence/topology_backup.rs",
+      "blockmatrix/src/orchestration/service_mesh/routing.rs",
+      "blockmatrix/src/assets/multi_node/mod.rs",
+      "catalog/src/sharing/topology/mod.rs"
+    ],
+    "failure": "Grep/IDE navigation and re-export collisions routinely land on the wrong topology; the dormant geospatial one is the documented one, compounding the confusion in finding 8."
+  },
+  {
+    "title": "MetricsReporter wire frames never deserialize into ngauge::MetricsFrame (NodeId hex string vs [u8;32] array) — live metrics ingestion is starved",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/network/metrics_reporter.rs",
+      "ngauge/src/streaming/protocol.rs",
+      "lib/src/types.rs",
+      "blockmatrix/src/network/message_handlers/message_utils.rs"
+    ],
+    "failure": "The entire peer-metrics chain (MetricsReporter → CONN_TYPE_METRICS stream → MetricsIngestionPipeline) silently ingests zero frames; ingestion counters stay 0 and everything downstream of the pipeline (throttle plumbing, routing weights, trending) has no data source, while both ends look wired."
+  },
+  {
+    "title": "trust_signals → TrustChain federation gating is unmounted despite docs and crate-status claiming it is wired (Phase F.1)",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "ngauge/src/trust_signals.rs",
+      "blockmatrix/src/intelligence/ngauge_trust_adapter.rs",
+      "trustchain/src/ca/federation.rs",
+      "ngauge/crate-status.toml"
+    ],
+    "failure": "Federation peers are admitted at whatever level the existing logic grants with no behavioral gating — the claimed protection does not run; additionally the 'public reputation signals' wording in crate-status violates the no-reputation terminology mandate even though no float reaches PoS admission."
+  },
+  {
+    "title": "NGauge standalone API serves fabricated data; marketplace engines (~1135 lines) have zero callers while crate-status lists them working",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "ngauge/src/api/ui_handlers.rs",
+      "ngauge/src/marketplace/lease_manager.rs",
+      "ngauge/crate-status.toml"
+    ],
+    "failure": "A UI or SDK consumer gets plausible fake numbers and a 'created' lease that does not exist — silent data fabrication behind a status file claiming the marketplace works; the real engines rot unreferenced."
+  },
+  {
+    "title": "SwarmAnalytics windowed fetch-rate subsystem (incl. its only GC, cleanup_cold_shards) has no production caller — the bounded mechanism is dead while the unbounded cumulative path is live",
+    "kind": "dead-code",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "ngauge/src/swarm_analytics.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs"
+    ],
+    "failure": "The window-trimmed, capped (max_history_per_shard=1000), GC-able design that R12 needs sits unused, while replication decisions run off the defective ever-growing cumulative counters — exactly inverted; crate-status claims 'windowed fetch tracking, popularity detection, ReplicationRecommendation' as working."
+  },
+  {
+    "title": "PlacementLease is a documented seam that nothing consumes — coordinate populated only by its own unit tests despite P2-P4 marked complete",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "ngauge/src/placement/lease.rs",
+      "blockmatrix/src/matrix/coordinate.rs"
+    ],
+    "failure": "The named identity/location boundary exists only as prose; anyone trusting the docs (or the completed-phase status) will look for lease flow that does not exist, and the NetworkId-scoped placement fact lives implicitly in ad-hoc maps instead of the type built for it."
+  },
+  {
+    "title": "CollectiveIntelligence confirmed orphaned (zero consumers)",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "ngauge/src/collective_intel.rs"
+    ],
+    "failure": "428 lines of maintained dead surface, including gold-gram EconomicSummary floats that could be mistaken for live economics; the intended feeder (metrics ingestion) is itself starved, so nothing will organically start consuming it."
+  },
+  {
+    "title": "Dormant module cluster with 'working' status claims: receipt, min_spec, compliance, caesar_tracker, node_metrics, throttle, MetricsCollector, organic_detection, trending",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "ngauge/src/receipt.rs",
+      "ngauge/src/min_spec.rs",
+      "ngauge/src/compliance.rs",
+      "ngauge/src/caesar_tracker.rs",
+      "ngauge/src/node_metrics.rs",
+      "ngauge/src/throttle.rs",
+      "ngauge/src/metrics.rs",
+      "ngauge/src/trending.rs",
+      "ngauge/crate-status.toml"
+    ],
+    "failure": "~2000 lines of tested-but-unreachable code inflate the crate's completion percentage and the website status feed; 'working' reads as 'wired' to anyone planning against the status, repeating the falsified-progress pattern P0.0 existed to correct."
+  },
+  {
+    "title": "File-size quality bar exceeded in ngauge: swarm_analytics.rs (1383L), api/stoq_api.rs (945L), routing_intel.rs (857L)",
+    "kind": "quality-bar",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "ngauge/src/swarm_analytics.rs",
+      "ngauge/src/api/stoq_api.rs",
+      "ngauge/src/routing_intel.rs"
+    ],
+    "failure": "Swarm_analytics in particular co-locates four separable units, which is how the dead windowed API and the live cumulative path ended up entangled in one file and their divergence went unnoticed."
+  },
+  {
+    "title": "Live placement 'PoS eligibility' gate is a hardcoded allow-all stub",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/pos_validator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/placement.rs"
+    ],
+    "failure": "Every peer passes the WHO/authorization gate unconditionally in a release binary: shards of a Private/PrivateNetwork asset can be placed on any node whose privacy *string* matches, with no chain-recorded AuthorizationSet ever consulted. The placement doc's 'WHO + execute: PoS eligibility' claim is false on the live path."
+  },
+  {
+    "title": "TrustChain CA -> HyperMesh PoS validation loop structurally disconnected; cert handler is an always-valid echo stub",
+    "kind": "misconnection",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/hypermesh_client.rs",
+      "/home/persist/hypermesh/core/stoq/src/api/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/api/proof_of_state_api.rs",
+      "/home/persist/hypermesh/core/trustchain/src/ca/trustchain_ca.rs"
+    ],
+    "failure": "Network-validated certificate issuance always fails with 'Handler not found' after retries (or never connects); if the route were ever fixed without fixing the handler, any certificate request would be rubber-stamped valid. Status claims of a working CA<->HyperMesh PoS loop are false."
+  },
+  {
+    "title": "stoq PosToken line-rate validation stack is dead on every live path",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/stoq/src/protocol/pos_validator.rs",
+      "/home/persist/hypermesh/core/stoq/src/transport/manager/pos.rs",
+      "/home/persist/hypermesh/core/stoq/src/transport/manager/constructors.rs",
+      "/home/persist/hypermesh/core/stoq/src/transport/multipath/connection.rs",
+      "/home/persist/hypermesh/core/stoq/src/transport/pos_extension_validator.rs"
+    ],
+    "failure": "'PoS at protocol layer / line-rate' reads as live (crate status lists it as working) but no shipped connection ever validates a PosToken; the stack costs maintenance and misleads audits. PosToken itself now correctly embeds the canonical lib StateProof, so this is pure wiring debt, not type divergence."
+  },
+  {
+    "title": "blockmatrix/src/verification/ (R12 shard commitment + PoSPing + R13 min-spec) is fully dormant",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/verification/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/verification/shard_commitment.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/block.rs"
+    ],
+    "failure": "R12's 'BLAKE3(sorted placements) per block' commitment and the PoSPing spatial-consistency probe protocol exist only as self-tested library code — no block carries a commitment and no probe is ever sent, while the requirement reads as implemented."
+  },
+  {
+    "title": "#52 confirmed open: block_handlers.rs pre-filter is a third received-validation site outside the D4 scope seam",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "Every received block is validated twice, and the two bars are only accidentally identical: once a network publishes a ruleset (or resolve_strict activates), the pre-filter at :115 still applies the intrinsic structural bar — a block a network's rules reject is dropped at a different layer with different logging, or vice versa. Maintenance divergence is the concrete risk; today the effective gate is not weaker."
+  },
+  {
+    "title": "Handshake validates FALCON envelope + structural inner proofs only — no WHEN-freshness threshold",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/mod.rs",
+      "/home/persist/hypermesh/core/stoq/src/protocol/bilateral.rs"
+    ],
+    "failure": "A peer presenting a signed proof with an arbitrarily stale network_time_offset or ancient timestamps passes admission — the single quantitative bound the canonical model allows (WHEN freshness) is unenforced at the trust boundary it exists for. Impact is bounded by the fresh challenge-nonce signature, but the code's own comments claim more than it checks."
+  },
+  {
+    "title": "Four-plus parallel four-proof validation bars with conflicting thresholds",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/lib/src/proof.rs",
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/validation.rs",
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/validator.rs",
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/proof.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/validation.rs"
+    ],
+    "failure": "The same proof is valid on one path and invalid on another (offset 90s: passes received-block accept, fails add_block at 60s, passes handshake with no bar, fails verify_all_proofs at 300s only above 300s). Three things named StateAuthenticator with different shapes make every audit and call-site review error-prone. No single owner of 'the bar' — exactly the divergence D4's seam was built to prevent."
+  },
+  {
+    "title": "trustchain SignedStateProof: unused duplicate envelope with a lossy conversion",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/mod.rs"
+    ],
+    "failure": "Two envelope types owning the same fact; if any future code adopts SignedStateProof the lossy From can emit an unverifiable empty-body envelope with no error. Pure scar tissue post type-unification."
+  },
+  {
+    "title": "Dead vestiges in proof_of_state modules: unused ProofOfState trait, integration shims, asset_integration",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/proof.rs",
+      "/home/persist/hypermesh/core/trustchain/src/proof_of_state/asset_integration.rs"
+    ],
+    "failure": "Readers (and status tooling) count these as live PoS surface; the unused ProofOfState trait shadows the real validation traits and invites accidental new implementations against a dead interface."
+  },
+  {
+    "title": "H3 unsigned-block env bypass still compiled into release; two test suites still depend on it",
+    "kind": "gap",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/s3_0_durability_and_genesis.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/s3_4_received_asset_chain.rs"
+    ],
+    "failure": "A runtime downgrade lever ships in the release binary one release past its stated migration window; an operator (or leaked env) silently re-opens unsigned block acceptance, and the two tests mask the remaining unsigned-producer paths."
+  },
+  {
+    "title": "mutations.rs and chain.rs far exceed the 500-line file bar",
+    "kind": "quality-bar",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/chain.rs"
+    ],
+    "failure": "Chain-mutation logic (the security-critical accept path) is buried in 1.5k-line files, making the single-gate invariants (append reservation, lineage stamping, H3 signing order) hard to review."
+  },
+  {
+    "title": "ProofValidationResult::confidence() float on the canonical lib proof type",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/lib/src/proof.rs"
+    ],
+    "failure": "The single-source-of-truth proof module exports banned 'confidence' vocabulary; any future caller adopting it reintroduces graded trust on the canonical type."
+  },
+  {
+    "title": "Placement PoS eligibility gate is an allow-all stub (\"Testing mode allows all\") on the live store path",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/pos_validator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/placement.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs"
+    ],
+    "failure": "Every connected peer is deemed PoS-eligible to hold any asset's shards. A Private (Bounded) asset's shards are pushed to peers that hold no on-chain grant for the asset — the canonical \"PoS decides WHO\" placement claim is false on the shipped binary; only the serve-side F6 gate and encryption stand between a shard and an unauthorized mirror."
+  },
+  {
+    "title": "Two complete pipelines: R13-mandated streaming segment pipeline has zero production consumers; legacy whole-blob AssetPipeline is the live path",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "high",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/streaming_pipeline.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/orchestrator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/commands/store.rs"
+    ],
+    "failure": "R13 (streaming reconstruction mandatory, bounded memory) is violated on the live path — a 4GB asset OOMs a min-spec node; CLAUDE.md presents the streaming pipeline as the shipped architecture. Two DecryptionKey shapes and two shard-set formats must be kept compatible forever while only one runs."
+  },
+  {
+    "title": "Entire AssetManager/adapter universe (assets/core manager, 7 adapters, proxy/NAT, privacy manager, multi_node) is unreachable from the shipped daemon",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/lib.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/core/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/adapters/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/proxy/manager.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/state.rs"
+    ],
+    "failure": "~15k+ lines (adapters, proxy, privacy, multi_node) present as live features in status docs but never execute in the daemon: adapter state-proof validation, NAT-like memory addressing, privacy-aware allocation, and per-user resource controls all silently do nothing; effort spent maintaining them changes no shipped behavior."
+  },
+  {
+    "title": "Per-asset NetworkScope is never enforced on the shard-serve gate; isolation machinery is unmounted end-to-end",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/asset_index.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/multi_network.rs"
+    ],
+    "failure": "The canonical rule \"shards belong to their NETWORK\" is unenforced: a Bounded/Private asset registered under `NetworkScope::Private(fingerprint)` is servable to ANY peer that passes the node-level PoS handshake, relying solely on Kyber encryption for confidentiality; once multi-network participation is real, cross-network leakage of shard presence and bytes is structural."
+  },
+  {
+    "title": "Dead parallel blockchain layer inside assets/: AssetBlockchainManager, EntityBlockchain per-entity chains, and CrossChainValidationManager duplicate the real per-asset chain",
+    "kind": "duplication",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/blockchain.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/matrix_blockchain.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/cross_chain/mod.rs"
+    ],
+    "failure": "Two competing implementations of \"an asset/entity has its own chain\" coexist; the dead one is re-exported at assets/mod.rs:39-43 as public API, inviting new code to build on pre-unification scar tissue and contradicting the node≡asset≡index model."
+  },
+  {
+    "title": "AssetAddress remains fully decorative on live paths and structurally cannot encode the protocol's own adaptive RS shard counts",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/lib/src/types.rs",
+      "/home/persist/hypermesh/core/lib/src/protocol.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/genesis_assessor.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/transfer/mod.rs"
+    ],
+    "failure": "The R10/R15-corrected \"IPv6-addressed asset\" story has no live consumer, and if wired as-is it would break on any asset over 100MB (>14 shards); code readers keep re-verifying a feature that does nothing."
+  },
+  {
+    "title": "distribution/ dormant half: redistribution, migration, swarm, and rebalancing (~2.3kL) have no live callers — PoS revocation triggers nothing",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/redistribution.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/rebalancing/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/swarm.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/migration.rs"
+    ],
+    "failure": "The claimed self-healing loop (grant revoked → shards redistributed; node leaves → rebalance) does not exist on the shipped binary; a revoked mirror keeps its shards and the placement record is never re-derived."
+  },
+  {
+    "title": "Third and fourth sharding/encryption implementations inside adapters/storage and assets/proxy, including a hardcoded foreign IPv6 as a 'proxy address'",
+    "kind": "soc-violation",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/adapters/storage/sharding.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/adapters/storage/distribution.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/proxy/sharding.rs"
+    ],
+    "failure": "Four places own the fact \"how an asset becomes shards\" (ngauge engine, pipeline, storage adapter, proxy) — any future change to shard semantics must find and reconcile all four; the hardcoded foreign IPv6 would leak a bogus routable address if the adapter path were ever mounted."
+  },
+  {
+    "title": "ProcessedAsset.proof_hash presents as PH=BLAKE3(PoS(A)) but is a hash of a placeholder string",
+    "kind": "missing-impl",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/orchestrator.rs"
+    ],
+    "failure": "A reader (or future consumer) of ProcessedAsset.proof_hash treats it as a proof commitment when it commits to nothing; two proof stories coexist in the same flow."
+  },
+  {
+    "title": "Name collisions that invite miswiring: two ShardPlacement types and two StateAuthenticator traits",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/distribution.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/pos_validator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/validation.rs"
+    ],
+    "failure": "The double `StateAuthenticator` actively conceals the allow-all placement stub: a reader who sees `DefaultStateAuthenticator` on the placement path assumes the real validating trait is in play; the double `ShardPlacement` makes imports pick the wrong shape."
+  },
+  {
+    "title": "CLI run_store duplicates the daemon store path and carries a dead distribution branch that would ship unregistered shards",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/commands/store.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/dispatch.rs"
+    ],
+    "failure": "Two persist implementations drift silently (paths already differ); if anyone activates the dist_ctx branch, published shards are undistributable-on-serve (authorizes_shard=false) — the exact A6.1 bug, reintroduced."
+  },
+  {
+    "title": "File-size bar exceeded across the assets subsystem (six files 800-965 lines)",
+    "kind": "quality-bar",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/core/asset_id.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/streaming_pipeline.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/proxy/sharding.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/orchestrator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/assets/multi_node/multi_network_coordinator.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/distribution/rebalancing/mod.rs"
+    ],
+    "failure": "Slow review surface on the three live/soon-live files; splitting after the pipeline convergence would be churn done twice."
+  },
+  {
+    "title": "H3 debt live: 3 flagship sync tests unpassable without HYPERMESH_ACCEPT_UNSIGNED_BLOCKS set out-of-band",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/tests/network_sync_e2e.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/scaling_integration.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "Plain `cargo test -p blockmatrix --test network_sync_e2e` fails 2 of 3 tests and scaling_integration fails 1 of 4; the only way to keep them green is exporting the one-release security-bypass flag into the whole test environment, which silently disables the H3 signature gate for every other test in the process."
+  },
+  {
+    "title": "No test carries a FALCON-signed block over a real QUIC connection; both capstones elide QUIC citing untracked flakiness",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/tests/d_exit_e2e.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/p_exit_e2e.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/a6_mirror_e2e.rs"
+    ],
+    "failure": "The claimed 'network sync MVP, E2E two-node over QUIC' has zero default-suite coverage of its production signed path: a regression in envelope serialization, wire framing of signed entries, or FALCON verify under QUIC timing ships green. The flakiness two capstones cite is itself an undiagnosed live-path bug with no tracking task."
+  },
+  {
+    "title": "network_sync_e2e reimplements the wire codec/parser; production block dispatch body has zero behavioral tests (gossip arm has zero, period)",
+    "kind": "duplication",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/tests/network_sync_e2e.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/peer_connection.rs"
+    ],
+    "failure": "If production framing or parse_and_verify_block drifts (field added, length layout changed), the test's private copy keeps passing while real nodes stop interoperating; device/network-scope handling, re-propagation, and the gossip loop can regress with no test failing."
+  },
+  {
+    "title": "#52 confirmed open: block_handlers.rs:115 intrinsic validate() bypasses the D4 resolver; resolve_strict fail-closed hook still inactive",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/block_handlers.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/proof_of_state/network_rules.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs"
+    ],
+    "failure": "Once a network publishes rules diverging from the anchor, the announce pre-filter and the insert gate return different verdicts for the same entry — the exact two-parallel-lists drift the S3.3 QA finding banned for asset chains; a block rejected at :115 for a rule its own network relaxed never reaches the authoritative gate."
+  },
+  {
+    "title": "Isolation enforcer unmounted from every live path — tests admit it; task #59 'Mount IsolationManager' record is false",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/tests/p5_network_isolation.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/multi_network.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/isolation/default.rs"
+    ],
+    "failure": "Per-network shard isolation is enforced only by ShardLocationIndex keying; nothing validates cross-network packets on the live fetch/serve path, while p5/quality-gate green checkmarks and the completed-task record present isolation as enforced."
+  },
+  {
+    "title": "Replication actuation (replication_service/) has zero tests; the live DispersionAdvisor anti-affinity no-op is exactly what a test would catch",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/network/replication_service/poll.rs",
+      "/home/persist/hypermesh/core/ngauge/src/swarm_analytics.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/intelligence_simulation.rs"
+    ],
+    "failure": "The re-replication actuator — the audited-open loop from 2026-07-05 — can regress or misbehave (it already does: anti-affinity dead, replicas cluster onto demand centroids regardless of existing placements) with nothing failing."
+  },
+  {
+    "title": "swarm_analytics consumer_positions unbounded on the live feed path; only a growth test exists, no bound test",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/ngauge/src/swarm_analytics.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/replication_service/feed.rs"
+    ],
+    "failure": "A long-lived node under sustained fetch traffic grows one Vec<MatrixPosition> per (network,shard) without limit — memory leak on the live intelligence path, violating the substrate-memory rule (bounded working set) and R13 minimum-spec survivability."
+  },
+  {
+    "title": "ngauge CollectiveIntelligence is orphaned: zero consumers, self-tests only",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/ngauge/src/collective_intel.rs",
+      "/home/persist/hypermesh/core/ngauge/src/lib.rs"
+    ],
+    "failure": "Dead intelligence code inflates test counts and presents as live analytics; per the vector-space-regions plan it is slated for reuse, so silent bit-rot here lands directly on that work."
+  },
+  {
+    "title": "13+ dead test files: root tests/ is not a cargo target at all; 12 blockmatrix tests gated behind never-on `future-tests` (enabling it breaks the build)",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/tests/main.rs",
+      "/home/persist/hypermesh/core/tests/byzantine_fault_tolerance_test.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/multi_node_integration.rs",
+      "/home/persist/hypermesh/core/blockmatrix/Cargo.toml"
+    ],
+    "failure": "Test listings and any file-count-based coverage claim include ~13 files of phantom coverage; a future engineer enabling future-tests gets a broken build; the BFT file contradicts the no-consensus canon in a repo-visible name."
+  },
+  {
+    "title": "Process-global env flag toggled around await points races parallel tests in the same binary",
+    "kind": "quality-bar",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/s3_0_durability_and_genesis.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/s3_4_received_asset_chain.rs"
+    ],
+    "failure": "cargo test's default parallel threads can interleave the flag-set window with an unsigned-rejection assertion → intermittent spurious pass/fail of H3 security tests, eroding trust in exactly the gate that matters."
+  },
+  {
+    "title": "Streaming pipeline fully tested but dormant: live IPC store handler still uses whole-blob AssetPipeline, and no test pins the live store path",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/streaming_pipeline_integration.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/p_exit_e2e.rs"
+    ],
+    "failure": "'Streaming-first pipeline complete' (CLAUDE.md architecture decisions) reads as live while R13 bounded-memory store/fetch is not what nodes actually run; green streaming tests mask the gap because nothing asserts which pipeline the live handler uses."
+  },
+  {
+    "title": "Received-entry mirror_seal authority gate: documented as unimplemented on the accept path, zero test coverage",
+    "kind": "missing-impl",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/blockchain/mutations.rs",
+      "/home/persist/hypermesh/core/blockmatrix/tests/s3_3_mirror_attestations.rs"
+    ],
+    "failure": "A peer can plant on-chain, hash-committed mirror history attributed to an identity that never authorized it; because the gap is comment-only, nothing red exists to force closure and the deferral can silently become permanent."
+  },
+  {
+    "title": "CLI dispatches 15 IPC methods the daemon never registers",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/dispatch.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/mod.rs"
+    ],
+    "failure": "With the daemon running, `hypermesh set-privacy`, `hypermesh caesar wallet`, all five `hypermesh trustchain ...` subcommands, `hypermesh ngauge marketplace|metrics|leases`, and `hypermesh catalog browse|info|stats` all return JSON-RPC \"Method not found\" — 15 shipped CLI commands are dead on arrival while their offline fallbacks (where they exist) mask it in tests."
+  },
+  {
+    "title": "message.* IPC handlers are stubs disconnected from the live MessageStore the network writes",
+    "kind": "missing-impl",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/message.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/commands/node_bringup.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/network/message_handlers/sync_and_reflection.rs"
+    ],
+    "failure": "`hypermesh message send` returns {\"status\":\"created\"} success while silently discarding the message (no wire send exists anywhere — receive-half only); messages actually received from peers are stored in the PeerContext store but `hypermesh message inbox/history/read` always report empty/not_found. The feature is presented as working CLI surface (dispatch.rs:669-713) but is one-way-in, zero-way-out."
+  },
+  {
+    "title": "gateway.transfer constructs a per-request GatewayManager: transfers evaporate, status/list permanently empty",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/gateway.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/gateway/mod.rs"
+    ],
+    "failure": "`hypermesh gateway transfer` reports {\"transfer_id\":\"gw-tx-1\",\"status\":\"pending\"} success, then all state is dropped: no lock/confirm/release chain entries, status queries return not_found, and repeated transfers all get the same id. The registration comment at gateway.rs:36-37 ('GatewayManager is now wired to the node's blockchain so that transfer lock/confirm/release entries are written as blocks') describes behavior that cannot occur."
+  },
+  {
+    "title": "retrieval/ (4,200 lines) — the R6 instruction-based-retrieval module — is a complete island; live fetch uses a parallel ShardMap in sharing/",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/retrieval",
+      "/home/persist/hypermesh/core/blockmatrix/src/sharing/shard_map.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs"
+    ],
+    "failure": "Anyone implementing R6 or fixing shard-map bugs has two shard-map representations and two consumer-becomes-provider implementations to choose from; changes to the island are silently no-ops in production while its tests keep passing, sustaining the claim that instruction-based retrieval is implemented when no instruction map is ever transmitted."
+  },
+  {
+    "title": "DnsPopularityTracker: write-only, unbounded, remote-fed, and split across two divergent instances",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/dns/popularity.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/commands/connect.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/commands/node_bringup.rs"
+    ],
+    "failure": "A remote peer can grow node memory without bound by issuing DNS queries for random names, and the data the module doc (popularity.rs:4-9) promises to feed 'ngauge-driven replication' is never read by anything — dead accumulation with a live remote write path."
+  },
+  {
+    "title": "src/runtime/ (with phoenix/), orchestration/lib.rs, and catalog/lib.rs are dead files never compiled",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/runtime",
+      "/home/persist/hypermesh/core/blockmatrix/src/orchestration/lib.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/catalog/lib.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/lib.rs"
+    ],
+    "failure": "Greps and audits keep 'finding' code in these files that does not exist in the binary; a developer editing runtime/phoenix or orchestration/lib.rs gets no compile error and no effect, and the leftover crate-style lib.rs files falsely suggest these modules were once standalone crates still in service."
+  },
+  {
+    "title": "api/ is an island but blockmatrix/CLAUDE.md presents it as the live STOQ API bridge",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/api",
+      "/home/persist/hypermesh/core/blockmatrix/CLAUDE.md"
+    ],
+    "failure": "Readers (and status tooling) believe remote STOQ API access to IPC handlers exists; in reality the only API surface is the localhost Unix socket. The module also drags the test-only HyperMeshSystem/extensions stack into apparent liveness."
+  },
+  {
+    "title": "intelligence/: ~4,000 of 4,596 lines are an island duplicating ngauge's advisory concern",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/intelligence"
+    ],
+    "failure": "Placement/replication intelligence is canonically ngauge's concern (blockmatrix executes); a second in-crate 'IntelligenceLayer' orchestrator that nothing runs invites new features to be added to the dead layer, and its self-referential tests keep certifying behavior the shipped node never exhibits."
+  },
+  {
+    "title": "privacy/ (2,832 lines) is an island; live privacy semantics live in hypermesh_lib::PrivacyMode",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/privacy"
+    ],
+    "failure": "Anyone changing privacy enforcement can change the island and pass its extensive tests while the shipped node's behavior (driven by lib PrivacyMode) is untouched — a policy change that appears to land but does not."
+  },
+  {
+    "title": "transport/ (2,177 lines) is a self-declared 10% stub duplicating stoq's concern; only two types leak out",
+    "kind": "soc-violation",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/transport"
+    ],
+    "failure": "A module named `transport` inside blockmatrix violates the stoq-owns-transport separation and invites contributions to a stub that will never run; PeerIdentity (an identity concern) hides inside it, coupling proof-of-state code to a dead transport module."
+  },
+  {
+    "title": "verification/ (PoSPing + shard commitment) is an island while lib.rs claims it anchors every block",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/verification",
+      "/home/persist/hypermesh/core/blockmatrix/src/lib.rs"
+    ],
+    "failure": "R12's spatial-evidence anchoring is claimed but not enforced: blocks are produced and accepted with no shard-commitment check and no PoSPing probes ever run, while the module docs describe an active protocol — auditors and downstream design (NGauge verification feeds) build on a signal that does not exist."
+  },
+  {
+    "title": "~23K-line island cluster: orchestration + container + integration + security + performance + platform reachable only from each other and tests",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/orchestration",
+      "/home/persist/hypermesh/core/blockmatrix/src/container",
+      "/home/persist/hypermesh/core/blockmatrix/src/integration",
+      "/home/persist/hypermesh/core/blockmatrix/src/security",
+      "/home/persist/hypermesh/core/blockmatrix/src/performance",
+      "/home/persist/hypermesh/core/blockmatrix/src/platform"
+    ],
+    "failure": "Nearly a quarter of blockmatrix/src compiles, tests, and pads status metrics (files/lines/test counts feed scripts/output/stats.ts) without a single instruction reachable from the shipped binary — inflating the '~75% complete' picture and slowing every audit and refactor that must first disprove liveness."
+  },
+  {
+    "title": "catalog registry seam: both halves built, no binary connects them",
+    "kind": "gap",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/catalog.rs",
+      "/home/persist/hypermesh/core/catalog/src/integration/blockmatrix_adapter.rs"
+    ],
+    "failure": "catalog.dependencies/catalog.search permanently return the 'alpha... registry not wired' response on every deployable binary; the documented wiring plan points at a binary nobody has written, so the dependency-cycle workaround is complete on both ends yet functionally vaporware."
+  },
+  {
+    "title": "cli/ library module (1,346 lines) duplicates the real bin/node CLI and is test-only",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/cli"
+    ],
+    "failure": "Two command surfaces for one concern: topology/asset commands added to CommandExecutor never reach users, and the CLAUDE.md claim points at the dead one."
+  },
+  {
+    "title": "--mode light|thin is accepted and silently ignored",
+    "kind": "naming",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/bin/node/cli.rs"
+    ],
+    "failure": "An operator on a constrained device runs `hypermesh connect --mode light` expecting ~256MB header-only behavior and silently gets a full node (shard store, pipeline, Caesar, ngauge) with no warning."
+  },
+  {
+    "title": "transfer/ module (TransferEngine) is a test-only island duplicating gateway's transfer concern",
+    "kind": "duplication",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "/home/persist/hypermesh/core/blockmatrix/src/transfer/mod.rs",
+      "/home/persist/hypermesh/core/blockmatrix/src/gateway/transfer_coordinator.rs"
+    ],
+    "failure": "Three transfer implementations coexist (transfer/TransferEngine island, gateway/GatewayManager ephemeral, gateway/TransferCoordinator dormant seam); a developer fixing transfer semantics must first discover which of the three is intended to win."
+  },
+  {
+    "title": "Sync-pull is dead: TransportSyncDriver dials unauthenticated connections whose auth-gated messages the receiver silently drops",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "critical",
+    "files": [
+      "blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs",
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/network/peer_auth.rs"
+    ],
+    "failure": "Every 5s sync round: request sent, receiver drops it as unauthenticated, client times out / gets empty response, reflector health downgraded, 'All reflectors failed for sync round'. A lagging node can NEVER catch up via sync-pull; only BLOCK_ANNOUNCE push to startup-injected peers delivers blocks. This corroborates the live remote node's chain being static at height 1. The known issue 'insert_received_block skips proof validation on sync-pull' is moot in the worst way: the path never delivers blocks at all."
+  },
+  {
+    "title": "Block-propagation adapter keeps a private duplicate connection registry populated exactly once at startup — late/accepted peers never receive propagated blocks",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/blockchain/stoq_transport.rs",
+      "blockmatrix/src/bin/node/commands/node_bringup.rs",
+      "blockmatrix/src/network/mod.rs"
+    ],
+    "failure": "Any peer that connects after startup (all accepted peers, all later dials) silently gets no propagated blocks — the A6 gap (publisher's registration block never reaches late peers) is still live at the propagation layer; the A6.6 registration-on-fetch change only patched one downstream symptom. The duplicate registry is the root cause: two owners of 'who am I connected to' that are only synced once."
+  },
+  {
+    "title": "Two disconnected eBPF orchestrators: the P5 kernel peer-auth mirror writes to an instance that never attaches XDP, while stoq's attached instance never receives validations",
+    "kind": "misconnection",
+    "autonomy": "in-scope-refactor",
+    "severity": "high",
+    "files": [
+      "blockmatrix/src/bin/node/commands/node_bringup.rs",
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "hypermesh-ebpf/src/lib.rs",
+      "stoq/src/transport/manager/constructors.rs"
+    ],
+    "failure": "The P5 claim 'kernel gate keys on the SAME source userspace authorized' is false in the shipped binary: when XDP is actually attached (by stoq), its pos_header_map/policy_map never learn any validated peer, and blockmatrix's handshake mirror silently no-ops into a detached instance. Kernel fast-path gating of HyperMesh-headed traffic can never admit an authenticated peer."
+  },
+  {
+    "title": "stoq transport/reflector/* is a dead duplicate blockchain-sync subsystem inside the transport crate, with quorum-fraction language",
+    "kind": "soc-violation",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "stoq/src/transport/reflector/sync_protocol.rs",
+      "stoq/src/transport/reflector/block_transport.rs",
+      "stoq/src/transport/reflector/bridge.rs",
+      "stoq/src/lib.rs"
+    ],
+    "failure": "Transport crate advertises ('Re-export reflector pool transport for Network-scope sync') a blockchain-sync capability that is never wired, duplicating live blockmatrix types; readers and future work keep rediscovering the wrong layer, and the 2/3-confirmation model contradicts PoS binary authentication if anyone ever wires it."
+  },
+  {
+    "title": "stoq's parallel PoS stack (PosToken/pos_integration/pos_fast_validator + shard-position placement + SHA-256) is constructed at startup but its gate is never called",
+    "kind": "dead-code",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "stoq/src/transport/manager/pos.rs",
+      "stoq/src/protocol/pos_integration.rs",
+      "stoq/src/protocol/pos_validator.rs",
+      "stoq/src/transport/manager/constructors.rs",
+      "stoq/src/transport/pos_extension_validator.rs"
+    ],
+    "failure": "A second, divergent notion of PoS validation (and of shard placement) sits armed-looking in the transport crate; auditors and the eBPF feed path (pos.rs:63-84) reference it as if live, and the SHA-256 keying would ship if anyone ever wired the gate. PosValidationState on connections is permanently Pending."
+  },
+  {
+    "title": "MatrixStoqIntegration is a husk: its connection map has had no writers since F2, so position broadcast / neighbor discovery are live no-ops",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/stoq_integration.rs",
+      "blockmatrix/src/network/mod.rs",
+      "blockmatrix/src/bin/node/commands/node_bringup.rs"
+    ],
+    "failure": "Reflector-mode 'position broadcast' and discover_matrix_neighbors_stoq report success while doing nothing — an operator reading logs believes matrix-position gossip is running. The file also mixes the LIVE MatrixMessage wire enum with this dead struct, hiding which half matters."
+  },
+  {
+    "title": "64KB hard cap in Stream::receive bounds every tagged message including shard payloads and block-fetch responses",
+    "kind": "unbounded",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "stoq/src/transport/connection.rs",
+      "blockmatrix/src/network/shard_transport.rs",
+      "blockmatrix/src/network/sync_dispatch/transport_sync_driver.rs"
+    ],
+    "failure": "Any shard over 64KB (R14 adaptive RS parameters produce these for non-trivial assets) or any block batch whose JSON exceeds 64KB fails at read_to_end with a transport error — silent per-message failure that looks like a flaky peer. This is the inverse of a bound-with-rationale: one magic constant capping unrelated protocol families."
+  },
+  {
+    "title": "blockmatrix/src/transport/ is a stub 'STOQ implementation' whose transport/auth/pool are dead; only its types are live",
+    "kind": "dead-code",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/transport/mod.rs",
+      "blockmatrix/src/transport/auth.rs",
+      "blockmatrix/src/transport/pool.rs"
+    ],
+    "failure": "A second 'transport layer' in blockmatrix shadows the real stoq crate; stub methods that return Ok(()) are landmines if any future code path calls them expecting delivery (accept() fabricating an empty peer identity is an auth hazard by construction)."
+  },
+  {
+    "title": "stoq api/, extensions.rs, network_isolation.rs: application-layer surface in the 'pure transport' crate with no live server or consumer",
+    "kind": "soc-violation",
+    "autonomy": "needs-owner",
+    "severity": "medium",
+    "files": [
+      "stoq/src/api/mod.rs",
+      "stoq/src/extensions.rs",
+      "stoq/src/network_isolation.rs",
+      "blockmatrix/src/api/ipc_bridge.rs",
+      "blockmatrix/src/catalog/peer_client.rs"
+    ],
+    "failure": "The crate's purity claim is a naming lie; catalog's peer client sends requests no one can answer (silent feature gap behind a 'complete' catalog claim); reliability scores in transport re-introduce reputation-float vocabulary the canon forbids."
+  },
+  {
+    "title": "TAG_SHARD_ANNOUNCE is unauthenticated: any connection can poison the ShardLocationIndex",
+    "kind": "gap",
+    "autonomy": "in-scope-refactor",
+    "severity": "medium",
+    "files": [
+      "blockmatrix/src/network/message_handlers/peer_connection.rs",
+      "blockmatrix/src/network/message_handlers/sync_and_reflection.rs"
+    ],
+    "failure": "An unauthenticated remote can register itself (or a garbage socket-addr identity) as provider for any content hash, redirecting R12 consumer-provider fetches to attacker endpoints or dead entries — availability degradation and fetch misdirection without ever passing the bilateral handshake."
+  },
+  {
+    "title": "Wire-tag constants duplicated outside the protocol module (self-acknowledged lockstep hazard)",
+    "kind": "duplication",
+    "autonomy": "mechanical",
+    "severity": "low",
+    "files": [
+      "blockmatrix/src/network/stoq_transfer_transport.rs",
+      "blockmatrix/src/bin/node/commands/background.rs",
+      "blockmatrix/src/network/message_handlers/protocol.rs"
+    ],
+    "failure": "Adding or renumbering a tag in protocol.rs silently desynchronizes the production transfer transport and the reflector heartbeat — the exact failure mode the comment predicts, undetectable at compile time."
+  },
+  {
+    "title": "stoq connection pool is dead: return_to_pool has no callers, so 'reuse pooled connection' never fires and every dial is a fresh QUIC connection",
+    "kind": "dead-code",
+    "autonomy": "needs-owner",
+    "severity": "low",
+    "files": [
+      "stoq/src/transport/manager/connections.rs"
+    ],
+    "failure": "The 5s sync loop and any repeated dial pay full QUIC+TLS handshake cost every time (connection churn against the same reflector), while pool metrics report healthy reuse machinery that has never executed — misleading performance claims ('reuse_count' can only be 0)."
+  }
+]

@@ -1,0 +1,308 @@
+[
+  {
+    "island": "blockmatrix/src/intelligence/ — mixed directory: a ~3070L 'Phase 2 IntelligenceLayer' island (mod.rs orchestrator + types/integration/performance/workflows/validation/metrics_bridge, reached only from tests/phase2_integration_tests.rs) wrapped around ~684L of genuinely live NGauge advisory glue (ngauge_bridge.rs, ebpf_feedback.rs) and one future-wanted trait implementor (ngauge_trust_adapter.rs)",
+    "verdict": "delete-all",
+    "salvage": [],
+    "delete": [
+      "blockmatrix/src/intelligence/integration.rs",
+      "blockmatrix/src/intelligence/performance.rs",
+      "blockmatrix/src/intelligence/workflows.rs",
+      "blockmatrix/src/intelligence/validation/mod.rs",
+      "blockmatrix/src/intelligence/validation/types.rs",
+      "blockmatrix/src/intelligence/metrics_bridge.rs",
+      "blockmatrix/src/intelligence/types.rs",
+      "blockmatrix/src/intelligence/mod.rs (IntelligenceLayer + re-exports at mod.rs:55-66 + _MatrixCoordinateExt; REPLACE with slim ~15L mod declaring ngauge_bridge, ebpf_feedback, ngauge_trust_adapter and re-exporting EbpfFeedbackAdapter/NGaugeTrustAdapter)",
+      "blockmatrix/tests/phase2_integration_tests.rs (835L, sole external constructor of IntelligenceLayer — delete with the island)"
+    ],
+    "gate": [
+      "blockmatrix/src/intelligence/ngauge_trust_adapter.rs (already #![cfg(feature = \"intelligence\")]; sole implementor of trustchain TrustSignalProvider — live seam at trustchain/src/ca/federation.rs:122,150,272; never constructed in the daemon (DaemonState.federation_manager: None, 'Phase F.1: not yet wired' connect.rs); keep gated for roadmap Phase F distributed CA)"
+    ],
+    "evidence": "LIVE: NGaugeBridge constructed in shipped daemon bin/node/commands/connect.rs:186 → ipc/state.rs:62; metrics_to_transmit consumed by ipc/handlers/ngauge.rs:96-98; compute_propagation_weights called in 15s live loop network/replication_service/propagation.rs:84; EbpfFeedbackAdapter boxed into ngauge RoutingIntelFeed at propagation.rs:42. ISLAND: IntelligenceLayer::new called only in tests/phase2_integration_tests.rs (21 sites, e.g. :78) + inline test mod.rs:791; transport_sync_driver.rs:180-185 references it in COMMENTS only; repo-wide grep shows zero external users of integration/performance/workflows/validation/metrics_bridge/types beyond mod.rs:55-66 re-exports; metrics_bridge.rs has no users at all. Placeholder proof: mod.rs:511 (retrieval = vec![0u8;1024]), mod.rs:332-336 (fake AssetData [1,2,3]), mod.rs:525-535 (reconstruct = concat), types.rs:151-153 (StubTrustChainClient validates any cert Ok(true)). Duplication proof: mod.rs:602 check_replication_needs duplicates propagation.rs:97-104 live trigger; metrics_bridge hardware sampling duplicated by live network/metrics_reporter.rs via bin/node/commands/background.rs:84. Feature 'intelligence' is default-on (blockmatrix/Cargo.toml:214).",
+    "risk": "(1) mod.rs is the module root: deleting it naively breaks the LIVE daemon — lib.rs:178 `pub mod intelligence`, and the exact paths crate::intelligence::EbpfFeedbackAdapter (propagation.rs:42), crate::intelligence::ngauge_bridge::* (propagation.rs:84, ipc/state.rs:62, connect.rs:186) must survive via a slim replacement mod.rs. (2) Test targets: tests/phase2_integration_tests.rs must go in the same commit (compile break otherwise); tests/r12_swarm_closure_integration.rs:31 and tests/ebpf_feedback_integration.rs:18 depend on the KEPT files and must still build — r12 calls NGaugeBridge::check_replication_signals (test-only method, keep or migrate the test). (3) No wire/on-disk format risk: AssetHandle/IntelligenceMetrics are Serialize but never persisted or transmitted (island-only), so no Block-preimage/migration batching concern. (4) ipc 'intelligence.stats' (ipc/handlers/intelligence.rs, registered ipc/handlers/mod.rs:104) uses only DaemonState — unaffected. (5) Dead-within-live trim candidates, not required: NGaugeBridge::run_periodic_feed superseded by inline loop (replication_service/feed.rs:24) and contains a .expect prod-panic path (ngauge_bridge.rs:138). (6) AssetPipeline/ContentAddressedStorage/MultiNetworkCoordinator/phase1_foundation are outside the target with other users — only the island's references to them are removed, do not chase them."
+  },
+  {
+    "island": "blockmatrix/src/privacy/ (mod.rs, tiers.rs, flexibility_matrix.rs, policies.rs, switching.rs, ebpf_integration.rs — 2832L) + its two feature-gated test targets",
+    "verdict": "delete-all",
+    "salvage": [],
+    "delete": [
+      "blockmatrix/src/privacy/mod.rs",
+      "blockmatrix/src/privacy/tiers.rs",
+      "blockmatrix/src/privacy/flexibility_matrix.rs",
+      "blockmatrix/src/privacy/policies.rs",
+      "blockmatrix/src/privacy/switching.rs",
+      "blockmatrix/src/privacy/ebpf_integration.rs",
+      "blockmatrix/tests/privacy_e2e_tests.rs",
+      "blockmatrix/tests/privacy_integration_tests.rs"
+    ],
+    "gate": [],
+    "evidence": "Declared lib.rs:172 (`pub mod privacy`), re-exported lib.rs:270-274. Only external importers: blockmatrix/tests/privacy_e2e_tests.rs:11 and privacy_integration_tests.rs:11 — both `#![cfg(feature = \"future-tests\")]` (lines 9), dead by default. PrivacySystem/TierSwitcher/PrivacyEbpfBridge never constructed in bin/node, ipc, cli, network, blockchain, api, intelligence, or assets (grep: zero hits). hypermesh-ebpf PolicyManager hits are a distinct type (hypermesh-ebpf/src/policy_maps.rs:117). The one real mechanism (tier→eBPF policy) is duplicated better on the LIVE path: HyperMeshEbpf::set_privacy_tier (hypermesh-ebpf/src/lib.rs:253, NetworkId-keyed + kernel sync) called from blockmatrix/src/security/ebpf.rs:296, blockmatrix/src/intelligence/ebpf_feedback.rs:85, stoq/src/network_isolation.rs:205; peer PoS gate wired at network/message_handlers/peer_connection.rs:516. Canon violations inside the island: voting thresholds 0.51/0.67 (tiers.rs:222,304), TrustLevel gradient (tiers.rs:22-31), per-proof toggles contra R2 (tiers.rs:35-42,360-368), caesar float bonus math (flexibility_matrix.rs:84-96), prohibited-combo validation contra R9 (flexibility_matrix.rs:117).",
+    "risk": "Must edit blockmatrix/src/lib.rs in the SAME change: remove `pub mod privacy;` (line 172) and the `pub use privacy::{...}` block (lines 269-274), else compile break. `blockmatrix::PrivacyMode` used by live tests (tests/cross_crate_integration.rs:128, blockmatrix/tests/basic_unit_test.rs:80) resolves via assets::core re-export at lib.rs:241 — UNAFFECTED. Do NOT touch blockmatrix/src/assets/privacy/ (PrivacyManager/allocation) or assets/core/privacy — separate LIVE modules used by intelligence/ and all six adapters. If the `future-tests` feature is ever enabled, the two deleted test files are the only privacy:: consumers — nothing else under that feature references the module. No wire/disk format impact: PrivacyFlexibilityMatrix is Serialize but never persisted or transmitted by any live caller. Name-collision note for the deleting agent: grep matches for PolicyManager/TrustLevel/RateLimits in hypermesh-ebpf and gateway are different types — leave them alone."
+  },
+  {
+    "island": "Cluster L: blockmatrix/src/{orchestration, container, integration, security, performance, platform} (~23K L pre-canonical \"enterprise platform\" scaffolding, MFN-era)",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "integration/phase1_foundation.rs (MatrixFoundation, 615L) — KEEP-WIRE, do not delete in this pass",
+        "why": "Compile-load-bearing: Arc<MatrixFoundation> appears in NON-test constructor signatures of live-compiled modules (assets/storage/mod.rs:47, assets/storage/replication.rs:15, assets/storage/bucket_mapper.rs:17, retrieval/instruction_generator.rs:13, intelligence/mod.rs:69,92) even though it is only constructed inside #[cfg(test)] and 4 integration-test targets + benches/phase1_bench.rs:16. Deleting it breaks the build of live modules; removing it requires refactoring those signatures — a separate audit (assets/storage + retrieval + intelligence cluster), not cluster L.",
+        "destination": "Stays at blockmatrix/src/integration/phase1_foundation.rs inside a slimmed integration/ (mod.rs reduced to `pub mod phase1_foundation` + re-exports); schedule its true removal with the assets/storage//retrieval//IntelligenceLayer de-simulation refactor"
+      },
+      {
+        "what": "container/process.rs ProcessIsolation — real process spawn + process-group SIGTERM/kill supervision (libc::kill(-pgid,...) at process.rs:340, CommandExt at :188)",
+        "why": "The only genuinely real mechanism in container/; catalog execution-delegation (roadmap) will need process supervision on executor nodes, and the live ContainerAssetAdapter (assets/adapters/container/) is bookkeeping-only with no runtime behind it",
+        "destination": "Feature-gate in place with the rest of container/ (see gate list) rather than extract now; when execution delegation lands, promote process.rs and rewrite the simulated cgroup layer (resources.rs:260-292 is fake)"
+      },
+      {
+        "what": "performance/regression_prevention.rs (~240L generic baseline/tolerance RegressionDetector — the only non-placeholder file in performance/)",
+        "why": "Small, real, dependency-free; could serve CI perf gating. Marginal — trivially rewritable, so losing it costs little",
+        "destination": "Optional: move to scripts/ or a dev-only benches support module; otherwise let it go with the dir (git history preserves it)"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/orchestration/ (entire dir incl. orphan orchestration/lib.rs; hardcoded confidence:0.7 placement floats violate no-confidence-float canon; duplicates NGauge placement)",
+      "blockmatrix/src/catalog/integration/hypermesh_bridge/ (orchestration's ONLY external importer at operations.rs:16 — CatalogHyperMeshBridge is never constructed outside catalog; edit catalog/mod.rs:14-17 re-exports)",
+      "blockmatrix/src/catalog/lib.rs (orphan file, never declared as a module)",
+      "blockmatrix/src/security/ (entire; sole importer is island-internal integration/config.rs:10; parallel PKIManager duplicates TrustChain; fix stale comments at os_integration/linux/mod.rs:14 and os_integration/linux/ebpf.rs:11)",
+      "blockmatrix/src/performance/ (entire; zero importers anywhere; final_optimization.rs lines 338-358 are 'would measure' stubs)",
+      "blockmatrix/src/platform/ (entire; zero importers; hardware.rs self-reported specs violate R1; pricing.rs/rewards.rs float coin logic belongs to Caesar; distribution_bridge duplicates live R12 seeder)",
+      "blockmatrix/src/integration/{api_bridge.rs, bootstrap/, config.rs, coordinator.rs, lifecycle.rs, metrics.rs, services.rs, stoq_bridge.rs} + IntegrationManager/IntegrationError in mod.rs (api_bridge already un-compiled; bootstrap providers implement a parallel dead StateProofProvider trait — live path uses hypermesh_lib::StateProofProvider per network/mod.rs:326)",
+      "blockmatrix/src/lib.rs edits: remove `pub mod orchestration`(:303), `pub mod platform`(:304), `pub mod security`(:305), `pub mod performance`(:280), container root re-export(:309 — only island-internal users), `pub use integration::IntegrationError` + IntegrationResult(:317-318 — no external users)",
+      "blockmatrix/tests/container_cluster_platform_integration.rs (trim container sections or gate with container/; uses container::process::ProcessIsolation at :14)"
+    ],
+    "gate": [
+      "blockmatrix/src/container/ (entire dir behind a `container-runtime` cargo feature, default off) — future-wanted for catalog execution delegation; process.rs is real, the rest (simulated cgroups at resources.rs:260-292, image/filesystem/migration) is scaffolding worth keeping reversible; gate lib.rs:309 re-export and tests/container_cluster_platform_integration.rs under the same feature"
+    ],
+    "evidence": "Reachability proven by exhaustive grep: bin/node (shipped daemon) imports NOTHING from any of the six dirs (grep over blockmatrix/src/bin/ for orchestration|MatrixFoundation|IntegrationManager|ContainerRuntime|SecurityManager|user_contribution|performance:: = zero hits). No crate outside blockmatrix imports them (workspace grep excluding blockmatrix = zero). Live catalog path is Arc<dyn CatalogProvider> only (ipc/state.rs:150, ipc/handlers/catalog.rs:17) — the bridge that pulls orchestration+container is compile-only, never constructed. IntelligenceLayer (the sole non-test constructor of ContentAddressedStorage, intelligence/mod.rs:230) is itself constructed only in tests (phase2_integration_tests.rs); the LIVE parts of intelligence are ngauge_bridge (bin/node/commands/connect.rs:186, ipc/state.rs:62) and EbpfFeedbackAdapter (network/replication_service/propagation.rs:42) — neither touches MatrixFoundation. integration::phase1_foundation is the single compile-live thread: assets/storage/mod.rs:47, replication.rs:15, bucket_mapper.rs:17, retrieval/instruction_generator.rs:13, intelligence/mod.rs:69.",
+    "risk": "Breakage surfaces if done naively: (1) deleting integration/ wholesale breaks live compilation of assets/storage, retrieval, intelligence via phase1_foundation — keep that one file (keep-wire). (2) Test/bench targets that must survive: phase1_e2e.rs:18, phase2_integration_tests.rs:12, retrieval_integration_tests.rs:11, content_addressed_storage_tests.rs:11, benches/phase1_bench.rs:16 all construct MatrixFoundation — they depend on the kept file, not the deleted submodules. (3) Re-export chains needing edits: lib.rs:299/303-305/280/309/316-318; catalog/mod.rs:14-17 (Bridge types); orchestration/mod.rs:23 re-exports integration::IntegrationManager (dies with orchestration). (4) container/resources.rs:8 and network.rs:8 use crate::ContainerId root re-export — island-internal, resolved by gating them together. (5) Stale doc-comments in os_integration/linux/{mod.rs:14, ebpf.rs:11} reference crate::security::ebpf — comments only, fix alongside. (6) None of cluster L touches Block wire/disk structs or hash preimages — no format-change batching needed. Conservative flag: sharing.rs/session.rs user-consent concepts in platform/ appear duplicated by live assets/privacy user controls, but if any future UI work expected platform::SharingPreferences, it is gone — verified zero importers today."
+  },
+  {
+    "island": "blockmatrix/src/transport/ — 10% stub duplicate of stoq's transport layer (auth/pool/monitoring/HyperMeshTransport stubs) wrapped around 3 genuinely live type shims (PeerIdentity, TransportError, TransportConfig)",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "types.rs — PeerIdentity (140L): the NodeId<->transport identity bridge (to_node_id(), From<&ScopedIdentity>)",
+        "why": "Genuinely live: re-exported at assets/multi_node/mod.rs:76 (~10 consumer files), used by proof_of_state/state_proof_impl.rs:11, constructed on the state-proof path at assets/blockchain.rs:291, and by tests/multi_network_integration_tests.rs:25. It does not belong in a transport-stub dir — lib is the single source of truth for shared identity types.",
+        "destination": "hypermesh-lib (alongside NodeId/ScopedIdentity) or blockmatrix identity module; until moved, keep in place"
+      },
+      {
+        "what": "error.rs — TransportError (324L): real error taxonomy with is_retryable()/category()",
+        "why": "On the shipped daemon path: network/shard_transport.rs:21 uses it as the ShardTransport trait error type (reached from bin/node/commands/{store,connect,node_bringup,background}.rs and ipc/state.rs). Only Network/NoConnection/Protocol variants constructed outside the module — the pool/chunk/monitoring variants and quinn/rustls/toml From impls can be trimmed at move time.",
+        "destination": "blockmatrix/src/network/ next to its only real consumer (shard_transport.rs)"
+      },
+      {
+        "what": "config.rs — HyperMeshTransportConfig + to_stoq_transport_config() mapping (280L)",
+        "why": "Compile-live: integration/config.rs:11 embeds it (IntegrationConfig.transport, port read at :143) and IntegrationConfig reaches the default-on intelligence feature (intelligence/mod.rs:56,236). Runtime-decorative but deleting breaks the build; shrink when the integration/ island is audited.",
+        "destination": "keep in place for now; dies or shrinks with the integration/ module audit"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/transport/auth.rs",
+      "blockmatrix/src/transport/pool.rs",
+      "blockmatrix/src/transport/monitoring.rs",
+      "blockmatrix/src/transport/tests/integration_tests.rs",
+      "blockmatrix/src/transport/benches/connection_benchmarks.rs",
+      "blockmatrix/src/transport/mod.rs — stub body only (lines ~41-178: HyperMeshTransport/HyperMeshEndpoint/HyperMeshConnection/HyperMeshTransportStats/HyperMeshTransportTrait + Connection/HyperEndpoint/HyperTransport/TransportStats aliases + auth/pool/monitoring mod decls and re-exports); keep module root with mod types/error/config + their re-exports",
+      "blockmatrix/src/orchestration/lib.rs — bonus sibling island: never compiled (orchestration/mod.rs declares no `mod lib`), its PeerIdentity re-export at :169 is inert"
+    ],
+    "gate": [],
+    "evidence": "LIVE: shard_transport.rs:21 `use crate::transport::error::TransportError` (trait error type at :124,:134; shard_transport consumed by bin/node/commands/store.rs:18, connect.rs:14, node_bringup.rs:21, background.rs:15, ipc/state.rs:12 — shipped daemon); assets/multi_node/mod.rs:76 `pub use crate::transport::PeerIdentity`; proof_of_state/state_proof_impl.rs:11; assets/blockchain.rs:291 `crate::transport::PeerIdentity::from_name(...)`; integration/config.rs:11 `use crate::transport::TransportConfig`; tests/multi_network_integration_tests.rs:25. DEAD: grep over blockmatrix src+tests finds zero importers/constructors of AuthManager, NodeAuthenticator, ConnectionPool, StoqConnection, TransportMonitor, TransportMetrics, HyperMeshTransport, HyperMeshConnection, HyperMeshEndpoint, or any alias outside src/transport/; transport/tests/ and transport/benches/ are absent from mod.rs (declares only auth,config,error,monitoring,pool,types at mod.rs:21-26), have no #[path] attr, and no Cargo.toml target — never compiled.",
+    "risk": "(1) mod.rs re-exports at :33-39 (AuthManager/NodeAuthenticator/TransportMonitor/TransportMetrics/ConnectionPool/Endpoint/StoqConnection) must be removed together with their files — safe, zero external consumers, but a piecemeal delete of a file without its re-export breaks the build. (2) Do NOT delete types.rs/error.rs/config.rs or the module root itself: that breaks the shipped daemon (shard_transport), the whole assets/multi_node tree, state_proof_impl, integration/config, and the multi_network_integration_tests test target. (3) If types.rs/error.rs are later relocated, ~15 import paths need updating (crate::transport::PeerIdentity x4 sites incl. one test target, crate::transport::error::TransportError x2). (4) error.rs From impls reference quinn/rustls/toml — if those are blockmatrix deps only for this file, trimming them at relocation shrinks the dep graph; verify before removing the From impls. (5) PeerIdentity is serde-Serialized — confirm it is not part of any on-disk/wire format before any field change (relocation alone is format-safe; renaming/reshaping is not, per the frozen-preimage rule)."
+  },
+  {
+    "island": "blockmatrix/src/retrieval/ (mod.rs, instruction_generator.rs, shard_map.rs, fallback.rs, streaming.rs, transmission.rs, location_resolver.rs, client_assembly/{mod,fetching,pipeline,seeding}.rs — ~4200L incl. tests/bench) — R6 instruction-based retrieval, superseded by sharing/ShardMap + ShareInvite + ipc shard.fetch two-layer resolve + on-chain StoragePointer placements",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "Ordered provider-merge resolver: ProviderSource taxonomy (LiveMirror < CanonicalPlacement < UpstreamTracker), dedup-first-wins resolve_shard_locations + merge_upstream (location_resolver.rs:44-165, with direct tests)",
+        "why": "The live ipc/handlers/shard.rs:135-152 re-implements half of this inline (known-providers-first ordering + upstream merge) with no canonical-placement layer at all; a shared resolver removes the duplication and adds the placement fallback the live path lacks. MUST be re-keyed: replace BLAKE3(x||y||z) pseudo-ids (location_resolver.rs:78-84 — can never match a real peer id = BLAKE3(FALCON pubkey), undialable as-is) with on-chain StoragePointer::Sharded placements / PlacementLease holders",
+        "destination": "blockmatrix/src/network/ (e.g. network/shard_locate.rs), consumed by ipc/handlers/shard.rs"
+      },
+      {
+        "what": "R6 <1KB instruction-size budget: RetrievalPlan::estimate_size + test_estimate_size (retrieval/mod.rs:177-188,282-308)",
+        "why": "R6's testable claim (shard maps under 1KB) has no regression check on the live path; sharing::ShardMap/ShareInvite serialized size is unbounded and untested",
+        "destination": "blockmatrix/src/sharing/ as a serialized-size regression test on ShardMap/ShareInvite"
+      },
+      {
+        "what": "Distance-ordered replica selection: optimize_for_position (retrieval/mod.rs:120-142) + SelectionCriteria/ReplicaSelector scoring (fallback.rs:47-70+)",
+        "why": "Live fetch orders only live-mirror-known-first (shard.rs:142-150); matrix-distance/latency-aware replica ordering is placement intelligence and belongs to NGauge (advisory analytics floats are fine there, per NGauge ownership model)",
+        "destination": "ngauge (placement/replica-selection intelligence), advisory-only"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/retrieval/ (entire directory: mod.rs, instruction_generator.rs, shard_map.rs, fallback.rs, streaming.rs, transmission.rs, location_resolver.rs, client_assembly/)",
+      "blockmatrix/tests/retrieval_integration_tests.rs",
+      "blockmatrix/benches/retrieval_bench.rs",
+      "blockmatrix/Cargo.toml [[bench]] retrieval_bench entry (lines 46-48)",
+      "blockmatrix/src/lib.rs:198-200 (pub mod retrieval + doc comment)"
+    ],
+    "gate": [],
+    "evidence": "Sole declaration: lib.rs:200 `pub mod retrieval` (no root `pub use` of its types). Zero in-src importers: grep `crate::retrieval` outside the module hits only a COMMENT at ipc/handlers/shard.rs:67. Dev-only importers: tests/retrieval_integration_tests.rs:13-14,455-458; benches/retrieval_bench.rs:8,220-221 (Cargo.toml:46-48). ConsumerProviderSeeder explicitly unwired (seeding.rs:79-84 'currently UNWIRED to production (only tests construct it)', SECURITY TODO #33). Live path proven independent: shard.fetch = ipc/handlers/shard.rs:38-126 using network/swarm_provider::ShardLocationIndex + network/consumer_provider.rs (wired at bin/node/commands/node_bringup.rs:229); asset map = sharing/shard_map.rs:34-52 (used by ipc/handlers/store.rs:21,306 + share.rs:32); asset reconstruction = bin/node/commands/store.rs:184-349 via assets pipeline; canonical WHERE = on-chain StoragePointer::Sharded{shard_hashes,placements} (shard.rs:323-327). StreamingReconstructor: zero callers repo-wide; superseded by assets/pipeline/streaming_pipeline (assets/pipeline/mod.rs:37). Catalog ref commented out (catalog/src/distribution/package_manager.rs:75). 2026-07-05 audit already recorded 'instruction-based retrieval never transmits a map'.",
+    "risk": "Deleting the module without its dev targets breaks the build: tests/retrieval_integration_tests.rs and benches/retrieval_bench.rs (+ its Cargo.toml [[bench]] entry) must go in the same commit. Documented-claim rot: blockmatrix/crate-status.toml:248 lists 'Two-layer mirror retrieval — client-assembly fetch ... (location_resolver)' as a WORKING feature — must be re-scoped to the live shard.rs implementation or moved, else sync-status lies; blockmatrix/CLAUDE.md module table and core CLAUDE.md R6 narrative reference retrieval/. Comment rot (non-compiling): ipc/handlers/shard.rs:67-69 claims 'the ClientAssembler path carries canonical coordinates' — false after deletion, update the comment. No serde-frozen wire/on-disk struct is affected: retrieval::RetrievalPlan is serialized only in its own tests, never persisted/transmitted by live code (content_address.rs has a separate same-named type), so no format-migration batching is triggered. network/shard_transport.rs::ShardTransport stays — its other consumer (network/replication_service/poll.rs:135) is live. Residual product risk: R6's 'map carries WHERE' collapses to on-chain placements + live-mirror/upstream discovery — owner should confirm that reframing before the salvage items are skipped."
+  },
+  {
+    "island": "blockmatrix/src/blockchain/{genesis_auth,genesis_crypto,genesis_ops,genesis_assessor}.rs — two sub-islands: (1) MFA genesis auth over a placeholder keypair, (2) a superseded parallel R1 hardware assessor",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "R13 minimum-spec enforcement at boot (genesis_assessor.rs:155-161 calls caps.meets_minimum_spec()/unmet_requirements(); checks already live in lib/src/protocol.rs:165-174 and lib/src/hardware.rs:50-59)",
+        "why": "The shipped daemon's R1 path (bootstrap.rs:320 -> bin/node/hardware.rs:23) never enforces R13 minimum device spec; this island was the only place the gate was wired. Note lib has TWO copies (protocol.rs + hardware.rs) — dedupe when wiring.",
+        "destination": "blockmatrix/src/bin/node/hardware.rs::assess_hardware_assets (fail-or-warn gate after detection), using the lib check"
+      },
+      {
+        "what": "Per-resource AssetAddress derivation: BLAKE3(kind_id || capability bytes) content hash + matrix coords -> IPv6 ULA address (genesis_assessor.rs:196-206 build_record, :272-288 compute_asset_content_hash, :263-269 identity hash = BLAKE3(type_id || falcon_pk || kyber_pk))",
+        "why": "R1/R10 require IPv6-addressed genesis assets; live AssetRegistrations carry no AssetAddress (2026-07-05 audit: AssetAddress is decorative, no live consumer). This is the cleanest existing derivation recipe and matches the canonical content-addressing model.",
+        "destination": "assets/core AssetRegistration::from_asset_data path (or a helper beside it) when AssetAddress gets its live consumer — carry as a design note, not a blind code move"
+      },
+      {
+        "what": "CONCEPT ONLY: at-rest protection of the node's FALCON secret key (passphrase Argon2id + TOTP + recovery codes, lock/unlock)",
+        "why": "Live identity is 4 plaintext copyable DER files with no machine binding — a real gap. But this code protects a random-bytes placeholder key (genesis_crypto.rs:175-183), uses fixed Argon2 salts (genesis_crypto.rs:61,77), and String errors; rewrite, don't lift.",
+        "destination": "trustchain identity keystore (trustchain/src/identity.rs area) as a future design item — do NOT port this implementation"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/blockchain/genesis_auth.rs",
+      "blockmatrix/src/blockchain/genesis_crypto.rs",
+      "blockmatrix/src/blockchain/genesis_ops.rs",
+      "blockmatrix/src/blockchain/genesis_assessor.rs",
+      "blockmatrix/src/blockchain/chain.rs — genesis_auth field + inits (lines 20, 64, 258, 402)",
+      "blockmatrix/src/blockchain/mod.rs — mod decls 28-31 + re-exports 56-59",
+      "blockmatrix/src/blockchain/node_chain.rs:10 — stale doc reference to genesis_ops",
+      "blockmatrix/Cargo.toml:116-120 — argon2, chacha20poly1305, hmac, sha1, base32 (used ONLY by this island; removes SHA-1 from tree per BLAKE3-everywhere)",
+      "lib/src/asset.rs:412-448 — GenesisAssetRecord + IdentityAssetRecord (sole consumer is genesis_assessor; verify SystemAssetKind/HardwareCapabilities have other users before touching THOSE — they do, keep them)"
+    ],
+    "gate": [],
+    "evidence": "chain.rs:64 field is Option<GenesisAuthManager> set to None at both constructors (chain.rs:258,402) and never written elsewhere; repo-wide grep for GenesisAuthManager/GenesisCredentials/initialize_genesis_auth/authenticate_genesis hits only blockchain/genesis_*.rs + chain.rs + mod.rs (no bin, no ipc, no tests dir, no other crate); GenesisAssessor/HardwareProbe/Real+SyntheticHardwareProbe constructed only in genesis_assessor.rs's own #[cfg(test)] (external refs = mod.rs:28,56-58 only); live R1 path is bin/node/bootstrap.rs:320 -> bin/node/hardware.rs:23 assess_hardware_assets + hardware.rs:59 build_hardware_state_proof -> proof_of_state/genesis_proof.rs (also called from commands/connect.rs:415, commands/services.rs:186) + block.rs:447 genesis_from_assessment; Cargo deps argon2/chacha20poly1305/hmac/sha1/base32 grep to zero users outside blockchain/genesis_*",
+    "risk": "Low. Not a wire/on-disk format change: GenesisCredentials and GenesisAssetRecord are serde-derived but never persisted or transmitted on any live path, and chain.rs's genesis_auth field is runtime-only — Block preimage untouched. Breakage surface: (a) mod.rs pub re-exports are public blockmatrix API — no consumer in hypermesh-sdk/ffi/other crates per repo-wide grep, but any out-of-repo user of blockmatrix::blockchain::{GenesisAuthManager,GenesisAssessor,...} would break; (b) .claude/worktrees/s3 carries a copy of these modules — a branch merge from that worktree could resurrect them; (c) lib/src/asset.rs type removal is a shared-crate API change — batch it with other lib cleanups, and do NOT remove SystemAssetKind or HardwareCapabilities (both have live users; note HardwareCapabilities/meets_minimum_spec is duplicated across lib/protocol.rs and lib/hardware.rs — separate dedupe); (d) tests deleted are all self-contained within the island files (plus none in tests/ reference them — s3_0 tests use proof_of_state HardwareAssessment, which stays)."
+  },
+  {
+    "island": "blockmatrix/src/blockchain/{errors.rs, state.rs} + orphan src/blockchain/integration_tests.rs — dead structured-error taxonomy and second persistence stack (JSON-per-block + snapshots + LRU cache) fully superseded by live src/persistence/ (PersistenceManager/BlockchainStorage/WAL/snapshots)",
+    "verdict": "delete-all",
+    "salvage": [
+      {
+        "what": "Concept only, not code: a structured error taxonomy for the live chain path (chain.rs 5x Result<T,String>, mutations.rs 11x) plus the thiserror + From<String> incremental-migration bridge pattern (errors.rs:159-181)",
+        "why": "The live path genuinely lacks structured errors, but errors.rs variants encode the superseded single-spine model (NoHeadBlock, InvalidIndex{expected,actual}, OwnershipMismatch{x,y,z:i64} vs i16 coords) and would import scar tissue; author fresh from live failure modes as its own migration task, batched with the String->enum signature change",
+        "destination": "future blockmatrix/src/blockchain/errors.rs rewritten against chain.rs/mutations.rs/accept live error sites (a follow-up task, nothing to physically move now)"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/blockchain/errors.rs",
+      "blockmatrix/src/blockchain/state.rs",
+      "blockmatrix/src/blockchain/integration_tests.rs",
+      "blockmatrix/src/blockchain/mod.rs: lines 27+50 (pub mod errors + re-export), line 36+66 (pub mod state + re-export), create_node_blockchain fn (mod.rs:77-93, zero external callers) + its test module",
+      "blockmatrix/src/integration/phase1_foundation.rs: state_managers field + wiring only (lines 15, 133-134, 178, 207-224 partial, 232-237) — insert/remove-only map with no reader; do NOT delete MatrixFoundation itself"
+    ],
+    "gate": [],
+    "evidence": "errors.rs types constructed nowhere outside errors.rs (repo grep; dns/mod.rs:112 BlockchainError is an unrelated local variant). ChainStateManager constructed only at blockchain/mod.rs:85 (create_node_blockchain, no callers except own test mod.rs:96+) and phase1_foundation.rs:207 (add_node — reached only from #[cfg(test)]/tests-dir MatrixFoundation::new sites: instruction_generator.rs:294+, deduplication.rs:388, replication.rs:388+, bucket_mapper.rs:489, intelligence/mod.rs:784, tests/{phase2,retrieval,content_addressed_storage}*.rs; stored managers never read — no getter, no store_block caller). src/blockchain/integration_tests.rs:121 calls store_block but the file is declared in NO mod — never compiled. Live daemon persistence = src/persistence/: bin/node/bootstrap.rs:15,156,172 (PersistenceManager::load_block(BlockQuery::ByIndex)), chain.rs:293 with_persistence; live BlockQuery at persistence/blockchain_storage/metadata.rs:28 (ByIndex/ByHash/Range/Last) supersedes state.rs BlockQuery; live snapshots at persistence/snapshots.rs. No sibling-crate importer of any deleted type (trustchain/ct StorageStats and catalog/distribution StorageStats are their own local types).",
+    "risk": "Low. (1) Re-export chain: blockchain/mod.rs:50+66 must be removed in the same change or the crate breaks; no qualified-path (blockchain::BlockchainError etc.) or glob importers found outside src/blockchain/. (2) create_node_blockchain returns ChainStateManager — delete helper+test together (no other callers). (3) phase1_foundation/MatrixFoundation is live-in-tests (tests/phase2_integration_tests.rs, retrieval_integration_tests.rs, content_addressed_storage_tests.rs + several #[cfg(test)] mods) — strip only the state_managers field or all those test targets break. (4) Name collisions are safe: errors.rs PropagationResult<T> alias is NOT the re-exported propagation.rs PropagationResult struct (mod.rs:63); dns DnsError::BlockchainError untouched. (5) No frozen-format concern: state.rs writes its own blocks/*.json + snapshots/ that nothing reads back in prod; ChainSnapshot serde struct is not on any wire or hash preimage. (6) Working tree has uncommitted S3.x changes in blockchain/ — coordinate deletion so it does not collide with in-flight chain.rs/mutations.rs edits."
+  },
+  {
+    "island": "ngauge cluster L: collective_intel.rs + marketplace/ + dormant modules (receipt, min_spec, compliance, caesar_tracker, node_metrics, metrics_source, throttle, trending)",
+    "verdict": "feature-gate",
+    "salvage": [
+      {
+        "what": "CollectiveIntelligence density signals: privacy-aware ingest (anonymous counted-not-tracked, collective_intel.rs:140-153), compute_centroid (:258-275), detect_hotspot (:198-222), detect_coverage_gap (:225-235) over MatrixPosition + RegionalAggregator",
+        "why": "The ONE flagged salvage from the deleted worlds layer. Vector-space-regions plan (owner 2026-07-30) needs coordinate SPACING derived from data distribution across the mesh — this is the only existing per-region density/cluster mechanism; the live locality path (P3) is RTT-only. crate-status.toml:47-50 declares it in_development.",
+        "destination": "ngauge/src/placement/locality.rs (LocalityProvider) — feed density/hotspot/coverage signals into placement so spacing reflects distribution; keep the module in ngauge (placement intelligence is NGauge's mandate)"
+      },
+      {
+        "what": "node_metrics::SelfMetrics/HardwareSummary + metrics_source::SystemMetricsSource (/proc-backed MetricsSource trait, metrics_source.rs:14)",
+        "why": "blockmatrix's live MetricsReporter (network/metrics_reporter.rs:70-90) samples cpu/mem ad hoc and hand-builds JSON frames; SystemMetricsSource is the typed, tested collection mechanism the live path lacks. Also complements R1 hardware-assessment (blockmatrix/src/bin/node/hardware.rs) — verify overlap before wiring.",
+        "destination": "blockmatrix/src/network/metrics_reporter.rs (replace ad-hoc sampling with ngauge::MetricsSource)"
+      },
+      {
+        "what": "min_spec R13 budget constants + MinSpecProfiler (min_spec.rs:20-26)",
+        "why": "R13 is a hard protocol requirement; ngauge/blockmatrix/stoq each have independent min_spec modules with no shared budget constants — the ngauge one is the analytics-overhead budget and the only profiler harness.",
+        "destination": "keep in ngauge behind the gate; optionally lift shared R13 constants to lib (single source of truth) during the next lib types pass"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/bin/node/dispatch.rs:542-552 dead CLI arms only (NGaugeAction::Marketplace/Metrics/Leases call IPC methods ngauge.marketplace/ngauge.node_metrics/ngauge.leases that are NEVER registered — ipc/handlers/ngauge.rs registers only capacity/traffic/throttle/routing; these fail method-not-found at runtime today). Not whole files — remove the arms + their NGaugeAction variants in bin/node/cli.rs, or register real handlers when the gated modules come back."
+    ],
+    "gate": [
+      "ngauge/src/collective_intel.rs (gate e.g. 'collective-intel' or leave ungated as salvage donor — zero cost, pending vector-space-regions work)",
+      "ngauge/src/marketplace/ (all 6 files, ~1160L — Caesar Economic Mode: leases/pricing/content-push; future-wanted, not scar; gate 'economics')",
+      "ngauge/src/receipt.rs (BLAKE3 content receipts — aligns with canonical PoWork=BLAKE3 hash-validation + Caesar rewards; gate 'economics')",
+      "ngauge/src/compliance.rs (hash-only KYC for MarketTier; gate 'economics')",
+      "ngauge/src/caesar_tracker.rs (gold-grams flow tracking; gate 'economics')",
+      "ngauge/src/min_spec.rs (R13 profiler; gate 'profiling' or keep as dev utility)",
+      "ngauge/src/node_metrics.rs + ngauge/src/metrics_source.rs (gate together — node_metrics' only consumer is metrics_source.rs:14; both zero external users — unless the metrics_reporter salvage lands first, which makes them live)"
+    ],
+    "evidence": "Island proof: CollectiveIntelligence referenced ONLY at ngauge/src/lib.rs:29,52 (repo-wide grep; NetworkInsight/HotspotAlert/CoverageGap/generate_insights = zero hits outside the file). marketplace: only lib.rs:32,55 + internal test lease_manager.rs:168; its CLI surface calls unregistered IPC methods (dispatch.rs:542 vs ipc/handlers/ngauge.rs:20-54). receipt/min_spec/compliance/caesar_tracker: only lib.rs:68/60/53/51. Live-path proof (keep-wire): trending::EpochTracker ← ingestion.rs:18 + routing_intel.rs:16; MetricsIngestionPipeline constructed in shipped daemon at bin/node/commands/node_bringup.rs:244 (wired :298, fed message_utils.rs:252); RoutingIntelligence live at replication_service/propagation.rs:69; SwarmAnalytics live at node_bringup.rs:240. throttle::ThrottleSignal ← caesar/src/governor/pid.rs:229-233 (feature 'ngauge', off by default: caesar/Cargo.toml:83-88, blockmatrix/Cargo.toml:99 enables no features) + IPC 'ngauge.throttle' registered ipc/handlers/ngauge.rs:43 (stub :136) + capability_registry.rs:61.",
+    "risk": "(1) trending.rs is transitively LIVE in the shipped daemon — deleting/gating it breaks blockmatrix build (ingestion.rs:18, routing_intel.rs:16 are ungated). KEEP-WIRE. (2) throttle.rs crosses a crate boundary: caesar --features ngauge builds (governor/pid.rs) and the registered ngauge.throttle IPC method break if removed — KEEP-WIRE; it is the Governor feedback contract, already de-facto gated by caesar's off-by-default feature. (3) lib.rs re-export chain (lines 50-83): every gated module needs matching #[cfg(feature)] on both `pub mod` and `pub use` or the crate stops compiling. (4) collective_intel imports live streaming::{aggregator,protocol} — gating it is safe (leaf), but do NOT gate streaming: gateway/src/sse_ngauge.rs:37-38, stoq metrics_frame.rs:10/metrics_bridge.rs:10-12, and blockmatrix message_utils.rs:256 consume it unconditionally. (5) capacity/organic_detection/metrics/trust_signals are dependencies of live or keep-wire modules (caesar routing.rs:135, fee_distribution.rs:150, gateway sse_ngauge.rs:37, api/stoq_api.rs:18) — out of scope, keep. (6) ngauge-server (api/ + udp_ingest) is built by build-release.sh:22 though not deployed (deploy-to-gcp.sh:43) — near-live, keep. (7) Worktree mirror .claude/worktrees/s3/ngauge duplicates lib.rs — apply changes on main only."
+  },
+  {
+    "island": "blockmatrix/src/assets/ dead parallel blockchain layer (blockchain.rs AssetBlockchainManager, matrix_blockchain.rs EntityBlockchain, cross_chain/ CrossChainValidationManager+types) + proxy/ NAT/sharding stack + adapters/storage stack. Reached only via self/sibling refs, uncalled lib.rs HyperMeshSystem facade (api/mod.rs create_api_server has zero callers), and tests (mostly future-tests-gated). EXCEPTION: cross_chain/receipt_validator.rs is LIVE daemon code; assets/storage/ is live via retrieval+intelligence (default feature). Hardcoded Hetzner IPv6 NOT FOUND anywhere — stale claim; only RFC-3849 doc addresses + Google DNS in adapter mock data.",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "CrossChainReceiptValidator + CrossChainError (cross_chain/receipt_validator.rs, all 13.5KB)",
+        "why": "LIVE, not island: DaemonState field, constructed by shipped daemon and gateway transfer coordinator; the audit-time receipt-atomicity index for cross-chain transfers. Must survive deletion of its parent module's manager.",
+        "destination": "Stays in place — trim assets/cross_chain/mod.rs to `pub mod receipt_validator; pub use receipt_validator::{CrossChainError, CrossChainReceiptValidator};` only (delete manager impl, delete `pub use types::*`, delete types.rs, delete the matrix_blockchain import at mod.rs:22)"
+      },
+      {
+        "what": "PrivacyScopedDedup + DedupResult/StorageRef (assets/storage/privacy_dedup.rs:24-188)",
+        "why": "The ONLY implementation of hard requirement R4 (privacy-scoped dedup: full tracking in Device/Private, none in Anonymous) in the codebase; declared at storage/mod.rs:36 but used by NOTHING — live DeduplicationEngine ignores PrivacyMode entirely.",
+        "destination": "Wire into the live dedup path: assets/storage/deduplication.rs (DeduplicationEngine) so ContentAddressedStorage store/check honors PrivacyMode; keep in assets/storage/ which is NOT being deleted"
+      },
+      {
+        "what": "CPU hardware assessment: detect_cpu_configuration + detect_numa_node (assets/adapters/cpu/adapter.rs:36-94,147; sysinfo + os_integration detect_cpu with fallback)",
+        "why": "R1 requires hardware ASSESSED not self-reported; 2026-07-05 claims audit found hardware not bound to fingerprint and no exclusivity. This is the only real hardware-probing machinery; adjacent to (not inside) the deleted storage-adapter stack.",
+        "destination": "bootstrap/genesis asset-instantiation path (blockmatrix/src/bootstrap/ or identity), invoked at genesis to instantiate R1 hardware assets; extract as a small hardware_assessment module independent of the AssetAdapter trait"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/assets/blockchain.rs",
+      "blockmatrix/src/assets/matrix_blockchain.rs",
+      "blockmatrix/src/assets/cross_chain/types.rs",
+      "blockmatrix/src/assets/cross_chain/mod.rs (manager portion only: CrossChainValidationManager impl lines ~18-470 + `pub mod types`/`pub use types::*` + matrix_blockchain import; KEEP receipt_validator declaration/re-export)",
+      "blockmatrix/src/assets/mod.rs:39-43 (re-exports of AssetBlockchainManager/AssetRecordType/HyperMeshAssetRecord/EntityBlockchain/MatrixBlockchainManager/BlockchainMatrixCoordinate/EntityType)",
+      "blockmatrix/src/proof_of_state/state_proof_impl.rs:88 (stale doc comment naming AssetBlockchainManager)",
+      "blockmatrix/src/assets/proxy/sharding.rs (EncryptedShard/ShardManager/ShardedDataAccess — duplicates NGauge's RS sharding authority + pipeline's Kyber path)",
+      "blockmatrix/src/assets/proxy/security.rs (FalconSigner/KyberEncryption/QuantumSecurity — duplicates trustchain crypto authority)",
+      "blockmatrix/src/assets/core/proxy.rs:437-447 + assets/core/mod.rs:55-68 (re-export chain of deleted proxy types: QuantumSecurity, ShardedDataAccess; trim to what remains)"
+    ],
+    "gate": [
+      "blockmatrix/src/assets/proxy/ remainder (forwarding, manager, nat_translation, proxy_selector, remote_memory_transport, routing, scope_routing, trust_integration) — NAT-like remote resource addressing is the documented future resource-access model (CLAUDE.md flagship), tests-only today; gate behind a `remote-proxy` feature (off by default) rather than delete",
+      "blockmatrix/src/assets/adapters/storage/ (StorageAssetAdapter: adapter, allocation, devices, distribution, encryption, sharding) — unreached from daemon but wired into AdapterRegistry + non-gated gate2_asset_test; catalog execution-delegation model expects adapters; gate behind existing `assets`-style feature or move gate2_asset_test behind future-tests",
+      "blockmatrix/src/lib.rs HyperMeshSystem/AssetManager facade + api/mod.rs create_api_server (uncalled entry chain that keeps adapters alive) — gate with adapters; outside strict target so flagging, not deleting"
+    ],
+    "evidence": "AssetBlockchainManager: zero constructors workspace-wide; only non-island ref = doc comment proof_of_state/state_proof_impl.rs:88. EntityBlockchain/MatrixBlockchainManager: sole importer assets/cross_chain/mod.rs:22. CrossChainValidationManager: zero external refs, self-test at cross_chain/mod.rs:470. cross_chain/types.rs: only consumer is matrix_blockchain.rs:98,299 (island-internal). LIVE receipt_validator: ipc/state.rs:82 (DaemonState field), bin/node/commands/connect.rs:209, gateway/transfer_coordinator.rs:47, ipc/handlers/* 14 sites, tests/i1_multihost_harness.rs:48 (non-gated). Proxy: zero imports from bin/ipc/network/gateway/blockchain; only re-export chain assets/core/proxy.rs:437-447 → assets/core/mod.rs:55-68; tests gate3_proxy_test.rs:11 + multi_node_integration.rs:8 are #[cfg(feature=\"future-tests\")] (never compiled; feature absent from default = [\"proof-of-state\",\"assets\",\"intelligence\",\"caesar\"], Cargo.toml:214); only compiled consumer = tests/proxy_tensor_cli_integration.rs:13 (scope_routing). Adapters: constructed only by AdapterRegistry::new (lib.rs:53 in HyperMeshSystem; HyperMeshSystem's only src consumer = api/mod.rs:49 create_api_server, zero callers) + tests/gate2_asset_test.rs:53 (non-gated). assets/storage LIVE: retrieval/instruction_generator.rs:12, intelligence/mod.rs:92 (intelligence default-on) — excluded from delete. Hetzner: grep 2a01/hetzner over all .rs/.toml/.md/.sh = zero hits; actual literals are 2001:db8 doc addrs (adapters/network/adapter.rs:88) + Google DNS (adapters/container/adapter.rs:272).",
+    "risk": "(1) cross_chain must be TRIMMED not deleted — 17 live daemon sites import CrossChainReceiptValidator; deleting mod.rs wholesale breaks the shipped binary and i1_multihost_harness/k2 tests. (2) Re-export chains must be updated atomically in one change: assets/mod.rs:39-43, lib.rs:244-246 (adapter re-exports), assets/core/mod.rs:55-68 + core/proxy.rs:437-447 — otherwise the lib target fails to compile. (3) Compiled test targets that break: gate2_asset_test.rs (adapters — gate it or its feature), proxy_tensor_cli_integration.rs (scope_routing half must be split out; its CLI/tensor half tests LIVE code and must be preserved). (4) Do NOT delete assets/storage/ or assets/multi_node/ — live importers via retrieval/ + intelligence/ (default feature); note name-collision hazard assets::storage::ReplicationConfig vs the live ngauge::ReplicationConfig (network/replication_service/{propagation.rs:97,poll.rs:50}). (5) No wire/disk format impact: HyperMeshAssetRecord/EntityBlock/proxy types are serde types never persisted or transmitted by the live path (no Block::calculate_hash preimage involvement), so no migration batching needed. (6) proxy/scope_routing overlaps but is NOT the live gateway/scope_bridge.rs — verify no future work targets it before hard delete; hence gate not delete."
+  },
+  {
+    "island": "cluster L — blockmatrix api/, transfer/, cli/ (library), runtime/+phoenix, orchestration/lib.rs, catalog/lib.rs",
+    "verdict": "salvage-then-delete",
+    "salvage": [
+      {
+        "what": "transfer/mod.rs AssetAddress↔matrix-coordinate binding: verify_address_coords (transfer/mod.rs:325-340), readdress_asset content-fingerprint-preserving re-addressing (344-359), deterministic BLAKE3 receipt_hash binding both chain block indices (385-399), and the dual-chain transfer-out/transfer-in records written via BlockAssetEntry::new_bound (226-231, 247-252 — P1 signed-to-content invariant already honored)",
+        "why": "This is the ONLY meaningful consumer of lib::AssetAddress in the repo (memory: AssetAddress is 'decorative — no live consumer'); the LIVE transfer path gateway/asset_transfer.rs has ZERO AssetAddress/matrix_coords/receipt_hash hits (grep empty) and its own unrelated TransferReceipt. Address-coordinate binding + content-preserving readdressing is exactly what canonical content+coordinate addressing needs for Phase-G cross-network transfers",
+        "destination": "blockmatrix/src/gateway/asset_transfer.rs (fold into the live Lock→Transfer→Unlock lifecycle when G-phase lands); receipt-hash helper could live beside gateway::asset_transfer::TransferReceipt"
+      },
+      {
+        "what": "transfer/mod.rs opaque-proof bilateral pattern: StateProofBytes wrapper + StateAuthenticator boolean-only validation at BOTH endpoints (transfer/mod.rs:28-52, 156-207)",
+        "why": "Cleanest existing embodiment of canonical PoS: bilateral, binary authentic-or-not, proof internals opaque to the transfer layer, no consensus. Live gateway transfer validators should match this shape",
+        "destination": "pattern reference for gateway/asset_transfer.rs DefaultTransferValidator — adopt shape, then delete the island"
+      },
+      {
+        "what": "api/ipc_bridge.rs — IpcBridgeHandler + register_ipc_bridge: exposes every ipc::handler::RequestHandler method as a STOQ API path (blockmatrix/blockchain/height ↔ blockchain.height), 243L, fully unit-tested, depends only on LIVE ipc handler + stoq::api",
+        "why": "Genuine mechanism the live path lacks: remote IPC over STOQ is the transport story for roadmap K (light client + remote dashboard) and the documented purpose of api/ in blockmatrix/CLAUDE.md. Small, correct, zero dead deps — reversible and future-wanted, so gate rather than delete",
+        "destination": "move to blockmatrix/src/ipc/stoq_bridge.rs behind a feature (e.g. remote-ipc), wire register_ipc_bridge from bin/node when K lands"
+      }
+    ],
+    "delete": [
+      "blockmatrix/src/runtime/ (whole dir: mod.rs + phoenix/mod.rs, 472L) — NEVER COMPILED: lib.rs:334 declares an inline `pub mod runtime { pub struct Runtime; }` stub, so no `mod runtime;` ever loads src/runtime/; zero 'Phoenix' references repo-wide; phoenix is a marketing-era SDK wrapper over StoqTransport (belongs in hypermesh-sdk if ever wanted)",
+      "blockmatrix/src/orchestration/lib.rs (496L) — NEVER COMPILED crate-root fossil (entry is mod.rs; no `mod lib`/#[path] anywhere except matrix/tensor/mod.rs:42); MFN-era marketing constants ('88.6% latency improvement'); conflicts with mod.rs re-exports. Delete lib.rs ONLY — orchestration/mod.rs IS compiled and imported (integration/config.rs:9, catalog/integration/hypermesh_bridge/operations.rs:16)",
+      "blockmatrix/src/catalog/lib.rs (15L) — NEVER COMPILED fossil re-exporting a subset of mod.rs. Delete lib.rs ONLY — catalog/mod.rs is LIVE (ipc/state.rs:150 catalog_registry: Arc<dyn crate::catalog::CatalogProvider>, ipc/handlers/catalog.rs:17)",
+      "blockmatrix/src/api/mod.rs + api/extensions.rs + api/proof_of_state_api.rs (809L) — compiled island, zero callers outside src/api (grep for register_ipc_bridge/create_api_server/start_api_server/create_extension_handlers/proof_of_state_api outside src/api: empty). proof_of_state_api stands up a remote STOQ 'validation service' endpoint — contrary to canonical bilateral PoS (validation happens at handshake/eBPF, not as a remote RPC). extensions.rs serves UnifiedExtensionManager which bin/node never constructs (keep ipc_bridge.rs per gate list)",
+      "blockmatrix/src/cli/ (commands.rs+executor.rs+output.rs+mod.rs, 1346L) — compiled island; only consumer is tests/proxy_tensor_cli_integration.rs (tests/proxy_tensor_cli_integration.rs:14-16) + its own doctest. The real shipped CLI is src/bin/node/cli.rs (main.rs:18 `mod cli;` — bin/node's `crate::cli` refers to ITS OWN cli.rs, not the library). Library executor drives an in-memory toy registry via matrix::tensor::routing, never touches daemon/blockchain/ipc; its 'future binary crate will parse args' already exists as bin/node and ignores it. matrix/tensor has its own test tree (matrix/tensor/mod.rs:42) so routing coverage survives",
+      "blockmatrix/tests/proxy_tensor_cli_integration.rs — sole cli/ consumer, dies with it",
+      "blockmatrix/tests/ipv6_transfer_simulation.rs + blockmatrix/benches/transfer_bench.rs + Cargo.toml [[bench]] transfer_bench entry (Cargo.toml:42-44) — sole transfer/ consumers, die with it AFTER salvage lands",
+      "blockmatrix/tests/integration/extension_integration_test.rs — dead file: tests/integration.rs (gated future-tests) only mods catalog_plugin (integration.rs:14-15), never this file; it is the last textual referent of HyperMeshSystem"
+    ],
+    "gate": [
+      "blockmatrix/src/api/ipc_bridge.rs — keep, move to ipc/stoq_bridge.rs behind feature `remote-ipc` (currently unreachable: register_ipc_bridge has zero callers, but it is the concrete IPC-over-STOQ mechanism for roadmap K light-client/remote-dashboard; 243L, tested, depends only on live ipc::handler + stoq::api)"
+    ],
+    "evidence": "Reachability: lib.rs:334-337 inline `pub mod runtime{...}` stub shadows src/runtime/ (never compiled); no `mod lib`/#[path] for orchestration/lib.rs or catalog/lib.rs (grep: only matrix/tensor/mod.rs:42 has #[path]). api/: declared lib.rs:146 but zero importers of api:: or its fns outside src/api. transfer/: declared lib.rs:226; only importers tests/ipv6_transfer_simulation.rs:18 + benches/transfer_bench.rs:14; live transfer path is gateway/asset_transfer (ipc/handlers/blockchain.rs:261, assets/cross_chain/receipt_validator.rs:41). cli/: declared lib.rs:283; only importer tests/proxy_tensor_cli_integration.rs:14-16; bin/node uses its own src/bin/node/cli.rs (main.rs:18). Live-dependency checks: ValidationService is LIVE (blockchain/chain.rs:23,58) — untouched; catalog/mod.rs LIVE (ipc/state.rs:150); orchestration/mod.rs compiled+imported (integration/config.rs:9).",
+    "risk": "(1) Deleting api/ orphans proof_of_state::stoq_handlers (proof_of_state/mod.rs:145-…, sole consumer is api/proof_of_state_api.rs) and HyperMeshSystem/HyperMeshConfig/initialize_hypermesh (lib.rs:29-104, last compiled consumer is api/mod.rs) — both become follow-up dead code in files OUTSIDE this target; do NOT touch validation_service (live in chain.rs). (2) Deleting transfer/ without removing the Cargo.toml [[bench]] transfer_bench entry (Cargo.toml:42-44) breaks the build; tests/ipv6_transfer_simulation.rs breaks too — remove together. (3) cli/ deletion breaks tests/proxy_tensor_cli_integration.rs and the cli/mod.rs doctest; also stale docs: blockmatrix/CLAUDE.md module table lists cli/ and api/, and crate-status.toml likely lists 'CLI (CommandExecutor…)' — update both. (4) No wire/on-disk format risk: nothing deleted is serde-serialized on a live path; transfer::TransferReceipt is a DIFFERENT type from live gateway::asset_transfer::TransferReceipt (no collision). (5) Never-compiled files (runtime/, orchestration/lib.rs, catalog/lib.rs, extension_integration_test.rs) carry zero compile risk. (6) Salvage ordering: land the AssetAddress-binding salvage into gateway/asset_transfer BEFORE deleting transfer/, or the repo loses its only worked example of AssetAddress consumption."
+  }
+]
