@@ -250,10 +250,12 @@ async fn s3_4_bad_signers_are_rejected() {
     let stranger = FalconIdentity::generate();
     let impostor = FalconIdentity::generate();
 
-    // (a) UNSIGNED — no envelope at all. Unlike the spine accept mode there is
-    //     NO legacy-migration escape hatch here, and setting the spine's compat
-    //     flag must not open one.
-    std::env::set_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS", "1");
+    // (a) UNSIGNED — no envelope at all. The received-asset-chain accept path
+    //     has NO legacy-migration escape hatch BY CONSTRUCTION: it never
+    //     consults the spine's accept-unsigned flag, so an unsigned import is
+    //     rejected unconditionally. We deliberately do NOT set that process-wide
+    //     env var here — doing so would race parallel tests, and the accept
+    //     path's independence from it holds regardless of the flag's value.
     let chain = NodeBlockchain::new(coord());
     let asset = [0x49u8; 32];
     let mut unsigned = received_chain(&stranger, asset, 2);
@@ -261,9 +263,8 @@ async fn s3_4_bad_signers_are_rejected() {
     assert_eq!(
         chain.accept_asset_chain(unsigned).await,
         Err(AcceptReject::Unsigned { position: 1 }),
-        "the spine's one-release legacy flag must not admit an unsigned received import"
+        "an unsigned received import must be rejected on the accept path"
     );
-    std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
     assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (b) SIGNER IS NOT THE CLAIMED AUTHOR — a real, valid FALCON signature over

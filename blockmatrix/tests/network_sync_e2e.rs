@@ -38,21 +38,29 @@ async fn make_transport() -> Result<StoqTransport> {
     StoqTransport::new(config).await
 }
 
-/// Build a test BlockAssetEntry whose proof is bound to its asset_hash.
+/// Build a test BlockAssetEntry whose proof is bound to its asset_hash AND
+/// claims `author` as its state-proof author.
 ///
 /// The proof is bound via `BlockAssetEntry::new_bound` so the entry satisfies
-/// the signed-to-content half of the mirror invariant (P1) enforced on the
-/// block-receive path.
-fn test_asset_entry(label: &str) -> BlockAssetEntry {
+/// the signed-to-content half of the mirror invariant (P1). The `stake_holder_id`
+/// is set to `author.node_id()` (`BLAKE3(pubkey)`) so that when the entry is
+/// FALCON-signed by that same identity — done inside `add_block` on a chain
+/// carrying `author` as its signer — the accept-path author binding
+/// (`signer_binds_to_author`) holds and the block passes the H3 gate on the
+/// receive path WITHOUT the legacy accept-unsigned flag.
+fn test_asset_entry(label: &str, author: &FalconIdentity) -> BlockAssetEntry {
     let data = format!("test-asset-{label}");
     let asset_hash = *blake3::hash(data.as_bytes()).as_bytes();
 
     let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
     let registration = blockmatrix::assets::core::AssetRegistration::genesis(coord);
 
+    let mut proof = StateProof::new_for_testing();
+    proof.stake_proof.stake_holder_id = author.node_id().to_string();
+
     BlockAssetEntry::new_bound(
         asset_hash,
-        &StateProof::new_for_testing(),
+        &proof,
         StoragePointer::Local {
             path: format!("/test/{label}"),
         },
@@ -153,11 +161,15 @@ async fn run_wire_protocol_test() -> Result<()> {
     let addr_b = transport_b.local_addr()?;
 
     // --- 2. Create a block on Node A ---
+    // A carries a FALCON signer so `add_block` attaches a signed_proof envelope
+    // to every entry (the real produced-block shape a peer receives).
     let coord_a = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
-    let blockchain_a = NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing());
+    let identity_a = Arc::new(FalconIdentity::generate());
+    let blockchain_a = NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+        .with_signer(identity_a.clone() as Arc<dyn NodeSigner + Send + Sync>);
     assert_eq!(blockchain_a.get_height().await, 0, "genesis only");
 
-    let entry = test_asset_entry("wire-test");
+    let entry = test_asset_entry("wire-test", &identity_a);
     let block_a = blockchain_a
         .add_block(vec![entry])
         .await
@@ -248,7 +260,13 @@ async fn run_full_insertion_test() -> Result<()> {
     let coord_a = MatrixCoordinate::new(5, 5, 5).expect("test: valid coord");
     let coord_b = MatrixCoordinate::new(10, 10, 10).expect("test: valid coord");
 
-    let blockchain_a = Arc::new(NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing()));
+    // A carries a FALCON signer so its produced block-1 arrives at B with a
+    // valid, author-bound signed_proof envelope (H3 gate on the receive path).
+    let identity_a = Arc::new(FalconIdentity::generate());
+    let blockchain_a = Arc::new(
+        NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+            .with_signer(identity_a.clone() as Arc<dyn NodeSigner + Send + Sync>),
+    );
     let blockchain_b = Arc::new(NodeBlockchain::with_requirements(coord_b, StateRequirements::localhost_testing()));
 
     // Both start at height 0 (genesis only)
@@ -267,13 +285,14 @@ async fn run_full_insertion_test() -> Result<()> {
     // predecessor. To join A's network, B ADOPTS A's genesis first — a foreign
     // block-1 referencing a genesis B does not have would be HARD-REJECTED
     // (no cross-genesis graft). This mirrors the real join-a-network flow.
+    // TODO(cluster-C): adopt_genesis / cross-genesis convergence is being retired for the per-asset-genesis model
     blockchain_b
         .adopt_genesis(genesis_a.clone())
         .await
         .expect("test: B adopts A's genesis to join A's chain");
 
     // --- 2. Node A creates a block with a test asset ---
-    let entry = test_asset_entry("sync-test");
+    let entry = test_asset_entry("sync-test", &identity_a);
     let block_from_a = blockchain_a
         .add_block(vec![entry])
         .await
@@ -361,13 +380,16 @@ async fn handshake_then_block_sync() {
 
 async fn run_handshake_then_sync() -> Result<()> {
     // --- 1. Create FALCON identities and proof providers ---
-    let identity_a = FalconIdentity::generate();
+    // Keep A's identity as an Arc<FalconIdentity> so it serves BOTH as the
+    // handshake signer AND as A's blockchain signer — the block A produces is
+    // then FALCON-signed and author-bound for the H3 receive gate.
+    let identity_a = Arc::new(FalconIdentity::generate());
     let identity_b = FalconIdentity::generate();
 
     let node_id_a = identity_a.node_id.clone();
     let node_id_b = identity_b.node_id.clone();
 
-    let signer_a: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_a);
+    let signer_a: Arc<dyn NodeSigner + Send + Sync> = identity_a.clone();
     let signer_b: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_b);
 
     let proof_provider_a = BlockMatrixProofProvider::new(
@@ -387,12 +409,16 @@ async fn run_handshake_then_sync() -> Result<()> {
     let coord_a = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
     let coord_b = MatrixCoordinate::new(4, 5, 6).expect("test: valid coord");
 
-    let blockchain_a = Arc::new(NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing()));
+    let blockchain_a = Arc::new(
+        NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+            .with_signer(signer_a.clone()),
+    );
     let blockchain_b = Arc::new(NodeBlockchain::with_requirements(coord_b, StateRequirements::localhost_testing()));
 
     // Zero-trust (P1/F7): B joins A's chain by adopting A's genesis, so A's
     // block-1 links to a verified predecessor. A foreign block-1 would be
     // hard-rejected (no cross-genesis graft).
+    // TODO(cluster-C): adopt_genesis / cross-genesis convergence is being retired for the per-asset-genesis model
     let genesis_a = blockchain_a.get_block(0).await.expect("test: A genesis");
     blockchain_b
         .adopt_genesis(genesis_a)
@@ -400,7 +426,7 @@ async fn run_handshake_then_sync() -> Result<()> {
         .expect("test: B adopts A's genesis");
 
     // --- 3. Create a block on A ---
-    let entry = test_asset_entry("handshake-sync");
+    let entry = test_asset_entry("handshake-sync", &identity_a);
     let block_from_a = blockchain_a
         .add_block(vec![entry])
         .await

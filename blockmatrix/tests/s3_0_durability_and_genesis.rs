@@ -14,6 +14,8 @@ use blockmatrix::blockchain::block::{Block, BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{BlockSink, NodeBlockchain};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::persistence::{BlockQuery, PersistenceConfig, PersistenceManager};
+use hypermesh_lib::NodeSigner;
+use trustchain::identity::FalconIdentity;
 use trustchain::proof_of_state::StateProof;
 
 const NODE_ID: &str = "s3-durability-node";
@@ -23,6 +25,7 @@ fn coord() -> MatrixCoordinate {
 }
 
 /// A content-bound entry that satisfies the signed-to-content invariant.
+/// Used for LOCAL `add_block` paths, which do not require a signed_proof.
 fn bound_entry(tag: &[u8]) -> BlockAssetEntry {
     let registration =
         blockmatrix::assets::core::AssetRegistration::genesis(coord());
@@ -30,6 +33,25 @@ fn bound_entry(tag: &[u8]) -> BlockAssetEntry {
     BlockAssetEntry::new_bound(
         asset_hash,
         &StateProof::new_for_testing(),
+        StoragePointer::Genesis,
+        registration,
+    )
+}
+
+/// A content-bound entry that also claims `author` as its state-proof author
+/// (`stake_holder_id = author.node_id()` = `BLAKE3(pubkey)`). A chain carrying
+/// `author` as its signer emits it FALCON-signed and author-bound, so the
+/// receiving node accepts it on the real H3 path (`insert_received_block`)
+/// WITHOUT the legacy accept-unsigned flag.
+fn authored_entry(tag: &[u8], author: &FalconIdentity) -> BlockAssetEntry {
+    let registration =
+        blockmatrix::assets::core::AssetRegistration::genesis(coord());
+    let asset_hash = *blake3::hash(tag).as_bytes();
+    let mut proof = StateProof::new_for_testing();
+    proof.stake_proof.stake_holder_id = author.node_id().to_string();
+    BlockAssetEntry::new_bound(
+        asset_hash,
+        &proof,
         StoragePointer::Genesis,
         registration,
     )
@@ -159,22 +181,26 @@ async fn b1_received_block_is_persisted() {
         .await
         .expect("test: persist genesis");
 
-    // Producer chain (memory only) builds a block we then "receive".
-    let producer = NodeBlockchain::from_genesis(coord(), genesis.clone());
+    // Producer chain (memory only) carries a FALCON signer, so the block it
+    // builds arrives with a valid, author-bound signed_proof envelope. The
+    // receiver accepts it on the real H3 path — no legacy accept-unsigned flag,
+    // so this test does not race parallel tests over a process-wide env var.
+    let producer_identity = std::sync::Arc::new(FalconIdentity::generate());
+    let producer = NodeBlockchain::from_genesis(coord(), genesis.clone()).with_signer(
+        producer_identity.clone() as std::sync::Arc<dyn NodeSigner + Send + Sync>,
+    );
     let produced = producer
-        .add_block(vec![bound_entry(b"s3-b1-received-asset")])
+        .add_block(vec![authored_entry(b"s3-b1-received-asset", &producer_identity)])
         .await
         .expect("test: produce block");
 
     let receiver = NodeBlockchain::from_genesis(coord(), genesis.clone())
         .with_persistence(persistence.clone());
 
-    // The producer chain has no signer, so the entry carries no envelope;
-    // accept it under the documented one-release legacy migration flag.
-    std::env::set_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS", "1");
-    let result = receiver.insert_received_block(produced.clone()).await;
-    std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
-    result.expect("test: insert_received_block");
+    receiver
+        .insert_received_block(produced.clone())
+        .await
+        .expect("test: insert_received_block");
 
     drop(receiver);
     drop(producer);
