@@ -1,4 +1,4 @@
-# Web3 Ecosystem - Development Project Context
+# HyperMesh Ecosystem - Development Project Context
 
 ## Hard Protocol Requirements
 

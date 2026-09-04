@@ -181,13 +181,13 @@ let addresses = transport.get_shard_addresses(&shard_ids);
 
 ### Test Execution
 ```bash
-cd /home/persist/repos/projects/web3/stoq
+cd stoq
 cargo test --test pos_integration_test
 ```
 
 ### Demo Application
 ```bash
-cd /home/persist/repos/projects/web3/stoq
+cd stoq
 cargo run --example pos_integration_demo
 ```
 

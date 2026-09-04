@@ -1,7 +1,7 @@
 # Written by Richard Christopher, Copyright 2026 HyperMesh Foundation
 [Unit]
 Description=HyperMesh TrustChain CA (STOQ — node-to-node certificates)
-Documentation=https://github.com/hypermesh-online/core
+Documentation=https://github.com/hypermesh-online/hypermesh
 After=network-online.target
 Wants=network-online.target
 

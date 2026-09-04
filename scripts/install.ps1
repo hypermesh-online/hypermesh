@@ -1,6 +1,6 @@
 # Install HyperMesh node from GitHub Releases (Windows / PowerShell).
 # Usage:
-#   iwr -useb https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.ps1 | iex
+#   iwr -useb https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.ps1 | iex
 #
 # Or with arguments (download first, then run):
 #   .\install.ps1 -Version v0.2.0 -Prefix "$env:LOCALAPPDATA\HyperMesh"

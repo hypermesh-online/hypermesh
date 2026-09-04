@@ -26,8 +26,8 @@ classifiers = [
 async = ["httpx>=0.25"]
 
 [project.urls]
-Homepage = "https://github.com/hypermesh-online/core"
-Repository = "https://github.com/hypermesh-online/core"
+Homepage = "https://github.com/hypermesh-online/hypermesh"
+Repository = "https://github.com/hypermesh-online/hypermesh"
 
 [tool.setuptools.packages.find]
 include = ["hypermesh*"]

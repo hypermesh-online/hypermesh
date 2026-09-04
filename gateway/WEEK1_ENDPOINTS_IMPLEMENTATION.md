@@ -9,12 +9,12 @@ All 10 Week 1 critical endpoints have been successfully implemented in the backe
 1. **BlockMatrix HTTP/3 Server** (`blockmatrix-http3-server.rs`)
    - Port: 8446
    - Endpoints: 9 endpoints implemented
-   - Location: `/home/persist/repos/projects/web3/blockmatrix/src/bin/blockmatrix-http3-server.rs`
+   - Location: `blockmatrix/src/bin/blockmatrix-http3-server.rs`
 
 2. **TrustChain HTTP/3 Server** (`trustchain-http3-server.rs`)
    - Port: 50053
    - Endpoint: 1 endpoint implemented
-   - Location: `/home/persist/repos/projects/web3/trustchain/src/bin/trustchain-http3-server.rs`
+   - Location: `trustchain/src/bin/trustchain-http3-server.rs`
 
 ## Implemented Endpoints
 
@@ -101,22 +101,22 @@ Endpoints include matrix position data (x, y, z) reflecting BlockMatrix's unique
 ### Build Servers
 ```bash
 # Build BlockMatrix server
-cd /home/persist/repos/projects/web3/blockmatrix
+cd blockmatrix
 cargo build --bin blockmatrix-http3-server
 
 # Build TrustChain server
-cd /home/persist/repos/projects/web3/trustchain
+cd trustchain
 cargo build --bin trustchain-http3-server
 ```
 
 ### Run Servers
 ```bash
 # Terminal 1: BlockMatrix server
-cd /home/persist/repos/projects/web3/blockmatrix
+cd blockmatrix
 cargo run --bin blockmatrix-http3-server
 
 # Terminal 2: TrustChain server
-cd /home/persist/repos/projects/web3/trustchain
+cd trustchain
 cargo run --bin trustchain-http3-server
 ```
 
@@ -137,13 +137,13 @@ curl -k -X POST https://[::1]:50053/api/v1/trustchain/auth/certificate \
 
 #### Using test script
 ```bash
-cd /home/persist/repos/projects/web3/gateway
+cd gateway
 ./test_week1_endpoints.sh
 ```
 
 #### Using test program
 ```bash
-cd /home/persist/repos/projects/web3/gateway
+cd gateway
 cargo run --bin test-week1-endpoints
 ```
 

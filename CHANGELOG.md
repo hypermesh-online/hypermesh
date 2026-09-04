@@ -29,5 +29,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Instruction-based retrieval (send maps, not files)
 - hypermesh-lib shared types crate as single source of truth for all workspace members
 
-[Unreleased]: https://github.com/hypermesh-online/core/compare/v0.1.0-alpha...HEAD
-[0.1.0-alpha]: https://github.com/hypermesh-online/core/releases/tag/v0.1.0-alpha
+[Unreleased]: https://github.com/hypermesh-online/hypermesh/compare/v0.1.0-alpha...HEAD
+[0.1.0-alpha]: https://github.com/hypermesh-online/hypermesh/releases/tag/v0.1.0-alpha

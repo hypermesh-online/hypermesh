@@ -1,6 +1,6 @@
 [Unit]
 Description=HyperMesh Block-MATRIX Node
-Documentation=https://github.com/hypermesh-online/core
+Documentation=https://github.com/hypermesh-online/hypermesh
 After=network-online.target trustchain-stoq.service
 Wants=network-online.target
 Requires=trustchain-stoq.service

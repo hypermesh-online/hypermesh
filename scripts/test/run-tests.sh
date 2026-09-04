@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Comprehensive Test Execution Script for Web3 Ecosystem
+# Comprehensive Test Execution Script for HyperMesh Ecosystem
 # Runs all testing phases and generates reports
 
 set -e
@@ -22,7 +22,7 @@ OUTPUT_DIR=${OUTPUT_DIR:-"test-results"}
 mkdir -p $OUTPUT_DIR
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  Web3 Ecosystem Testing Framework${NC}"
+echo -e "${BLUE}  HyperMesh Ecosystem Testing Framework${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -152,7 +152,7 @@ if [ ${#FAILED_TESTS[@]} -eq 0 ]; then
 
     # Generate success report
     cat > $OUTPUT_DIR/summary.txt << EOF
-Web3 Ecosystem Test Results
+HyperMesh Ecosystem Test Results
 ==========================
 Status: SUCCESS
 Date: $(date)
@@ -175,7 +175,7 @@ else
 
     # Generate failure report
     cat > $OUTPUT_DIR/summary.txt << EOF
-Web3 Ecosystem Test Results
+HyperMesh Ecosystem Test Results
 ==========================
 Status: FAILED
 Date: $(date)

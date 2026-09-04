@@ -15,6 +15,9 @@ import os
 import sys
 from pathlib import Path
 
+HM_DIR = str(Path(__file__).resolve().parent)
+STOQ_DIR = str(Path(__file__).resolve().parents[1] / "stoq")
+
 class Colors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -51,7 +54,7 @@ def test_build_status():
     results = {}
     for module in modules:
         print(f"\nBuilding {module}...")
-        code, stdout, stderr = run_command(f"cargo build -p {module} 2>&1", cwd="/home/persist/repos/projects/web3/hypermesh")
+        code, stdout, stderr = run_command(f"cargo build -p {module} 2>&1", cwd=HM_DIR)
 
         if code == 0:
             results[module] = "✅ BUILDS"
@@ -69,11 +72,11 @@ def test_asset_management():
 
     # Check for asset management code
     asset_files = [
-        "/home/persist/repos/projects/web3/hypermesh/src/assets/core/mod.rs",
-        "/home/persist/repos/projects/web3/hypermesh/src/assets/adapters/cpu.rs",
-        "/home/persist/repos/projects/web3/hypermesh/src/assets/adapters/gpu.rs",
-        "/home/persist/repos/projects/web3/hypermesh/src/assets/adapters/memory.rs",
-        "/home/persist/repos/projects/web3/hypermesh/src/assets/adapters/storage.rs"
+        f"{HM_DIR}/src/assets/core/mod.rs",
+        f"{HM_DIR}/src/assets/adapters/cpu.rs",
+        f"{HM_DIR}/src/assets/adapters/gpu.rs",
+        f"{HM_DIR}/src/assets/adapters/memory.rs",
+        f"{HM_DIR}/src/assets/adapters/storage.rs"
     ]
 
     results = {}
@@ -117,7 +120,7 @@ def test_stoq_integration():
     """Test STOQ protocol integration"""
     print(f"\n{Colors.HEADER}=== STOQ PROTOCOL TEST ==={Colors.ENDC}")
 
-    stoq_path = "/home/persist/repos/projects/web3/hypermesh/protocols/stoq"
+    stoq_path = STOQ_DIR
 
     if not os.path.exists(stoq_path):
         return {"STOQ": "❌ DIRECTORY MISSING"}
@@ -170,7 +173,7 @@ def test_trustchain_integration():
     print(f"\n{Colors.HEADER}=== TRUSTCHAIN INTEGRATION TEST ==={Colors.ENDC}")
 
     # Check if TrustChain is referenced in HyperMesh
-    code, stdout, _ = run_command("grep -r 'trustchain\\|TrustChain' /home/persist/repos/projects/web3/hypermesh/src --include='*.rs' | wc -l")
+    code, stdout, _ = run_command(f"grep -r 'trustchain\\|TrustChain' {HM_DIR}/src --include='*.rs' | wc -l")
     trustchain_refs = int(stdout.strip()) if stdout.strip().isdigit() else 0
 
     results = {}
@@ -182,7 +185,7 @@ def test_trustchain_integration():
         print(f"  {Colors.FAIL}❌ No TrustChain references found{Colors.ENDC}")
 
     # Check for certificate handling
-    code, stdout, _ = run_command("grep -r 'certificate\\|Certificate' /home/persist/repos/projects/web3/hypermesh/src --include='*.rs' | wc -l")
+    code, stdout, _ = run_command(f"grep -r 'certificate\\|Certificate' {HM_DIR}/src --include='*.rs' | wc -l")
     cert_refs = int(stdout.strip()) if stdout.strip().isdigit() else 0
 
     if cert_refs > 10:
@@ -201,11 +204,11 @@ def test_nova_gpu():
     results = {}
 
     # Check for Nova references
-    code, stdout, _ = run_command("grep -r 'nova\\|Nova\\|vulkan\\|Vulkan' /home/persist/repos/projects/web3/hypermesh/src --include='*.rs' | wc -l")
+    code, stdout, _ = run_command(f"grep -r 'nova\\|Nova\\|vulkan\\|Vulkan' {HM_DIR}/src --include='*.rs' | wc -l")
     nova_refs = int(stdout.strip()) if stdout.strip().isdigit() else 0
 
     # Check for CUDA references (should be minimal/none)
-    code, stdout, _ = run_command("grep -r 'cuda\\|CUDA' /home/persist/repos/projects/web3/hypermesh/src --include='*.rs' | wc -l")
+    code, stdout, _ = run_command(f"grep -r 'cuda\\|CUDA' {HM_DIR}/src --include='*.rs' | wc -l")
     cuda_refs = int(stdout.strip()) if stdout.strip().isdigit() else 0
 
     if nova_refs > 0 and cuda_refs == 0:
@@ -227,7 +230,7 @@ def test_nat_proxy():
     """Test NAT/Proxy system for remote addressing"""
     print(f"\n{Colors.HEADER}=== NAT/PROXY SYSTEM TEST ==={Colors.ENDC}")
 
-    proxy_path = "/home/persist/repos/projects/web3/hypermesh/src/assets/proxy"
+    proxy_path = f"{HM_DIR}/src/assets/proxy"
 
     results = {}
     if os.path.exists(proxy_path):

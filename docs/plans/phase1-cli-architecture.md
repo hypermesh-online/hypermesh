@@ -49,20 +49,20 @@ Introduce a **daemon/client architecture** with Unix domain socket IPC using JSO
 
 ### Step 1.1: Create IPC module root
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/mod.rs` (~20 lines)
+**File**: `blockmatrix/src/ipc/mod.rs` (~20 lines)
 
 - Declare submodules: `pub mod protocol;`, `pub mod server;`, `pub mod client;`, `pub mod handler;`
 - Re-export primary types: `IpcServer`, `IpcClient`, `RpcRequest`, `RpcResponse`, `RequestHandler`
 
 ### Step 1.2: Register the module in lib.rs
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/lib.rs` (~1 line, insert near line 270)
+**File**: `blockmatrix/src/lib.rs` (~1 line, insert near line 270)
 
 - Add `pub mod ipc;` alongside the existing `pub mod cli;`
 
 ### Step 1.3: Define JSON-RPC protocol types
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/protocol.rs` (~80 lines)
+**File**: `blockmatrix/src/ipc/protocol.rs` (~80 lines)
 
 Types to create:
 
@@ -121,7 +121,7 @@ Wire protocol: Each message is a newline-delimited JSON line (`serde_json` line)
 
 ### Step 1.4: Implement IPC server
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/server.rs` (~120 lines)
+**File**: `blockmatrix/src/ipc/server.rs` (~120 lines)
 
 ```rust
 /// Unix socket IPC server for the daemon.
@@ -166,7 +166,7 @@ Key implementation details:
 
 ### Step 1.5: Implement IPC client
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/client.rs` (~70 lines)
+**File**: `blockmatrix/src/ipc/client.rs` (~70 lines)
 
 ```rust
 /// Unix socket IPC client for CLI commands.
@@ -202,7 +202,7 @@ pub fn daemon_running() -> bool {
 
 ### Step 1.6: Implement request handler / dispatcher
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handler.rs` (~60 lines)
+**File**: `blockmatrix/src/ipc/handler.rs` (~60 lines)
 
 ```rust
 use std::collections::HashMap;
@@ -276,7 +276,7 @@ impl RequestHandler {
 
 ### Step 2.1: Refactor clap `Commands` enum
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify lines 113-148)
+**File**: `blockmatrix/src/bin/node.rs` (modify lines 113-148)
 
 Replace the current `Commands` enum:
 
@@ -330,7 +330,7 @@ Changes:
 
 ### Step 2.2: Create shared daemon state struct
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/state.rs` (~50 lines, new file)
+**File**: `blockmatrix/src/ipc/state.rs` (~50 lines, new file)
 
 Add `pub mod state;` to `ipc/mod.rs`.
 
@@ -356,7 +356,7 @@ This struct is constructed once during daemon startup and passed to `RequestHand
 
 ### Step 2.3: Wire `connect` command into the daemon startup path
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify `main()`, lines 992-1333)
+**File**: `blockmatrix/src/bin/node.rs` (modify `main()`, lines 992-1333)
 
 The existing `Some(Commands::Start)` block (lines 993-1303, ~310 lines) becomes the body of `Some(Commands::Connect { mode, foreground })`:
 
@@ -374,7 +374,7 @@ The existing `Some(Commands::Start)` block (lines 993-1303, ~310 lines) becomes 
 
 ### Step 2.4: Implement `disconnect` command
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (add to match block)
+**File**: `blockmatrix/src/bin/node.rs` (add to match block)
 
 ```rust
 Some(Commands::Disconnect) => {
@@ -394,7 +394,7 @@ The `shutdown` IPC method handler (registered in the `RequestHandler`) signals t
 
 ### Step 2.5: Route `Status` command through IPC client
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify `Status` match arm)
+**File**: `blockmatrix/src/bin/node.rs` (modify `Status` match arm)
 
 For Sprint 2, only `Status` is converted to IPC-first. Other commands remain as-is (Sprint 3 handles the full conversion). The `Status` match arm becomes:
 
@@ -484,7 +484,7 @@ handler.register("status", Arc::new(move |_| {
 
 ### Step 3.1: Create handler registration module
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/mod.rs` (~30 lines, new file)
+**File**: `blockmatrix/src/ipc/handlers/mod.rs` (~30 lines, new file)
 
 Create a handlers subdirectory to organize handler registration. This replaces inline handler registration in node.rs.
 
@@ -527,7 +527,7 @@ Update `ipc/mod.rs` to add `pub mod handlers;`.
 
 ### Step 3.2: DNS handlers
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/dns.rs` (~60 lines)
+**File**: `blockmatrix/src/ipc/handlers/dns.rs` (~60 lines)
 
 Methods:
 - `dns.register` -- params: `{ "name": "foo", "addr": "::1" }` -- accesses `DaemonState.bootstrap.dns()` to register in local resolver, writes DNS asset to blockchain via `DaemonState.blockchain`, persists to disk via the same logic currently in `run_dns(DnsAction::Register)` (lines 730-780 of node.rs)
@@ -538,7 +538,7 @@ Each handler accesses `DaemonState.bootstrap` to get the `DnsResolver` and `Node
 
 ### Step 3.3: Store/Fetch handlers
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/store.rs` (~50 lines)
+**File**: `blockmatrix/src/ipc/handlers/store.rs` (~50 lines)
 
 Methods:
 - `store` -- params: `{ "path": "/path/to/file" }` -- calls existing `run_store()` function with `ShardDistributionCtx` constructed from `DaemonState.network` and shard transport. Returns asset_id and shard map summary.
@@ -548,7 +548,7 @@ Note: `run_store` and `run_fetch` are currently free functions in node.rs. They 
 
 ### Step 3.4: Network handlers
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/network.rs` (~40 lines)
+**File**: `blockmatrix/src/ipc/handlers/network.rs` (~40 lines)
 
 Methods:
 - `network.peers` -- returns list of connected nodes from `NetworkManager::get_connected_nodes()`, formatted as JSON array with node_id, coordinate, address
@@ -556,7 +556,7 @@ Methods:
 
 ### Step 3.5: Blockchain handlers
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/blockchain.rs` (~50 lines)
+**File**: `blockmatrix/src/ipc/handlers/blockchain.rs` (~50 lines)
 
 Methods:
 - `blockchain.height` -- returns `blockchain.get_height().await` as integer
@@ -565,8 +565,8 @@ Methods:
 
 ### Step 3.6: Topology and Asset handlers (wire existing CommandExecutor)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/topology.rs` (~40 lines)
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/asset.rs` (~40 lines)
+**File**: `blockmatrix/src/ipc/handlers/topology.rs` (~40 lines)
+**File**: `blockmatrix/src/ipc/handlers/asset.rs` (~40 lines)
 
 These translate IPC params into `CliCommand` variants and execute via `CommandExecutor`:
 
@@ -585,7 +585,7 @@ Asset methods:
 
 ### Step 3.7: Convert all binary command match arms to IPC-first
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify match arms at lines 1304-1333)
+**File**: `blockmatrix/src/bin/node.rs` (modify match arms at lines 1304-1333)
 
 Pattern for each command:
 
@@ -627,7 +627,7 @@ Some(Commands::Store { path }) => {
 
 ### Step 3.8: Add `CliOutput` JSON serialization
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/cli/output.rs` (~15 lines modified)
+**File**: `blockmatrix/src/cli/output.rs` (~15 lines modified)
 
 Add `Serialize` derive to `CliOutput`, `CliTable`, and `CliError` so they can be returned over IPC. Currently these types derive `Debug, Clone, PartialEq` -- add `serde::Serialize`:
 
@@ -691,7 +691,7 @@ This enables topology/asset handlers to return `serde_json::to_value(&cli_output
 
 ### Step 4.1: Create config module
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/config.rs` (~100 lines, new file)
+**File**: `blockmatrix/src/ipc/config.rs` (~100 lines, new file)
 
 ```rust
 use serde::{Deserialize, Serialize};
@@ -800,7 +800,7 @@ Update `ipc/mod.rs` to add `pub mod config;`.
 
 ### Step 4.2: Integrate config with CLI parsing
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify `main()`, ~30 lines inserted after line 814)
+**File**: `blockmatrix/src/bin/node.rs` (modify `main()`, ~30 lines inserted after line 814)
 
 After `Cli::parse()`, load config and merge:
 
@@ -833,7 +833,7 @@ let reflector = cli.reflector || config.network.reflector;
 
 ### Step 4.3: Add `config` IPC handlers and CLI subcommand
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/ipc/handlers/config.rs` (~40 lines, new handler file)
+**File**: `blockmatrix/src/ipc/handlers/config.rs` (~40 lines, new handler file)
 
 Methods:
 - `config.show` -- returns current config as JSON
@@ -868,7 +868,7 @@ enum ConfigCommand {
 
 ### Step 4.4: Add `--json` flag to all query commands
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (~20 lines)
+**File**: `blockmatrix/src/bin/node.rs` (~20 lines)
 
 Add a global `--json` flag to the `Cli` struct:
 
@@ -884,7 +884,7 @@ In each command handler, when `cli.json` is true:
 
 ### Step 4.5: Shell completions
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (~15 lines)
+**File**: `blockmatrix/src/bin/node.rs` (~15 lines)
 
 Add a hidden `Completions` command:
 
@@ -915,7 +915,7 @@ Note: `clap_complete` is a lightweight crate. Check if `clap` workspace dependen
 
 ### Step 4.6: Add `--config` CLI flag
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (~5 lines added to `Cli` struct)
+**File**: `blockmatrix/src/bin/node.rs` (~5 lines added to `Cli` struct)
 
 ```rust
 /// Path to config file (default: ~/.hypermesh/config.toml)
@@ -1006,8 +1006,8 @@ config: Option<std::path::PathBuf>,
 
 ### Critical Files for Implementation
 
-- `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` - Primary binary requiring refactor: clap Commands enum (lines 113-148), daemon lifecycle in the Start block (lines 993-1303), all command match arms (lines 1304-1333). This is the single most complex file to modify.
-- `/home/persist/hypermesh/core/blockmatrix/src/cli/output.rs` - Must add Serialize derives to CliOutput, CliTable, and CliError (lines 18-155) so IPC handlers can serialize structured CLI results to JSON for transport over the socket.
-- `/home/persist/hypermesh/core/blockmatrix/src/bootstrap/mod.rs` - NodeBootstrap struct (line 169) holds all subsystem references (blockchain, dns, cert, privacy_mode). DaemonState wraps these via Arc for IPC handler access. Understanding this struct's public API is essential for handler implementation.
-- `/home/persist/hypermesh/core/blockmatrix/src/cli/executor.rs` - CommandExecutor (line 45) with topology/node/asset execution logic. Will be wrapped in `Arc<Mutex<>>` inside DaemonState and invoked by topology and asset IPC handlers to avoid reimplementing command logic.
-- `/home/persist/hypermesh/core/blockmatrix/src/network/mod.rs` - NetworkManager (line 67) with public async methods for peer listing (`get_connected_nodes`), peer connection (`connect_to_peer`), and node counting (`get_node_count`). Used directly by network IPC handlers and for building status responses.
+- `blockmatrix/src/bin/node.rs` - Primary binary requiring refactor: clap Commands enum (lines 113-148), daemon lifecycle in the Start block (lines 993-1303), all command match arms (lines 1304-1333). This is the single most complex file to modify.
+- `blockmatrix/src/cli/output.rs` - Must add Serialize derives to CliOutput, CliTable, and CliError (lines 18-155) so IPC handlers can serialize structured CLI results to JSON for transport over the socket.
+- `blockmatrix/src/bootstrap/mod.rs` - NodeBootstrap struct (line 169) holds all subsystem references (blockchain, dns, cert, privacy_mode). DaemonState wraps these via Arc for IPC handler access. Understanding this struct's public API is essential for handler implementation.
+- `blockmatrix/src/cli/executor.rs` - CommandExecutor (line 45) with topology/node/asset execution logic. Will be wrapped in `Arc<Mutex<>>` inside DaemonState and invoked by topology and asset IPC handlers to avoid reimplementing command logic.
+- `blockmatrix/src/network/mod.rs` - NetworkManager (line 67) with public async methods for peer listing (`get_connected_nodes`), peer connection (`connect_to_peer`), and node counting (`get_node_count`). Used directly by network IPC handlers and for building status responses.

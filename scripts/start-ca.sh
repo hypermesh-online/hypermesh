@@ -81,7 +81,7 @@ echo ""
 
 # Build the CA binary
 echo -e "${YELLOW}Building TrustChain CA binary...${NC}"
-cd /home/persist/repos/projects/web3/trustchain
+cd "$(dirname "$0")/../trustchain"
 
 # Build with minimal output
 if cargo build --bin trustchain_ca --release 2>&1 | grep -E "(error|warning:|Finished)" | head -20; then

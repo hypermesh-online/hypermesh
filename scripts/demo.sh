@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# HyperMesh Web3 Ecosystem Demo Script
+# HyperMesh Ecosystem Demo Script
 # =====================================
 # This script starts core components to demonstrate a working HyperMesh environment
 #
@@ -31,12 +31,12 @@ cleanup() {
 trap cleanup SIGINT SIGTERM EXIT
 
 echo -e "${BLUE}==========================================${NC}"
-echo -e "${BLUE}    HyperMesh Web3 Ecosystem Demo${NC}"
+echo -e "${BLUE}    HyperMesh Ecosystem Demo${NC}"
 echo -e "${BLUE}==========================================${NC}\n"
 
 # Check if we're in the right directory
 if [ ! -f "Cargo.toml" ]; then
-    echo -e "${RED}Error: Must run from web3 project root${NC}"
+    echo -e "${RED}Error: Must run from HyperMesh project root${NC}"
     exit 1
 fi
 

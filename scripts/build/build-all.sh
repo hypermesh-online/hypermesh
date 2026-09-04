@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Web3 Ecosystem Build Script
+# HyperMesh Ecosystem Build Script
 # Builds all components in proper dependency order
 
 set -e
@@ -182,7 +182,7 @@ EOF
 # Main build process
 main() {
     echo "=========================================="
-    echo "   Web3 Ecosystem Build Script"
+    echo "   HyperMesh Ecosystem Build Script"
     echo "=========================================="
     
     check_prerequisites

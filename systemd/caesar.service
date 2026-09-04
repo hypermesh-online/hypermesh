@@ -1,6 +1,6 @@
 [Unit]
 Description=HyperMesh Caesar EVP
-Documentation=https://github.com/hypermesh-online/core
+Documentation=https://github.com/hypermesh-online/hypermesh
 After=network-online.target blockmatrix.service
 Wants=network-online.target
 

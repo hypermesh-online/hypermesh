@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Web3 Infrastructure Performance Validation"
+echo "🚀 HyperMesh Infrastructure Performance Validation"
 echo "=============================================="
 echo "Testing with REAL measurements from existing STOQ benchmarks"
 echo ""

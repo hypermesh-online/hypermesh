@@ -141,7 +141,7 @@ export function NodeConfigurationSettings({
           )}
         </div>
         <CardDescription className="text-gray-400">
-          Configure your Web3 ecosystem node settings and network preferences
+          Configure your HyperMesh ecosystem node settings and network preferences
         </CardDescription>
       </CardHeader>
 

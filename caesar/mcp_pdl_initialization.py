@@ -17,7 +17,7 @@ def create_project_status():
     
     status = {
         "project_name": "Caesar Token DEX/Wallet/App Development",
-        "project_path": "/home/persist/repos/work/vazio/caesar",
+        "project_path": os.path.dirname(os.path.abspath(__file__)),
         "current_phase": "Assessment & Planning",
         "phase_status": "INITIALIZING",
         "last_updated": datetime.now().isoformat(),

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Web3 Workspace Build Script
+# HyperMesh Workspace Build Script
 # Provides quick build status and error analysis
 
 set -e
 
 echo "======================================"
-echo "   Web3 Workspace Build Status"
+echo "   HyperMesh Workspace Build Status"
 echo "======================================"
 echo ""
 

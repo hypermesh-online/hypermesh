@@ -1,4 +1,4 @@
-# Cargo configuration for Web3 workspace
+# Cargo configuration for HyperMesh workspace
 
 [build]
 # Parallelism (`jobs`) and `target-dir` are set in user-global ~/.cargo/config.toml

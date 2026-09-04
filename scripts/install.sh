@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Install HyperMesh node from GitHub Releases.
-# Usage: curl -sSf https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.sh | bash
+# Usage: curl -sSf https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.sh | bash
 #
 # Options:
 #   --version <tag>   Install specific version (default: latest)

@@ -11,7 +11,7 @@ A sovereign distributed computing platform with post-quantum cryptography, Block
 ```bash
 # Build (requires Rust + clang + lld)
 git clone https://github.com/hypermesh-online/hypermesh.git
-cd hypermesh/core
+cd hypermesh
 cargo build --release --target x86_64-unknown-linux-musl -p blockmatrix --bin hypermesh
 
 # Run — joins the public test network via trust.hypermesh.online

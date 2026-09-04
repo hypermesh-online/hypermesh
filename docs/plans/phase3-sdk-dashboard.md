@@ -76,8 +76,8 @@ Phase 3 builds the developer-facing SDK layer and dashboard asset system for Hyp
 
 ### Step 1.1: Create crate skeleton
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/Cargo.toml`:
-- Add `"hypermesh-sdk"` to workspace members in `/home/persist/hypermesh/core/Cargo.toml` (line 12, after `"ngauge"`)
+Create `hypermesh-sdk/Cargo.toml`:
+- Add `"hypermesh-sdk"` to workspace members in `Cargo.toml` (line 12, after `"ngauge"`)
 - Dependencies: `hypermesh-lib` (workspace), `tokio` (workspace), `serde` (workspace), `serde_json` (workspace), `thiserror` (workspace), `tracing` (workspace), `anyhow` (workspace)
 - Optional dependency on `stoq` (feature-gated `remote` feature) for STOQ transport mode
 
@@ -85,7 +85,7 @@ Create `/home/persist/hypermesh/core/hypermesh-sdk/Cargo.toml`:
 
 ### Step 1.2: Connection modes and error types
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/src/lib.rs`:
+Create `hypermesh-sdk/src/lib.rs`:
 ```rust
 pub mod client;
 pub mod api;
@@ -95,7 +95,7 @@ pub use client::{HyperMeshClient, ConnectionMode};
 pub use error::SdkError;
 ```
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/src/error.rs` (~40 lines):
+Create `hypermesh-sdk/src/error.rs` (~40 lines):
 
 The `SdkError` enum covers five failure categories:
 - `Connection(String)` -- socket or STOQ connection failures
@@ -109,7 +109,7 @@ All variants derive `thiserror::Error` with Display implementations.
 
 ### Step 1.3: Client connection management
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/src/client.rs` (~120 lines):
+Create `hypermesh-sdk/src/client.rs` (~120 lines):
 
 Key types:
 ```rust
@@ -127,7 +127,7 @@ pub struct HyperMeshClient {
 }
 ```
 
-`ClientInner` is an enum wrapping either a `tokio::net::UnixStream` (with newline-delimited JSON framing) or a `StoqApiClient` from the existing `/home/persist/hypermesh/core/stoq/src/api/mod.rs` (line 257).
+`ClientInner` is an enum wrapping either a `tokio::net::UnixStream` (with newline-delimited JSON framing) or a `StoqApiClient` from the existing `stoq/src/api/mod.rs` (line 257).
 
 Methods:
 - `async fn connect(mode: ConnectionMode) -> Result<Self, SdkError>` -- establish connection
@@ -140,7 +140,7 @@ The JSON-RPC framing follows the same wire format as Phase 1's IPC: newline-deli
 
 ### Step 1.4: API modules
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/src/api/mod.rs` with six submodules. Each API group is a zero-cost wrapper struct `XxxApi<'a>` holding `&'a HyperMeshClient` and delegating to `raw_call`.
+Create `hypermesh-sdk/src/api/mod.rs` with six submodules. Each API group is a zero-cost wrapper struct `XxxApi<'a>` holding `&'a HyperMeshClient` and delegating to `raw_call`.
 
 **`api/node.rs`** (~40 lines):
 - `async fn status(&self) -> Result<NodeStatus, SdkError>` -- calls JSON-RPC method `node.status`
@@ -154,7 +154,7 @@ Return type `NodeStatus` contains: `node_id: String`, `privacy_mode: String`, `c
 - `async fn resolve(&self, name: &str) -> Result<Option<String>, SdkError>` -- calls `dns.resolve`
 - `async fn list(&self) -> Result<Vec<DnsRecord>, SdkError>` -- calls `dns.list`
 
-These methods mirror the existing `DnsAction` enum in `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (lines 149-166).
+These methods mirror the existing `DnsAction` enum in `blockmatrix/src/bin/node.rs` (lines 149-166).
 
 **`api/asset.rs`** (~40 lines):
 - `async fn store(&self, data: &[u8], metadata: AssetMetadata) -> Result<AssetInfo, SdkError>` -- calls `asset.store`
@@ -219,9 +219,9 @@ Usage: `let status = client.node().status().await?;`
 
 ### Step 2.1: Add Dashboard to Catalog type registry
 
-Modify `/home/persist/hypermesh/core/catalog/src/registry/` to register `"Dashboard"` as a new `AssetTypeDefinition` in `CatalogRegistry`.
+Modify `catalog/src/registry/` to register `"Dashboard"` as a new `AssetTypeDefinition` in `CatalogRegistry`.
 
-Dashboard is a user-defined type registered at bootstrap, not a `SystemAssetKind` variant. The `SystemAssetKind` enum in `/home/persist/hypermesh/core/lib/src/asset.rs` (lines 59-71) has 10 variants for system resources (Cpu, Gpu, Memory, Storage, Network, Container, Economic, Blockchain, Dns, Transmission). Dashboards are Catalog packages, not system resources, so they use `AssetKind::User(UserAssetKind { type_name: "Dashboard", type_hash })` from line 30 of the same file.
+Dashboard is a user-defined type registered at bootstrap, not a `SystemAssetKind` variant. The `SystemAssetKind` enum in `lib/src/asset.rs` (lines 59-71) has 10 variants for system resources (Cpu, Gpu, Memory, Storage, Network, Container, Economic, Blockchain, Dns, Transmission). Dashboards are Catalog packages, not system resources, so they use `AssetKind::User(UserAssetKind { type_name: "Dashboard", type_hash })` from line 30 of the same file.
 
 The `CatalogRegistry` already supports type definitions via `AssetTypeDefinition`. Dashboard type schema: requires `name`, `version`, `description`, `domain`; optional `access.public`, `access.private`, `access.admin`.
 
@@ -229,7 +229,7 @@ The `CatalogRegistry` already supports type definitions via `AssetTypeDefinition
 
 ### Step 2.2: Dashboard manifest parser
 
-Create `/home/persist/hypermesh/core/catalog/src/assets/dashboard.rs`:
+Create `catalog/src/assets/dashboard.rs`:
 
 Types:
 ```rust
@@ -261,13 +261,13 @@ Functions:
 - `fn parse_manifest(toml_str: &str) -> Result<DashboardManifest>` -- parse `dashboard.toml` using the `toml` crate (workspace dependency, line 93 of workspace Cargo.toml)
 - `fn validate_manifest(manifest: &DashboardManifest, base_dir: &Path) -> Result<Vec<String>>` -- checks: directories referenced by `access` fields exist on disk, version is valid semver, domain follows HyperMesh naming rules (alphanumeric + hyphens, no dots except `.hypermesh`), at least one access scope defined
 
-Wire this into `catalog/src/assets/mod.rs` (currently at `/home/persist/hypermesh/core/catalog/src/assets/mod.rs` lines 1-17) by adding `pub mod dashboard;`.
+Wire this into `catalog/src/assets/mod.rs` (currently at `catalog/src/assets/mod.rs` lines 1-17) by adding `pub mod dashboard;`.
 
 **Estimated lines**: ~80
 
 ### Step 2.3: Dashboard registration pipeline
 
-Create `/home/persist/hypermesh/core/catalog/src/assets/dashboard_pipeline.rs`:
+Create `catalog/src/assets/dashboard_pipeline.rs`:
 
 This module orchestrates the full registration flow:
 
@@ -289,8 +289,8 @@ pub async fn register_dashboard(
 Steps:
 1. **Validate** manifest + directory structure via `validate_manifest()`
 2. **Archive**: Tar the dist directory into a single blob (using `tar` crate, workspace dependency line 136)
-3. **Pipeline**: Feed the tarball through the existing `AssetPipeline` from `/home/persist/hypermesh/core/blockmatrix/src/assets/pipeline/` -- Brotli compress, Kyber-1024 encrypt (whole blob), Reed-Solomon 10+4 shard
-4. **Store**: Persist shards via `ShardStore` from `/home/persist/hypermesh/core/blockmatrix/src/network/shard_store.rs`
+3. **Pipeline**: Feed the tarball through the existing `AssetPipeline` from `blockmatrix/src/assets/pipeline/` -- Brotli compress, Kyber-1024 encrypt (whole blob), Reed-Solomon 10+4 shard
+4. **Store**: Persist shards via `ShardStore` from `blockmatrix/src/network/shard_store.rs`
 5. **Register**: Create an `AssetPackage` with type "Dashboard" and register in Catalog via `catalog.publish_asset()`
 6. **DNS**: Register the domain (`manifest.dashboard.domain`) pointing to the node's IPv6 address, following the existing DNS registration pattern in node.rs (lines 149-166)
 
@@ -300,7 +300,7 @@ The shard map (asset_id, shard hashes, decryption key, metadata) is persisted to
 
 ### Step 2.4: CLI commands for dashboard management
 
-Extend the existing `Commands` enum in `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (line 113):
+Extend the existing `Commands` enum in `blockmatrix/src/bin/node.rs` (line 113):
 
 Add a new variant:
 ```rust
@@ -365,7 +365,7 @@ These commands are also exposed via IPC as `dashboard.init`, `dashboard.deploy`,
 
 ### Step 3.1: Dashboard asset server module
 
-Create `/home/persist/hypermesh/core/gateway/src/dashboard_server.rs` (~150 lines):
+Create `gateway/src/dashboard_server.rs` (~150 lines):
 
 This module resolves a domain to a dashboard asset, reconstructs content from the pipeline cache, and serves static files with correct Content-Type headers.
 
@@ -402,7 +402,7 @@ struct DashboardServerStats {
 }
 ```
 
-This follows the atomic stats pattern used throughout the gateway crate -- see `ScopeRouterStats` in `/home/persist/hypermesh/core/gateway/src/scope_router.rs` (lines 64-73) and `DomainRouterStats` in `/home/persist/hypermesh/core/gateway/src/domain_router.rs` (lines 29-33).
+This follows the atomic stats pattern used throughout the gateway crate -- see `ScopeRouterStats` in `gateway/src/scope_router.rs` (lines 64-73) and `DomainRouterStats` in `gateway/src/domain_router.rs` (lines 29-33).
 
 Methods:
 - `fn new(cache_ttl: Duration) -> Self`
@@ -413,7 +413,7 @@ Methods:
 
 ### Step 3.2: Auth-level to scope mapping (~30 lines)
 
-The scope determination uses the existing `AuthResult` enum from `/home/persist/hypermesh/core/gateway/src/auth.rs` (lines 24-42):
+The scope determination uses the existing `AuthResult` enum from `gateway/src/auth.rs` (lines 24-42):
 
 ```rust
 enum DashboardScope {
@@ -442,7 +442,7 @@ This maps directly to the three directory scopes from `dashboard.toml`: `access.
 
 ### Step 3.3: Integrate into gateway router (~50 lines)
 
-Modify `/home/persist/hypermesh/core/gateway/src/router.rs`. The existing `GatewayRouter::route` method (line 147) handles request routing. Currently, the `select_backend` method (line 229) matches on path prefixes (`/api/v1/trustchain`, `/api/v1/blockmatrix`, etc.) and returns an error for unknown paths (line 269).
+Modify `gateway/src/router.rs`. The existing `GatewayRouter::route` method (line 147) handles request routing. Currently, the `select_backend` method (line 229) matches on path prefixes (`/api/v1/trustchain`, `/api/v1/blockmatrix`, etc.) and returns an error for unknown paths (line 269).
 
 Add dashboard serving as a **pre-check** before backend selection:
 
@@ -459,8 +459,8 @@ if let Some(dashboard_response) = self.try_serve_dashboard(&path, &req).await {
 
 The `try_serve_dashboard` method:
 1. Extracts the Host header or SNI from the request
-2. Checks `DomainRouter` (at `/home/persist/hypermesh/core/gateway/src/domain_router.rs`) for a dashboard route
-3. If found, authenticates via `AuthManager` (at `/home/persist/hypermesh/core/gateway/src/auth.rs`)
+2. Checks `DomainRouter` (at `gateway/src/domain_router.rs`) for a dashboard route
+3. If found, authenticates via `AuthManager` (at `gateway/src/auth.rs`)
 4. Delegates to `DashboardServer::serve()`
 5. Returns `None` if the domain is not a dashboard (falls through to API proxy)
 
@@ -492,7 +492,7 @@ fn detect_content_type(path: &str) -> &'static str {
 
 Fallback behavior:
 1. If the requested scope directory does not exist in the dashboard, fall back to the next lower scope (admin -> private -> public). This means a dashboard with only `public/` still works for authenticated users.
-2. If the file is not found in the scope directory, serve `index.html` from that scope (SPA routing support -- essential for React Router used in `/home/persist/hypermesh/core/ui/frontend/package.json` line 42).
+2. If the file is not found in the scope directory, serve `index.html` from that scope (SPA routing support -- essential for React Router used in `ui/frontend/package.json` line 42).
 3. If no `index.html` exists in any applicable scope, return a 404 JSON response.
 4. Path traversal prevention: reject any path containing `..` segments before lookup.
 
@@ -504,7 +504,7 @@ Cache management:
 - A background `tokio::spawn` task sweeps expired entries every 60 seconds
 - Cache size is bounded: if more than 100 dashboards are cached, evict the least recently used entries
 
-Wire the module into `/home/persist/hypermesh/core/gateway/src/lib.rs` by adding `pub mod dashboard_server;`.
+Wire the module into `gateway/src/lib.rs` by adding `pub mod dashboard_server;`.
 
 ### Test Plan (Sprint 3)
 - **Scope determination**: 5 tests covering Anonymous->Public, BootstrapRequired->Public, Authenticated non-owner->Private, Authenticated owner->Admin, Rejected->Public
@@ -532,20 +532,20 @@ Wire the module into `/home/persist/hypermesh/core/gateway/src/lib.rs` by adding
 
 ### Step 4.1: Default dashboard content
 
-Create a new module: `/home/persist/hypermesh/core/blockmatrix/src/dashboard/mod.rs`:
+Create a new module: `blockmatrix/src/dashboard/mod.rs`:
 ```rust
 pub mod default;
 pub mod scaffold;
 ```
 
-Create `/home/persist/hypermesh/core/blockmatrix/src/dashboard/default.rs` with embedded HTML:
+Create `blockmatrix/src/dashboard/default.rs` with embedded HTML:
 ```rust
 pub const DEFAULT_PUBLIC_HTML: &str = include_str!("default_content/public.html");
 pub const DEFAULT_PRIVATE_HTML: &str = include_str!("default_content/private.html");
 pub const DEFAULT_ADMIN_HTML: &str = include_str!("default_content/admin.html");
 ```
 
-The three HTML files (~80 lines each) are stored at `/home/persist/hypermesh/core/blockmatrix/src/dashboard/default_content/`:
+The three HTML files (~80 lines each) are stored at `blockmatrix/src/dashboard/default_content/`:
 
 **`public.html`**: Static welcome page. No JavaScript, no live data (anonymous visitors see this). Contains:
 - HyperMesh branding and logo
@@ -575,7 +575,7 @@ Uses vanilla JavaScript (no framework dependency) for maximum portability. Refre
 
 ### Step 4.2: Auto-registration on `connect public`
 
-Modify the privacy mode transition flow in `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs`. After the existing `SetPrivacy` command handler successfully transitions to Public mode, add:
+Modify the privacy mode transition flow in `blockmatrix/src/bin/node.rs`. After the existing `SetPrivacy` command handler successfully transitions to Public mode, add:
 
 ```rust
 // After privacy mode transition to Public succeeds:
@@ -599,7 +599,7 @@ The `dashboard_already_registered` function checks for the marker file.
 
 ### Step 4.3: Scaffold generator
 
-Create `/home/persist/hypermesh/core/blockmatrix/src/dashboard/scaffold.rs` (~100 lines):
+Create `blockmatrix/src/dashboard/scaffold.rs` (~100 lines):
 
 `hypermesh dashboard init [name]` generates the following directory structure:
 ```
@@ -680,7 +680,7 @@ Feature-gated behind `#[cfg(feature = "development")]` to avoid including a deve
 
 ### Step 5.1: TypeScript SDK (`@hypermesh/sdk`, ~500 lines)
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/ts/`:
+Create `hypermesh-sdk/ts/`:
 
 **`package.json`** (~20 lines):
 ```json
@@ -732,7 +732,7 @@ interface NodeStatus {
 **`src/error.ts`** (~30 lines): `SdkError` class with typed `code` field
 **`src/index.ts`** (~20 lines): Re-exports `HyperMeshClient`, `BrowserClient`, all types
 
-**`src/example/dashboard-component.tsx`** (~50 lines): React component demonstrating SDK usage with `@tanstack/react-query` (already a dependency in the UI frontend at line 37 of `/home/persist/hypermesh/core/ui/frontend/package.json`):
+**`src/example/dashboard-component.tsx`** (~50 lines): React component demonstrating SDK usage with `@tanstack/react-query` (already a dependency in the UI frontend at line 37 of `ui/frontend/package.json`):
 ```tsx
 import { useQuery } from '@tanstack/react-query';
 import { HyperMesh } from '@hypermesh/sdk';
@@ -752,7 +752,7 @@ export function NodeStatus() {
 
 ### Step 5.2: Go SDK (`sdk-go`, ~400 lines)
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/go/`:
+Create `hypermesh-sdk/go/`:
 
 **`go.mod`** (~5 lines): `module github.com/hypermesh-online/sdk-go`, Go 1.22+
 **`client.go`** (~100 lines):
@@ -778,7 +778,7 @@ func (c *Client) AssetStore(ctx context.Context, data []byte, meta AssetMetadata
 
 ### Step 5.3: Python SDK (`hypermesh`, ~300 lines)
 
-Create `/home/persist/hypermesh/core/hypermesh-sdk/python/`:
+Create `hypermesh-sdk/python/`:
 
 **`pyproject.toml`** (~15 lines): Package metadata, Python >= 3.10
 **`hypermesh/client.py`** (~80 lines):
@@ -813,7 +813,7 @@ class NodeStatus:
 
 ### Step 5.4: C FFI (`libhypermesh`, ~300 lines)
 
-Add to the existing Rust SDK crate at `/home/persist/hypermesh/core/hypermesh-sdk/`, feature-gated:
+Add to the existing Rust SDK crate at `hypermesh-sdk/`, feature-gated:
 
 **`Cargo.toml` additions**:
 ```toml
@@ -888,7 +888,7 @@ pub extern "C" fn hm_free(client: *mut HmClient) { ... }
 Each function validates pointers (null check returns `HmError::NullPointer`), creates a tokio runtime block for async operations, and writes results to caller-provided buffers.
 
 **`cbindgen.toml`** (~15 lines): Configuration for header generation
-**`build.rs`** (~20 lines): Runs cbindgen to generate `/home/persist/hypermesh/core/hypermesh-sdk/include/libhypermesh.h`
+**`build.rs`** (~20 lines): Runs cbindgen to generate `hypermesh-sdk/include/libhypermesh.h`
 **`examples/c_example.c`** (~60 lines): Demonstrates connect, status, disconnect with error checking
 
 ### Cross-Language Consistency Requirements
@@ -962,9 +962,9 @@ This means every sprint's deliverables are validated through the default dashboa
 
 1. **Local mode (Unix socket)**: The daemon process runs on the local machine with the node's identity. Local SDK calls are implicitly authorized as the node owner. The Unix socket is protected by filesystem permissions (`0600`, owner-only read/write). No PoS token is needed for local calls because physical access to the socket IS the authorization.
 
-2. **Remote mode (STOQ)**: Every STOQ connection carries a PoS token in the handshake, as implemented in the node binary's bootstrap flow (`/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs`). The SDK's `ConnectionMode::Remote` requires a `pos_token` parameter. The daemon validates this token bilaterally (four proofs: PoSpace, PoStake, PoWork, PoTime) before accepting any RPC calls. Failed validation results in connection termination.
+2. **Remote mode (STOQ)**: Every STOQ connection carries a PoS token in the handshake, as implemented in the node binary's bootstrap flow (`blockmatrix/src/bin/node.rs`). The SDK's `ConnectionMode::Remote` requires a `pos_token` parameter. The daemon validates this token bilaterally (four proofs: PoSpace, PoStake, PoWork, PoTime) before accepting any RPC calls. Failed validation results in connection termination.
 
-3. **Dashboard serving (HTTP/3)**: The gateway's `AuthManager` at `/home/persist/hypermesh/core/gateway/src/auth.rs` validates Bearer tokens against the session store and bootstrap handler. The `DashboardServer` maps `AuthResult` to scopes. No private or admin content is ever served to unauthenticated clients. The `AuthResult::Rejected` variant falls back to public scope, never to private.
+3. **Dashboard serving (HTTP/3)**: The gateway's `AuthManager` at `gateway/src/auth.rs` validates Bearer tokens against the session store and bootstrap handler. The `DashboardServer` maps `AuthResult` to scopes. No private or admin content is ever served to unauthenticated clients. The `AuthResult::Rejected` variant falls back to public scope, never to private.
 
 4. **Dashboard deployment**: The `dashboard.deploy` IPC method is only available via local Unix socket (node owner). Remote deployment over STOQ requires valid PoS with the owner's identity. There is no HTTP/3 endpoint for deployment.
 
@@ -1016,7 +1016,7 @@ Sprint 5 (Multi-Language SDKs) <-- Sprint 1 (follows same API contract)
 
 2. **Pipeline reconstruction latency**: Serving dashboard files from the asset pipeline (decompress + decrypt + unshard) on every HTTP/3 request would add hundreds of milliseconds of latency. The cache layer in Sprint 3 mitigates this for warm requests, but the first request per domain incurs cold-start latency. Mitigation: pre-load all registered dashboards into cache on gateway startup by scanning the catalog for Dashboard-type assets.
 
-3. **Gateway crate structure**: The gateway's `main.rs` at `/home/persist/hypermesh/core/gateway/src/main.rs` uses `h3` and `h3-quinn` for HTTP/3. The library modules (`auth.rs`, `domain_router.rs`, `scope_router.rs`, `inbound.rs`, `router.rs`) are clean, well-tested, and follow a consistent pattern with `DashMap` + atomic stats. Adding `DashboardServer` requires it to integrate with `GatewayRouter` which currently only proxies to backend services via `select_backend`. The cleanest approach is a pre-routing check: try dashboard serving first, fall through to API proxy if the domain is not a dashboard.
+3. **Gateway crate structure**: The gateway's `main.rs` at `gateway/src/main.rs` uses `h3` and `h3-quinn` for HTTP/3. The library modules (`auth.rs`, `domain_router.rs`, `scope_router.rs`, `inbound.rs`, `router.rs`) are clean, well-tested, and follow a consistent pattern with `DashMap` + atomic stats. Adding `DashboardServer` requires it to integrate with `GatewayRouter` which currently only proxies to backend services via `select_backend`. The cleanest approach is a pre-routing check: try dashboard serving first, fall through to API proxy if the domain is not a dashboard.
 
 4. **Content embedding**: The default dashboard HTML (Sprint 4) is embedded via `include_str!()` which means changes require recompilation. For the alpha phase this is acceptable. In a future phase, the default dashboard could be loaded from a template directory at runtime (read from `~/.hypermesh/templates/`).
 
@@ -1040,8 +1040,8 @@ Sprint 5 (Multi-Language SDKs) <-- Sprint 1 (follows same API contract)
 ---
 
 ### Critical Files for Implementation
-- `/home/persist/hypermesh/core/gateway/src/auth.rs` - Contains the `AuthResult` enum (lines 24-42) that drives scope-aware dashboard serving; Sprint 3 maps these variants to Public/Private/Admin scopes
-- `/home/persist/hypermesh/core/gateway/src/domain_router.rs` - Contains `DomainRouter` with exact and wildcard matching (lines 41-142); Sprint 3 adds dashboard domain routes here
-- `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` - Contains the CLI `Commands` enum (lines 113-147) and `DnsAction` subcommand (lines 149-166); Sprint 2 adds `Dashboard` subcommand, Sprint 4 adds auto-registration in the `SetPrivacy` handler
-- `/home/persist/hypermesh/core/stoq/src/api/mod.rs` - Contains the STOQ API framework (`ApiHandler` trait, `ApiRequest`/`ApiResponse` types, `StoqApiClient` at line 257) that defines the RPC pattern the Rust SDK wraps for remote mode
-- `/home/persist/hypermesh/core/catalog/src/assets/mod.rs` - Module root for catalog asset types (lines 1-17); Sprint 2 adds `pub mod dashboard;` here and the `DashboardManifest`/`DashboardAccess` types that define the `dashboard.toml` format
+- `gateway/src/auth.rs` - Contains the `AuthResult` enum (lines 24-42) that drives scope-aware dashboard serving; Sprint 3 maps these variants to Public/Private/Admin scopes
+- `gateway/src/domain_router.rs` - Contains `DomainRouter` with exact and wildcard matching (lines 41-142); Sprint 3 adds dashboard domain routes here
+- `blockmatrix/src/bin/node.rs` - Contains the CLI `Commands` enum (lines 113-147) and `DnsAction` subcommand (lines 149-166); Sprint 2 adds `Dashboard` subcommand, Sprint 4 adds auto-registration in the `SetPrivacy` handler
+- `stoq/src/api/mod.rs` - Contains the STOQ API framework (`ApiHandler` trait, `ApiRequest`/`ApiResponse` types, `StoqApiClient` at line 257) that defines the RPC pattern the Rust SDK wraps for remote mode
+- `catalog/src/assets/mod.rs` - Module root for catalog asset types (lines 1-17); Sprint 2 adds `pub mod dashboard;` here and the `DashboardManifest`/`DashboardAccess` types that define the `dashboard.toml` format

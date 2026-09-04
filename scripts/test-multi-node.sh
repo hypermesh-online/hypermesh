@@ -8,7 +8,7 @@ set -e
 echo "Testing multi-node communication..."
 
 # Build the blockmatrix main binary which has networking capabilities
-cd /home/persist/repos/projects/web3/blockmatrix
+cd "$(dirname "$0")/../blockmatrix"
 echo "Building blockmatrix binary..."
 cargo build --bin blockmatrix 2>&1 | tail -2
 

@@ -529,7 +529,7 @@ When working with connections:
 
 - QUIC RFC 9000: https://www.rfc-editor.org/rfc/rfc9000.html
 - FALCON Specification: https://falcon-sign.info/
-- STOQ Protocol Design: `/home/persist/repos/projects/web3/CLAUDE.md`
+- STOQ Protocol Design: `CLAUDE.md`
 - Proof of State Architecture: `/lib/src/proof_of_state/`
 
 ---

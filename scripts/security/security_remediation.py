@@ -5,7 +5,7 @@
 # See the LICENSE file in the repository root for full license text.
 
 """
-Web3 Ecosystem Security Remediation Tool
+HyperMesh Ecosystem Security Remediation Tool
 Automatically fixes critical security violations
 """
 
@@ -334,7 +334,7 @@ mod tests {
         print("To restore: cp -r {} .".format(self.backup_dir / '*'))
 
 def main():
-    project_root = "/home/persist/repos/projects/web3"
+    project_root = str(Path(__file__).resolve().parents[2])
 
     print("Starting security remediation...")
     print(f"Project root: {project_root}")

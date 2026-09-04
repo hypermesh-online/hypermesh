@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-// Main test runner for Web3 ecosystem
+// Main test runner for HyperMesh ecosystem
 // Orchestrates comprehensive testing and validation
 
 mod integration;
@@ -22,8 +22,8 @@ use tracing::{info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
-#[command(name = "web3-test")]
-#[command(about = "Comprehensive testing framework for Web3 ecosystem")]
+#[command(name = "hypermesh-test")]
+#[command(about = "Comprehensive testing framework for HyperMesh ecosystem")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

@@ -28,7 +28,7 @@ uname -r
 Run the one-line installer:
 
 ```bash
-curl -sSf https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.sh | bash
+curl -sSf https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.sh | bash
 ```
 
 This downloads the latest release, installs binaries, creates configuration files, and sets up systemd units. Skip to [Verifying the Installation](#verifying-the-installation) once it completes.
@@ -41,7 +41,7 @@ Download the latest tarball from GitHub Releases:
 
 ```bash
 VERSION="0.1.0"
-curl -LO "https://github.com/hypermesh-online/core/releases/download/v${VERSION}/hypermesh-v${VERSION}-linux-x86_64.tar.gz"
+curl -LO "https://github.com/hypermesh-online/hypermesh/releases/download/v${VERSION}/hypermesh-v${VERSION}-linux-x86_64.tar.gz"
 ```
 
 ### 2. Extract and install binaries
