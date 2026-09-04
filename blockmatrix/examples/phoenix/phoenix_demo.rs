@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
         .install_default()
         .map_err(|_| anyhow::anyhow!("Failed to install crypto provider"))?;
 
-    info!("🔥 Phoenix SDK Demo - Web3 Developer Platform");
+    info!("🔥 Phoenix SDK Demo - HyperMesh Developer Platform");
     info!("===============================================");
 
     // Test 1: Phoenix configuration

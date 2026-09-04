@@ -92,8 +92,8 @@ fn main() -> Result<()> {
     // Check if servers are built
     info!("Checking if servers are built...");
 
-    let blockmatrix_bin = "/home/persist/repos/projects/web3/target/debug/blockmatrix-http3-server";
-    let trustchain_bin = "/home/persist/repos/projects/web3/target/debug/trustchain-http3-server";
+    let blockmatrix_bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/debug/blockmatrix-http3-server");
+    let trustchain_bin = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/debug/trustchain-http3-server");
 
     if std::path::Path::new(blockmatrix_bin).exists() {
         info!("✓ BlockMatrix server binary found");

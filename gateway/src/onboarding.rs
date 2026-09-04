@@ -73,7 +73,7 @@ code{color:#e0e0e0}
 
 <div class="step">
   <div class="step-num">1. Install</div>
-  <pre><code>curl -LO https://github.com/hypermesh-online/core/releases/latest/download/hypermesh-linux-x86_64
+  <pre><code>curl -LO https://github.com/hypermesh-online/hypermesh/releases/latest/download/hypermesh-linux-x86_64
 chmod +x hypermesh-linux-x86_64 &amp;&amp; sudo mv hypermesh-linux-x86_64 /usr/local/bin/hypermesh</code></pre>
 </div>
 
@@ -95,7 +95,7 @@ chmod +x hypermesh-linux-x86_64 &amp;&amp; sudo mv hypermesh-linux-x86_64 /usr/l
 <hr class="divider">
 
 <div class="links">
-  <a href="https://github.com/hypermesh-online/core/blob/main/papers/HYPERMESH.md">Documentation</a>
+  <a href="https://github.com/hypermesh-online/hypermesh/blob/main/papers/HYPERMESH.md">Documentation</a>
   <a href="https://github.com/hypermesh-online">Source</a>
 </div>
 

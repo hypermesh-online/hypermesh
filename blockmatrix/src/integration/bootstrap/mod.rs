@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Bootstrap Manager for Web3 Ecosystem
+//! Bootstrap Manager for HyperMesh Ecosystem
 //!
 //! Manages the phased bootstrap process to resolve circular dependencies
 //! between HyperMesh, TrustChain, STOQ, Catalog, and Caesar components.
@@ -221,7 +221,7 @@ impl BootstrapManager {
 
     #[instrument(skip(self))]
     pub async fn start(&self) -> Result<()> {
-        info!("Starting Web3 ecosystem bootstrap sequence");
+        info!("Starting HyperMesh ecosystem bootstrap sequence");
         self.metrics.set_start_time();
         self.execute_phase_0().await?;
         if self.should_transition_to_phase_1().await {

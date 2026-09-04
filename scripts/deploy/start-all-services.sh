@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Web3 Ecosystem Service Startup Script
+# HyperMesh Ecosystem Service Startup Script
 # Starts all services in proper dependency order
 
 set -e
@@ -129,7 +129,7 @@ stop_all_services() {
 # Main startup process
 start_ecosystem() {
     echo "=========================================="
-    echo "   Web3 Ecosystem Service Startup"
+    echo "   HyperMesh Ecosystem Service Startup"
     echo "=========================================="
     
     setup_directories
@@ -209,7 +209,7 @@ start_ecosystem() {
 # Function to show service status
 show_status() {
     echo "=========================================="
-    echo "   Web3 Ecosystem Service Status"
+    echo "   HyperMesh Ecosystem Service Status"
     echo "=========================================="
     
     check_service_status "trustchain-server"

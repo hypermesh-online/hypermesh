@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Web3 Infrastructure Performance Validation Script
+# HyperMesh Infrastructure Performance Validation Script
 # Provides REAL performance measurements for production deployment approval
 
-echo "🚀 Web3 Infrastructure Performance Validation"
+echo "🚀 HyperMesh Infrastructure Performance Validation"
 echo "=============================================="
 echo ""
 

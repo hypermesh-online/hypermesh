@@ -15,7 +15,7 @@ This guide walks you through joining the public HyperMesh mesh network. By the e
 
 ```bash
 # Download the latest static binary (runs on any x86-64 Linux, no dependencies)
-curl -LO https://github.com/hypermesh-online/core/releases/latest/download/hypermesh-linux-x86_64
+curl -LO https://github.com/hypermesh-online/hypermesh/releases/latest/download/hypermesh-linux-x86_64
 chmod +x hypermesh-linux-x86_64
 sudo mv hypermesh-linux-x86_64 /usr/local/bin/hypermesh
 ```
@@ -23,8 +23,8 @@ sudo mv hypermesh-linux-x86_64 /usr/local/bin/hypermesh
 ### Option B: Build from source
 
 ```bash
-git clone https://github.com/hypermesh-online/core.git
-cd core
+git clone https://github.com/hypermesh-online/hypermesh.git
+cd hypermesh
 sudo apt install clang lld pkg-config    # Ubuntu/Debian
 cargo build --release -p blockmatrix
 # Binary at: target/release/hypermesh

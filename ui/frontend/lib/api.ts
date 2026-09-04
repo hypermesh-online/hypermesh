@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 /**
- * Core API Infrastructure for Web3 Frontend
+ * Core API Infrastructure for HyperMesh Frontend
  *
  * Provides base API request functionality for all services
  * with real backend integration - NO MOCK DATA

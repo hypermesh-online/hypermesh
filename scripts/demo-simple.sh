@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# HyperMesh Web3 Ecosystem - Simple Test Demo
+# HyperMesh Ecosystem - Simple Test Demo
 # ============================================
 # This script runs available examples and tests to demonstrate what works
 #
@@ -15,12 +15,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}==========================================${NC}"
-echo -e "${BLUE}    HyperMesh Web3 - Component Tests${NC}"
+echo -e "${BLUE}    HyperMesh - Component Tests${NC}"
 echo -e "${BLUE}==========================================${NC}\n"
 
 # Check if we're in the right directory
 if [ ! -f "Cargo.toml" ]; then
-    echo -e "${RED}Error: Must run from web3 project root${NC}"
+    echo -e "${RED}Error: Must run from HyperMesh project root${NC}"
     exit 1
 fi
 

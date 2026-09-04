@@ -188,7 +188,7 @@ flip to `stable` and `continue-on-error` is removed.
 ### Linux (any glibc / musl distro)
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.sh \
+curl -sSfL https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.sh \
     | sudo bash -s -- --version v0.2.0
 ```
 
@@ -198,7 +198,7 @@ root with `systemctl` available.
 ### macOS (Apple Silicon)
 
 ```bash
-curl -sSfL https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.sh \
+curl -sSfL https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.sh \
     | bash -s -- --version v0.2.0
 ```
 
@@ -216,14 +216,14 @@ Same command as Apple Silicon. Detects `x86_64-apple-darwin`, installs to
 PowerShell installer (Phase C.2):
 
 ```powershell
-iwr -useb https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.ps1 | iex
 ```
 
 Or with explicit options:
 
 ```powershell
 # Download install.ps1 first, then run with arguments
-iwr -useb https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.ps1 -OutFile install.ps1
+iwr -useb https://raw.githubusercontent.com/hypermesh-online/hypermesh/main/scripts/install.ps1 -OutFile install.ps1
 .\install.ps1 -Version v0.2.0 -Prefix "$env:LOCALAPPDATA\HyperMesh"
 ```
 

@@ -1,6 +1,6 @@
 [Unit]
 Description=HyperMesh Catalog STOQ Server
-Documentation=https://github.com/hypermesh-online/core
+Documentation=https://github.com/hypermesh-online/hypermesh
 After=network-online.target trustchain.service
 Wants=network-online.target
 

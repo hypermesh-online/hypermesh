@@ -29,7 +29,7 @@ class SecurityViolation:
     remediation: str
 
 class TrustChainSecurityAuditor:
-    def __init__(self, base_path: str = "/home/persist/repos/projects/web3/trustchain"):
+    def __init__(self, base_path: str = str(Path(__file__).resolve().parent)):
         self.base_path = Path(base_path)
         self.src_path = self.base_path / "src"
         self.violations: List[SecurityViolation] = []
@@ -439,7 +439,7 @@ if __name__ == "__main__":
     print_report(report)
 
     # Save JSON report
-    report_path = Path("/home/persist/repos/projects/web3/trustchain/security_audit_report.json")
+    report_path = Path(__file__).resolve().parent / "security_audit_report.json"
     with open(report_path, 'w') as f:
         # Convert violations to dict for JSON serialization
         for category in report['categories'].values():

@@ -4,16 +4,16 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Simple Web3 Ecosystem Demo
+//! Simple HyperMesh Ecosystem Demo
 //!
-//! This script demonstrates the current working state of the Web3 ecosystem
+//! This script demonstrates the current working state of the HyperMesh ecosystem
 //! with honest performance metrics and actual capabilities.
 
 use std::thread;
 use std::time::Duration;
 
 fn main() {
-    println!("🌐 Web3 Ecosystem - Working Demo");
+    println!("🌐 HyperMesh Ecosystem - Working Demo");
     println!("==================================");
 
     // STOQ Transport Layer

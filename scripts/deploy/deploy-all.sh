@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Quick Deploy Script - Sync all Web3 ecosystem repositories
+# Quick Deploy Script - Sync all HyperMesh ecosystem repositories
 #
 # This script performs a complete sync of all components to their respective GitHub repositories
 # with proper separation of concerns.
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-echo -e "${BLUE}🚀 Web3 Ecosystem - Deploy All Repositories${NC}"
+echo -e "${BLUE}🚀 HyperMesh Ecosystem - Deploy All Repositories${NC}"
 echo "=============================================="
 echo
 echo -e "${YELLOW}Components to deploy:${NC}"
@@ -30,7 +30,7 @@ echo
 # Check if sync script exists
 if [[ ! -f "./sync-repos.sh" ]]; then
     echo "❌ Error: sync-repos.sh not found in current directory"
-    echo "Please run this script from the Web3 ecosystem root directory"
+    echo "Please run this script from the HyperMesh ecosystem root directory"
     exit 1
 fi
 

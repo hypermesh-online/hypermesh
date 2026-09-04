@@ -58,7 +58,7 @@ export function EcosystemMetricsDashboard({
       {/* Dashboard Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Web3 Ecosystem Dashboard</h1>
+          <h1 className="text-3xl font-bold text-white">HyperMesh Ecosystem Dashboard</h1>
           <p className="text-gray-400 mt-2">
             Quantum-secure, user-sovereign internet infrastructure
           </p>
@@ -155,7 +155,7 @@ export function EcosystemMetricsDashboard({
                 <span>System Health Overview</span>
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Real-time status of all Web3 ecosystem components
+                Real-time status of all HyperMesh ecosystem components
               </CardDescription>
             </div>
             <div className="text-right">

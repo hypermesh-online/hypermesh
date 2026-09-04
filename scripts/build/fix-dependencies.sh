@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Fix dependency issues in Web3 workspace
+# Fix dependency issues in HyperMesh workspace
 
-echo "=== Web3 Workspace Dependency Fix Script ==="
+echo "=== HyperMesh Workspace Dependency Fix Script ==="
 echo ""
 
 # Step 1: Clean build artifacts

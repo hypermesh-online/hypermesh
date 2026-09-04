@@ -3,7 +3,7 @@
 // See the LICENSE file in the repository root for full license text.
 
 // Integration Testing Module
-// Multi-component integration tests for the Web3 ecosystem
+// Multi-component integration tests for the HyperMesh ecosystem
 
 use anyhow::Result;
 use std::time::Duration;

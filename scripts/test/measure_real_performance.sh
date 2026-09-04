@@ -18,7 +18,7 @@ echo -e "${BOLD}║         Replacing Fantasy Metrics with Reality              
 echo -e "${BOLD}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo
 
-cd /home/persist/repos/projects/web3/stoq
+cd "$(dirname "$0")/../../stoq"
 
 echo -e "${YELLOW}Step 1: Building Performance Infrastructure...${NC}"
 cargo build --lib --quiet 2>/dev/null || {

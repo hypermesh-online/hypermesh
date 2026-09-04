@@ -1,11 +1,11 @@
 # Certificate Architecture Specification
-# Web3 Ecosystem - TrustChain + STOQ + Proof of State Consensus
+# HyperMesh Ecosystem - TrustChain + STOQ + Proof of State Consensus
 # 
 # CRITICAL: This file must be maintained EXCLUSIVELY by @agent-scribe
 # Direct modifications are forbidden - use @agent-scribe for updates
 
 ## Overview
-This specification defines the certificate architecture for the entire Web3 ecosystem, ensuring consistent certificate management, validation, and consensus across all components.
+This specification defines the certificate architecture for the entire HyperMesh ecosystem, ensuring consistent certificate management, validation, and consensus across all components.
 
 ## Certificate Authority (TrustChain) Requirements
 
@@ -147,4 +147,4 @@ production_mode:
 - Add Proof of State validation requirements to all specifications
 - Update testing procedures for localhost vs production modes
 
-This specification serves as the authoritative source for certificate architecture across the entire Web3 ecosystem.
+This specification serves as the authoritative source for certificate architecture across the entire HyperMesh ecosystem.

@@ -5,7 +5,7 @@
 # See the LICENSE file in the repository root for full license text.
 
 """
-Web3 Ecosystem Security Audit Tool
+HyperMesh Ecosystem Security Audit Tool
 Comprehensive security analysis to identify and report vulnerabilities
 """
 
@@ -381,7 +381,7 @@ class SecurityAuditor:
             print(f"{i:2}. {rec}")
 
 def main():
-    project_root = "/home/persist/repos/projects/web3"
+    project_root = str(Path(__file__).resolve().parents[2])
 
     auditor = SecurityAuditor(project_root)
     auditor.scan_project()

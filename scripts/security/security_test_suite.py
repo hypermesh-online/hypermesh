@@ -5,7 +5,7 @@
 # See the LICENSE file in the repository root for full license text.
 
 """
-Web3 Ecosystem Security Testing Suite
+HyperMesh Ecosystem Security Testing Suite
 Comprehensive security tests including penetration testing
 """
 
@@ -409,7 +409,7 @@ class SecurityTestSuite:
     async def run_all_tests(self):
         """Run all security tests"""
         print("="*60)
-        print("WEB3 ECOSYSTEM SECURITY TEST SUITE")
+        print("HYPERMESH ECOSYSTEM SECURITY TEST SUITE")
         print("="*60)
 
         test_functions = [
@@ -459,7 +459,7 @@ class SecurityTestSuite:
             return 1
 
 async def main():
-    project_root = "/home/persist/repos/projects/web3"
+    project_root = str(Path(__file__).resolve().parents[2])
     suite = SecurityTestSuite(project_root)
     return await suite.run_all_tests()
 

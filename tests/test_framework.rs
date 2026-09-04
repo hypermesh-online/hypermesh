@@ -2,7 +2,7 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-// Comprehensive Testing Framework for Web3 Ecosystem
+// Comprehensive Testing Framework for HyperMesh Ecosystem
 // Provides unified testing infrastructure for all components
 
 use anyhow::Result;
@@ -228,7 +228,7 @@ impl TestReport {
             r#"<!DOCTYPE html>
 <html>
 <head>
-    <title>Web3 Ecosystem Test Report</title>
+    <title>HyperMesh Ecosystem Test Report</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; }}
         .summary {{ background: #f0f0f0; padding: 15px; border-radius: 5px; }}
@@ -241,7 +241,7 @@ impl TestReport {
     </style>
 </head>
 <body>
-    <h1>Web3 Ecosystem Test Report</h1>
+    <h1>HyperMesh Ecosystem Test Report</h1>
     <div class="summary">
         <h2>Summary</h2>
         <p>Total Tests: {}</p>

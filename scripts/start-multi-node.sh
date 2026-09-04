@@ -54,7 +54,7 @@ rm -f "$PID_FILE"
 
 # Build the node binary
 echo -e "${YELLOW}Building node binary...${NC}"
-cd /home/persist/repos/projects/web3/blockmatrix
+cd "$(dirname "$0")/../blockmatrix"
 cargo build --bin node --release 2>&1 | tail -5
 
 # Check if build succeeded (check both debug and release)

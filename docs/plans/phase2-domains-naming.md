@@ -4,7 +4,7 @@
 
 Phase 2 transforms HyperMesh domains from flat DNS records into first-class blockchain assets that simultaneously create Network-scope blockchains. The core architectural insight is that **a domain IS a network**. Registering `persist.hypermesh` creates a Network-scope chain identified by `BLAKE3("persist.hypermesh")`; creating subdomain `home.persist.hypermesh` creates a nested Network chain under its parent. Joining a domain means joining its network chain via `SyncManager::join_network()`.
 
-This phase builds on Phase 1 (daemon/client IPC) and integrates with the existing DNS module at `/home/persist/hypermesh/core/blockmatrix/src/dns/`, the sync manager at `/home/persist/hypermesh/core/blockmatrix/src/blockchain/sync_manager.rs`, the gateway domain router at `/home/persist/hypermesh/core/gateway/src/domain_router.rs`, and the node binary at `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs`.
+This phase builds on Phase 1 (daemon/client IPC) and integrates with the existing DNS module at `blockmatrix/src/dns/`, the sync manager at `blockmatrix/src/blockchain/sync_manager.rs`, the gateway domain router at `gateway/src/domain_router.rs`, and the node binary at `blockmatrix/src/bin/node.rs`.
 
 ### Architecture Diagram
 
@@ -59,13 +59,13 @@ This phase builds on Phase 1 (daemon/client IPC) and integrates with the existin
 
 1. **Domain chain ID derivation**: `BLAKE3(domain_name.as_bytes())` produces a 32-byte hash. The first 16 bytes are hex-encoded to form a 32-character `network_id` string for `SyncManager::join_network()`. This is deterministic: any node can compute the chain ID from the domain name alone without network access.
 
-2. **No new `BaseSystemType` variant**: The existing `Dns` variant (at `/home/persist/hypermesh/core/blockmatrix/src/assets/core/asset_id.rs` line 86) already covers domain registration. A new `DomainRegistration` struct carries the extra metadata (parent chain, privacy mode, network chain ID). This avoids a breaking change across `SystemAssetKind` (in `lib/src/asset.rs`), `BaseSystemType`, and all bidirectional `From` implementations documented in MEMORY.md.
+2. **No new `BaseSystemType` variant**: The existing `Dns` variant (at `blockmatrix/src/assets/core/asset_id.rs` line 86) already covers domain registration. A new `DomainRegistration` struct carries the extra metadata (parent chain, privacy mode, network chain ID). This avoids a breaking change across `SystemAssetKind` (in `lib/src/asset.rs`), `BaseSystemType`, and all bidirectional `From` implementations documented in MEMORY.md.
 
 3. **Backward compatibility**: Existing `DnsRecord`, `DnsRegistration`, pools, and cache continue to work unchanged. The `DomainRegistration` is a new struct layered on top, registered as a `BaseSystemType::Dns` asset with a specific `AssetData.config` prefix (`DOMAIN:REGISTER:...`) distinguishable from plain DNS records (`DNS:REGISTER:...`).
 
 4. **Invitation tokens**: BLAKE3-HMAC over `(domain_name, invitee_node_id, expiry_timestamp)` keyed by the domain owner's PoS stake proof bytes. Compact (32 bytes + metadata), verifiable without blockchain lookup, time-bounded.
 
-5. **SyncManager integration**: `SyncManager::join_network()` at `/home/persist/hypermesh/core/blockmatrix/src/blockchain/sync_manager.rs` line 216 is synchronous and takes `(network_id: String, privacy_mode: PrivacyMode, now_unix_secs: u64)`. The `DomainNetworkManager` wraps this behind an async-friendly interface that derives the network_id from the domain name.
+5. **SyncManager integration**: `SyncManager::join_network()` at `blockmatrix/src/blockchain/sync_manager.rs` line 216 is synchronous and takes `(network_id: String, privacy_mode: PrivacyMode, now_unix_secs: u64)`. The `DomainNetworkManager` wraps this behind an async-friendly interface that derives the network_id from the domain name.
 
 ---
 
@@ -75,7 +75,7 @@ This phase builds on Phase 1 (daemon/client IPC) and integrates with the existin
 
 ### 2.1 Create `domain.rs` module — `DomainRegistration` struct (~60 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (new)
+**File**: `blockmatrix/src/dns/domain.rs` (new)
 
 This file introduces the core type that links a domain name to a Network-scope blockchain.
 
@@ -123,7 +123,7 @@ pub struct DomainRegistration {
 
 ### 2.2 Add domain registration method to `DnsRegistrar` (~80 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/registration.rs` (modify)
+**File**: `blockmatrix/src/dns/registration.rs` (modify)
 
 The existing `DnsRegistrar` at line 47 has `pool_manager`, `validator`, `blockchain`, and `registrations` fields. This step adds domain-specific registration.
 
@@ -165,7 +165,7 @@ let pool_visibility = match privacy_mode {
 
 ### 2.3 Register the `domain` module (~10 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/mod.rs` (modify)
+**File**: `blockmatrix/src/dns/mod.rs` (modify)
 
 At line 21, among the existing `pub mod` declarations:
 
@@ -194,7 +194,7 @@ DomainAlreadyRegistered { domain: String },
 
 ### 2.4 Domain pool creation in `DnsPoolManager` (~40 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/pools.rs` (modify)
+**File**: `blockmatrix/src/dns/pools.rs` (modify)
 
 Add method to `DnsPoolManager` (after `register_federated` around line 165):
 
@@ -238,7 +238,7 @@ pub async fn has_pool(&self, network_id: &str) -> bool {
 
 ### 2.5 Persistence for domain registrations (~50 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (append)
+**File**: `blockmatrix/src/dns/domain.rs` (append)
 
 Follow the existing pattern of `dns_records.json` used in the node binary. Add:
 
@@ -267,7 +267,7 @@ The node binary will call `save_domains()` after each `register_domain()` and `l
 
 ### 2.6 Unit tests (~60 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (tests module)
+**File**: `blockmatrix/src/dns/domain.rs` (tests module)
 
 ```
 #[cfg(test)]
@@ -332,7 +332,7 @@ mod tests {
 
 ### 3.1 Hierarchical resolution in `DnsResolver` (~100 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/resolver.rs` (modify)
+**File**: `blockmatrix/src/dns/resolver.rs` (modify)
 
 **New field** on `DnsResolver` (line 67):
 
@@ -433,7 +433,7 @@ fn find_authoritative_network_id(&self, domain: &Domain) -> Option<String> {
 
 ### 3.2 Update `DnsResolutionTier` for hierarchical results (~15 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/resolver.rs` (modify)
+**File**: `blockmatrix/src/dns/resolver.rs` (modify)
 
 Add a variant to `DnsResolutionTier` (line 24):
 
@@ -451,7 +451,7 @@ Update the hierarchical resolution code to use this variant instead of the place
 
 ### 3.3 `DomainNetworkManager` — bridge between DNS and SyncManager (~80 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (append)
+**File**: `blockmatrix/src/dns/domain.rs` (append)
 
 This struct provides the high-level "join a domain" operation that combines domain lookup with `SyncManager::join_network()`.
 
@@ -493,7 +493,7 @@ pub struct DomainNetworkManager {
 
 ### 3.4 Bootstrap peer discovery for domain networks (~60 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (append)
+**File**: `blockmatrix/src/dns/domain.rs` (append)
 
 Add to `DomainNetworkManager`:
 
@@ -563,7 +563,7 @@ pub async fn discover_domain_peers(
 
 ### 3.5 Integration with `NetworkManager` (~30 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/network/mod.rs` (modify)
+**File**: `blockmatrix/src/network/mod.rs` (modify)
 
 Add method to `NetworkManager` (after `join_network()` around line 194):
 
@@ -607,7 +607,7 @@ pub async fn connect_to_domain_network(
 
 ### 3.6 Unit and integration tests (~65 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/resolver.rs` (append to existing tests module)
+**File**: `blockmatrix/src/dns/resolver.rs` (append to existing tests module)
 
 ```
 // test_hierarchical_resolve_local_first:
@@ -628,7 +628,7 @@ pub async fn connect_to_domain_network(
 //   Query "nike" — should use existing Public tier, not hierarchical.
 ```
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/domain.rs` (append to tests module)
+**File**: `blockmatrix/src/dns/domain.rs` (append to tests module)
 
 ```
 // test_join_domain_creates_sync_membership:
@@ -682,7 +682,7 @@ pub async fn connect_to_domain_network(
 
 ### 4.1 CLI command types for domains (~50 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify)
+**File**: `blockmatrix/src/bin/node.rs` (modify)
 
 Add to the `Commands` enum (after `Dns` at line 146):
 
@@ -747,7 +747,7 @@ enum DomainAction {
 
 ### 4.2 CLI execution logic (~60 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` (modify, in the main match arms)
+**File**: `blockmatrix/src/bin/node.rs` (modify, in the main match arms)
 
 In the existing `match cli.command` block, add arms:
 
@@ -796,7 +796,7 @@ Some(Commands::Connect { network, invite }) => {
 
 ### 4.3 Invitation token system (~60 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/invitation.rs` (new)
+**File**: `blockmatrix/src/dns/invitation.rs` (new)
 
 ```rust
 use blake3;
@@ -919,7 +919,7 @@ fn base64_url_decode(s: &str) -> Result<Vec<u8>, base64::DecodeError> {
 
 ### 4.4 Gateway DNS routing enhancement (~40 lines)
 
-**File**: `/home/persist/hypermesh/core/gateway/src/domain_router.rs` (modify)
+**File**: `gateway/src/domain_router.rs` (modify)
 
 Add methods to `DomainRouter` (after `add_route` at line 69):
 
@@ -971,7 +971,7 @@ pub fn route_dns_query(&self, domain: &str) -> Option<SocketAddr> {
 
 ### 4.5 Register invitation module (~5 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/mod.rs` (modify)
+**File**: `blockmatrix/src/dns/mod.rs` (modify)
 
 Add to module declarations:
 
@@ -990,7 +990,7 @@ pub use invitation::{
 
 ### 4.6 Tests (~25 lines)
 
-**File**: `/home/persist/hypermesh/core/blockmatrix/src/dns/invitation.rs` (tests module)
+**File**: `blockmatrix/src/dns/invitation.rs` (tests module)
 
 ```
 #[cfg(test)]
@@ -1015,7 +1015,7 @@ mod tests {
 }
 ```
 
-**File**: `/home/persist/hypermesh/core/gateway/src/domain_router.rs` (append to existing tests)
+**File**: `gateway/src/domain_router.rs` (append to existing tests)
 
 ```
 // test_domain_chain_route_exact:
@@ -1098,13 +1098,13 @@ mod tests {
 - Max 63 characters per component (matching DNS RFC 1035 label limits)
 - Max 253 characters total (matching DNS RFC 1035 name limits)
 - Components must be non-empty (existing `Domain::parse()` checks this)
-- Reserved names that cannot be registered as top-level domains: `hypermesh`, `caesar`, `trust`, `assets`, `catalog` (these are TrustChain service domains, per `/home/persist/hypermesh/core/blockmatrix/src/dns/trustchain.rs` line 102-105)
+- Reserved names that cannot be registered as top-level domains: `hypermesh`, `caesar`, `trust`, `assets`, `catalog` (these are TrustChain service domains, per `blockmatrix/src/dns/trustchain.rs` line 102-105)
 - Add validation in Sprint 1's `register_domain()` method
 
 **Network Isolation:**
 - Each domain's DNS pool is a separate federated pool keyed by `network_id`
 - Pool access requires matching `network_id` in the query's `requester_network` field
-- The existing `DnsPoolManager::can_access()` method at `/home/persist/hypermesh/core/blockmatrix/src/dns/pools.rs` line 194 enforces this boundary
+- The existing `DnsPoolManager::can_access()` method at `blockmatrix/src/dns/pools.rs` line 194 enforces this boundary
 - Cross-domain queries walk the hierarchy through the resolver, not through direct pool access
 
 ### 5.3 Dependencies and Sequencing
@@ -1141,7 +1141,7 @@ Sprint 1 is fully self-contained and can be implemented and tested independently
 | **SyncManager is synchronous** | `join_network()` at line 216 of `sync_manager.rs` is `&mut self`, not async. The node binary runs in a tokio runtime. | `SyncManager` is already wrapped in `Arc<RwLock<>>` in the node binary (see imports at line 38). Use `sync_manager.write().await.join_network(...)`. The `RwLock` is tokio's. |
 | **Parent chain verification is local-only in Sprint 1** | A node could register a sub-domain without the parent existing on any Network chain | Acceptable for alpha. Sprint 1 checks local `domain_registrations` HashMap. True cross-node verification requires Sprint 2's sync integration, where the parent's Network chain is queried for the domain asset. |
 | **Domain name collisions across nodes** | Two nodes register the same top-level domain simultaneously | First to write a valid block wins (blockchain ordering). In Sprint 1 (single-node), this cannot happen. With Network scope sync (future), the Network chain's bilateral PoS verification resolves conflicts by block ordering. |
-| **Gateway crate depends on `DomainRouter` without blockmatrix types** | The gateway crate at `/home/persist/hypermesh/core/gateway/` does not depend on blockmatrix. Adding domain chain routing must not create a dependency. | Sprint 3's `add_domain_chain_route()` takes primitive types (`&str`, `SocketAddr`), not blockmatrix types. The node binary calls the gateway with computed values. No new crate dependency needed. |
+| **Gateway crate depends on `DomainRouter` without blockmatrix types** | The gateway crate at `gateway/` does not depend on blockmatrix. Adding domain chain routing must not create a dependency. | Sprint 3's `add_domain_chain_route()` takes primitive types (`&str`, `SocketAddr`), not blockmatrix types. The node binary calls the gateway with computed values. No new crate dependency needed. |
 | **`base64` crate availability** | Invitation encoding requires `base64`. | Already in workspace: used by `stoq` (QUIC handshake) and `trustchain` (certificate encoding). Verify with `grep -r 'base64' Cargo.toml` before implementation. |
 | **Hierarchical resolution performance** | Walking 4+ levels of parent domains could be slow with network round-trips | Sprint 2's implementation queries local pools only (in-memory `HashMap` lookups). Network-level resolution (querying remote reflectors) is a future optimization. The DNS cache also prevents repeated walks for the same domain. |
 | **`DnsResolutionTier::Hierarchical` variant breaks exhaustive matches** | Adding a new variant to the existing enum could break match expressions in other code | Grep for `DnsResolutionTier` match usage before implementation. The enum is only matched in `resolver.rs` internally and in test assertions. |
@@ -1223,8 +1223,8 @@ hypermesh domain nodes home.persist.hypermesh
 
 ### Critical Files for Implementation
 
-- `/home/persist/hypermesh/core/blockmatrix/src/dns/registration.rs` — Core change: add `register_domain()` method that creates `DomainRegistration`, validates PoS, writes blockchain asset, and creates federated DNS pool. This is the central integration point between domains and the existing DNS/blockchain infrastructure.
-- `/home/persist/hypermesh/core/blockmatrix/src/dns/resolver.rs` — Hierarchical resolution: add `resolve_hierarchical()` that walks domain components right-to-left querying parent pools. Critical for cross-domain name resolution.
-- `/home/persist/hypermesh/core/blockmatrix/src/blockchain/sync_manager.rs` — Integration target: `join_network()` at line 216 is the existing entry point that `DomainNetworkManager` calls with domain-derived `network_id`. Understanding its `NetworkMembership`, `SyncState`, and `SyncConfig` types is essential.
-- `/home/persist/hypermesh/core/blockmatrix/src/bin/node.rs` — CLI entry point: add `Domain` and `Connect` subcommands (extends existing `Commands` enum at line 113), wire execution through to `DnsRegistrar`, `DomainNetworkManager`, and `NetworkManager`.
-- `/home/persist/hypermesh/core/blockmatrix/src/dns/mod.rs` — Module hub: register new `domain` and `invitation` submodules, add error variants to `DnsError`, manage re-exports. The existing `Domain` struct (line 81) with `parse()`, `parent()`, `is_public()`, `is_federated()` is the foundation for all domain operations.
+- `blockmatrix/src/dns/registration.rs` — Core change: add `register_domain()` method that creates `DomainRegistration`, validates PoS, writes blockchain asset, and creates federated DNS pool. This is the central integration point between domains and the existing DNS/blockchain infrastructure.
+- `blockmatrix/src/dns/resolver.rs` — Hierarchical resolution: add `resolve_hierarchical()` that walks domain components right-to-left querying parent pools. Critical for cross-domain name resolution.
+- `blockmatrix/src/blockchain/sync_manager.rs` — Integration target: `join_network()` at line 216 is the existing entry point that `DomainNetworkManager` calls with domain-derived `network_id`. Understanding its `NetworkMembership`, `SyncState`, and `SyncConfig` types is essential.
+- `blockmatrix/src/bin/node.rs` — CLI entry point: add `Domain` and `Connect` subcommands (extends existing `Commands` enum at line 113), wire execution through to `DnsRegistrar`, `DomainNetworkManager`, and `NetworkManager`.
+- `blockmatrix/src/dns/mod.rs` — Module hub: register new `domain` and `invitation` submodules, add error variants to `DnsError`, manage re-exports. The existing `Domain` struct (line 81) with `parse()`, `parent()`, `is_public()`, `is_federated()` is the foundation for all domain operations.

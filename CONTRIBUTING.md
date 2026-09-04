@@ -1,6 +1,6 @@
 # Contributing to HyperMesh
 
-Thank you for your interest in contributing to the HyperMesh Web3 ecosystem. This document covers the development workflow, constraints, and expectations for contributions.
+Thank you for your interest in contributing to the HyperMesh ecosystem. This document covers the development workflow, constraints, and expectations for contributions.
 
 ## Prerequisites
 

@@ -16,7 +16,7 @@ test.describe('Dashboard Home Page', () => {
 
   test('should load the dashboard home page', async ({ page }) => {
     // Verify the page title
-    await expect(page).toHaveTitle(/Web3 Ecosystem Dashboard/);
+    await expect(page).toHaveTitle(/HyperMesh Ecosystem Dashboard/);
 
     // Verify the root element renders
     const root = page.locator('#root');
@@ -34,7 +34,7 @@ test.describe('Dashboard Home Page', () => {
 
   test('should display API connection status indicator', async ({ page }) => {
     // The app shows an API status indicator during initialization
-    // Either "Initializing Web3 API..." or "API Connected" or "API Warning"
+    // Either "Initializing HyperMesh API..." or "API Connected" or "API Warning"
     const statusIndicator = page.locator('[class*="fixed"][class*="top-4"]');
     await expect(statusIndicator).toBeVisible({ timeout: 10000 });
   });

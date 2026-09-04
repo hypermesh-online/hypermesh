@@ -288,7 +288,7 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
       await page.waitForTimeout(1000);
       
       // Verify metrics refresh
-      await expect(page.getByText('Web3 Ecosystem Dashboard')).toBeVisible();
+      await expect(page.getByText('HyperMesh Ecosystem Dashboard')).toBeVisible();
     });
 
     test('should identify performance bottlenecks @performance', async ({ page }) => {
@@ -408,7 +408,7 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
       await page.getByRole('tab', { name: /ecosystem metrics/i }).click();
       
       // Wait for content to be visible
-      await expect(page.getByText('Web3 Ecosystem Dashboard')).toBeVisible();
+      await expect(page.getByText('HyperMesh Ecosystem Dashboard')).toBeVisible();
       
       const loadTime = Date.now() - startTime;
       
@@ -435,7 +435,7 @@ test.describe('TrustChain UI Consolidation - E2E Tests', () => {
       
       // Verify final tab still works
       await page.getByRole('tab', { name: /ecosystem metrics/i }).click();
-      await expect(page.getByText('Web3 Ecosystem Dashboard')).toBeVisible();
+      await expect(page.getByText('HyperMesh Ecosystem Dashboard')).toBeVisible();
     });
   });
 });
