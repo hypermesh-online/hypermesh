@@ -13,10 +13,15 @@
 //! demand clustering, and the replacement for the
 //! identity-derived (uniform-random) cell as a location source.
 
+pub mod dms;
 pub mod lease;
 pub mod locality;
 pub mod replica_selection;
 
+pub use dms::{
+    DmsDriver, DmsError, DmsPlan, MirrorAction, MirrorExecutor, ReflectAction, ReflectExecutor,
+    ShardCandidates,
+};
 pub use lease::PlacementLease;
 pub use locality::{LocalityProvider, PeerProximity};
 pub use replica_selection::{

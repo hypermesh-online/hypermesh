@@ -34,6 +34,7 @@ use crate::network::shard_transport::StoqShardTransport;
 use crate::network::swarm_provider::ShardLocationIndex;
 use crate::network::{NetworkManager, SwarmDemandTracker};
 
+mod executor;
 mod feed;
 mod poll;
 mod propagation;

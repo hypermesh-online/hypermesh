@@ -65,8 +65,9 @@ pub use organic_detection::{
     ClassifierConfig, TrafficClassification, TrafficClassifier, TrafficPattern,
 };
 pub use placement::{
-    order_by_proximity, FallbackStrategy, LocalityProvider, PeerProximity, PlacementLease,
-    ReplicaCandidate, ReplicaSelector, SelectionCriteria,
+    order_by_proximity, DmsDriver, DmsError, DmsPlan, FallbackStrategy, LocalityProvider,
+    MirrorAction, MirrorExecutor, PeerProximity, PlacementLease, ReflectAction, ReflectExecutor,
+    ReplicaCandidate, ReplicaSelector, SelectionCriteria, ShardCandidates,
 };
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
