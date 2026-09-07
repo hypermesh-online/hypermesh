@@ -23,11 +23,15 @@ use super::super::peer_auth::{self, AuthenticatedPeers};
 use super::asset_chain_handlers::handle_asset_chain;
 use super::attestation_handlers::handle_mirror_attestation;
 use super::block_handlers::handle_block_announce;
-use super::distributed_ca::{handle_ca_key_share, handle_ca_sign_request, handle_ca_sign_response};
+use super::distributed_ca::{
+    handle_ca_key_share, handle_ca_sign_request, handle_ca_sign_response,
+    handle_crl_request, handle_crl_response,
+};
 use super::message_utils::{handle_gossip_connection, handle_metrics_connection};
 use super::protocol::{
     TAG_ASSET_CHAIN, TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE,
-    TAG_CA_SIGN_REQUEST, TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE,
+    TAG_CA_SIGN_REQUEST, TAG_CA_SIGN_RESPONSE, TAG_CRL_REQUEST, TAG_CRL_RESPONSE,
+    TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE,
     TAG_GOSSIP, TAG_KEY_ROTATION, TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH,
     TAG_SHARD_LOCATE, TAG_SHARD_SEND,
     TAG_SHARE_INVITE, TAG_SYNC_MESSAGE, TAG_TRANSFER, TAG_TRANSFER_LOCK,
@@ -122,6 +126,7 @@ pub fn message_requires_auth(tag: u8) -> bool {
             | TAG_BLOCK_ANNOUNCE
             | TAG_SYNC_MESSAGE | TAG_BLOCK_FETCH_REQUEST
             | TAG_CA_KEY_SHARE | TAG_CA_SIGN_REQUEST | TAG_CA_SIGN_RESPONSE
+            | TAG_CRL_REQUEST | TAG_CRL_RESPONSE
             | TAG_TRANSFER_LOCK | TAG_TRANSFER_REGISTER_REQ | TAG_TRANSFER_REGISTER_ACK
             | TAG_TRANSFER_RELEASE | TAG_TRANSFER_ROLLBACK
             // S3.4: an attestation is a third party's statement about an asset
@@ -180,6 +185,10 @@ pub(crate) enum Handler {
     CaSignRequest,
     /// Distributed-CA threshold sign response. `TAG_CA_SIGN_RESPONSE`.
     CaSignResponse,
+    /// CRL fetch request. `TAG_CRL_REQUEST`.
+    CrlRequest,
+    /// CRL fetch response. `TAG_CRL_RESPONSE`.
+    CrlResponse,
     /// Key rotation announcement. `TAG_KEY_ROTATION`.
     KeyRotation,
     /// DNS resolution request. `TAG_DNS_RESOLVE`.
@@ -253,6 +262,8 @@ pub(crate) fn route_message(tag: u8, is_authenticated: bool) -> Route {
         TAG_CA_KEY_SHARE => Route::Handler(Handler::CaKeyShare),
         TAG_CA_SIGN_REQUEST => Route::Handler(Handler::CaSignRequest),
         TAG_CA_SIGN_RESPONSE => Route::Handler(Handler::CaSignResponse),
+        TAG_CRL_REQUEST => Route::Handler(Handler::CrlRequest),
+        TAG_CRL_RESPONSE => Route::Handler(Handler::CrlResponse),
         TAG_KEY_ROTATION => Route::Handler(Handler::KeyRotation),
         TAG_DNS_RESOLVE => Route::Handler(Handler::DnsResolve),
         TAG_DNS_QUERY => Route::Handler(Handler::DnsQuery),
@@ -400,6 +411,16 @@ async fn dispatch_to_handler(
         Handler::CaSignResponse => {
             if let Err(e) = handle_ca_sign_response(&data, peer_node_id, ctx).await {
                 warn!("Failed to handle CA sign response: {e}");
+            }
+        }
+        Handler::CrlRequest => {
+            if let Err(e) = handle_crl_request(data, peer_node_id, ctx).await {
+                warn!("Failed to handle CRL request: {e}");
+            }
+        }
+        Handler::CrlResponse => {
+            if let Err(e) = handle_crl_response(data, peer_node_id, ctx).await {
+                warn!("Failed to handle CRL response: {e}");
             }
         }
         Handler::KeyRotation => {

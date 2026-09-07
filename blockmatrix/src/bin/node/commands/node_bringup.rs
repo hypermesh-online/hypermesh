@@ -24,6 +24,8 @@ use stoq::transport::NetworkType;
 
 use crate::cli::Cli;
 
+#[cfg(feature = "intelligence")]
+use super::background::spawn_ca_discovery_loop;
 use super::background::{spawn_block_sync_loop, spawn_gossip_loop, spawn_peer_sync_loop};
 use super::services::{count_dns_assets_in_block, propagate_block, register_reflector_peers};
 
@@ -63,6 +65,12 @@ pub(crate) async fn start_network(
     privacy_mode: PrivacyMode,
     has_bootstrap_peers: bool,
     share_inbox_store: std::sync::Arc<blockmatrix::sharing::inbox::InboxStore>,
+    // Federation CA handle for the intelligence-gated CA-discovery loop. The
+    // daemon passes `None` in the alpha default (self-signing only); it becomes
+    // `Some(..)` once the node opts into a federation, at which point the
+    // discovery loop begins surfacing connected peers to `FederationManager`.
+    #[cfg(feature = "intelligence")]
+    federation_manager: Option<std::sync::Arc<trustchain::ca::FederationManager>>,
 ) -> Result<NetworkStartResult> {
     info!("Initializing STOQ transport on port {}", cli.stoq_port);
 
@@ -374,6 +382,11 @@ pub(crate) async fn start_network(
         coord,
     )
     .await;
+
+    #[cfg(feature = "intelligence")]
+    if let Some(ref fed) = federation_manager {
+        spawn_ca_discovery_loop(network_clone.clone(), fed.clone());
+    }
 
     // P8: hand the intelligence-driven replication / placement loops (H3
     // demand feed 10s, H4/H5 propagation-weight + replication-signal 15s, E.2

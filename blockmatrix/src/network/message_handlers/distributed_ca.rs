@@ -101,3 +101,43 @@ pub(super) async fn handle_ca_sign_response(
 
     Ok(())
 }
+
+/// Handle a CRL fetch request (tag 0x33, Phase F.2).
+pub(super) async fn handle_crl_request(
+    data: &[u8],
+    peer_node_id: &str,
+    _ctx: &PeerContext,
+) -> Result<()> {
+    let msg_data = &data[1..];
+    let msg: serde_json::Value = serde_json::from_slice(msg_data)
+        .map_err(|e| anyhow!("Invalid CRL request JSON: {e}"))?;
+
+    let ca_id = msg.get("ca_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+    info!(
+        peer = %&peer_node_id[..8.min(peer_node_id.len())],
+        ca_id = ca_id,
+        "Received CRL fetch request"
+    );
+    Ok(())
+}
+
+/// Handle a CRL fetch response (tag 0x34, Phase F.2).
+pub(super) async fn handle_crl_response(
+    data: &[u8],
+    peer_node_id: &str,
+    _ctx: &PeerContext,
+) -> Result<()> {
+    let msg_data = &data[1..];
+    let msg: serde_json::Value = serde_json::from_slice(msg_data)
+        .map_err(|e| anyhow!("Invalid CRL response JSON: {e}"))?;
+
+    let ca_id = msg.get("ca_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let count = msg.get("revoked_count").and_then(|v| v.as_u64()).unwrap_or(0);
+    info!(
+        peer = %&peer_node_id[..8.min(peer_node_id.len())],
+        ca_id = ca_id,
+        revoked_count = count,
+        "Received CRL fetch response"
+    );
+    Ok(())
+}

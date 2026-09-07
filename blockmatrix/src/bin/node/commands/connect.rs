@@ -122,6 +122,11 @@ pub async fn run_connect(
             privacy_mode,
             has_bootstrap_peers,
             share_inbox_store.clone(),
+            // Alpha default: no federation CA wired yet (self-signing only),
+            // matching `DaemonState.federation_manager: None` below. The
+            // CA-discovery loop stays inert until federation opt-in.
+            #[cfg(feature = "intelligence")]
+            None,
         )
         .await?;
         network_ref = Some(result.network);
