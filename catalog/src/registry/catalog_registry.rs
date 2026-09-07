@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 
 use blockmatrix::assets::core::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 use blockmatrix::assets::{AssetRegistration, StateProof};
+use blockmatrix::blockchain::NodeBlockchain;
 use hypermesh_lib::{ContentHash, PrivacyMode};
 
 use super::asset_type::AssetTypeDefinition;
@@ -68,6 +69,16 @@ pub struct CatalogRegistry {
 
     /// Registry configuration
     config: RegistryConfig,
+
+    /// OPTIONAL read-only handle to the asset-chain substrate.
+    ///
+    /// Phase 2 (VCS read side): when present, the registry can READ an asset's
+    /// version graph directly from the blockmatrix `AssetLineage` (the single
+    /// lineage substrate — Catalog owns no version store). When `None`, the
+    /// registry behaves exactly as it did before this handle existed, so
+    /// Catalog still works standalone. This handle is NEVER written through in
+    /// Phase 2 (writes are Phase 3, gated on cluster G).
+    pub(crate) chain: Option<Arc<NodeBlockchain>>,
 }
 
 /// Trust policy for registry operations
@@ -147,7 +158,29 @@ impl CatalogRegistry {
             privacy,
             trust_policy,
             config,
+            chain: None,
         }
+    }
+
+    /// Attach a read-only asset-chain handle (builder form).
+    ///
+    /// With a handle attached the registry can serve the VCS version-graph read
+    /// API (`list_versions` / `head_version`). Without it those methods return
+    /// empty/None and every other behavior is unchanged. Phase 2 never WRITES
+    /// through this handle.
+    pub fn with_chain(mut self, chain: Arc<NodeBlockchain>) -> Self {
+        self.chain = Some(chain);
+        self
+    }
+
+    /// Attach or replace the read-only asset-chain handle in place.
+    pub fn set_chain(&mut self, chain: Arc<NodeBlockchain>) {
+        self.chain = Some(chain);
+    }
+
+    /// Whether a read-only asset-chain handle is currently attached.
+    pub fn has_chain(&self) -> bool {
+        self.chain.is_some()
     }
 
     /// Create a registry pre-populated with built-in HyperMesh types.
@@ -230,6 +263,7 @@ impl CatalogRegistry {
             privacy,
             trust_policy,
             config,
+            chain: registry.chain,
         }
     }
 

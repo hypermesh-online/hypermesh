@@ -119,6 +119,10 @@ socket2 = { workspace = true }
 criterion = { workspace = true }
 proptest = { workspace = true }
 tempfile = { workspace = true }
+# Phase 2 VCS-read tests build asset lineages with the canonical test proof
+# (`StateProof::new_for_testing`), gated behind hypermesh-lib's `test-utils`
+# feature. Dev-dep scope keeps it out of catalog's non-test build graph.
+hypermesh-lib = { workspace = true, features = ["test-utils"] }
 
 [features]
 default = ["hypermesh-integration"]

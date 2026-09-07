@@ -15,6 +15,7 @@
 pub mod asset_type;
 pub mod catalog_registry;
 pub mod schema_scanner;
+pub mod version_view;
 
 // Re-export main types
 pub use asset_type::{
@@ -28,6 +29,8 @@ pub use catalog_registry::{
 };
 
 pub use schema_scanner::scan_schema_for_typedef_refs;
+
+pub use version_view::VersionRef;
 
 // Legacy compatibility exports (DEPRECATED - use new types above)
 // These are kept temporarily to avoid breaking existing code during migration
