@@ -603,11 +603,31 @@ impl ChainBridge for InternalBridge {
         &self,
         amount: Decimal,
         recipient: &str,
-        _source_tx: &str,
+        source_tx: &str,
     ) -> Result<String> {
         if amount <= Decimal::ZERO {
             return Err(anyhow!("Release amount must be positive"));
         }
+
+        // Validate source lock record if present
+        let locks = self.lock_records.read().await;
+        if let Some(record) = locks.get(source_tx) {
+            if record.amount != amount {
+                return Err(anyhow!(
+                    "Release amount {} does not match locked amount {}",
+                    amount,
+                    record.amount
+                ));
+            }
+            if record.recipient != recipient {
+                return Err(anyhow!(
+                    "Release recipient {} does not match locked recipient {}",
+                    recipient,
+                    record.recipient
+                ));
+            }
+        }
+        drop(locks);
 
         let mut balances = self.balances.write().await;
         *balances.entry(recipient.to_string()).or_insert(dec!(0)) += amount;

@@ -29,8 +29,8 @@ pub enum DashboardScope {
     Public,
     /// Authenticated but non-owner users.
     Private,
-    /// The node owner.
-    Admin,
+    /// The asset / node owner.
+    Owner,
 }
 
 impl DashboardScope {
@@ -40,14 +40,14 @@ impl DashboardScope {
         match self {
             Self::Public => "public",
             Self::Private => "private",
-            Self::Admin => "admin",
+            Self::Owner => "owner",
         }
     }
 
     /// Ordered fallback chain for the given scope.
     fn fallback_chain(self) -> &'static [&'static str] {
         match self {
-            Self::Admin => &["admin", "private", "public"],
+            Self::Owner => &["owner", "private", "public"],
             Self::Private => &["private", "public"],
             Self::Public => &["public"],
         }
@@ -64,9 +64,9 @@ pub struct CachedFile {
 /// Cache entry for a single domain's dashboard content.
 #[derive(Debug, Clone)]
 pub struct DashboardCache {
-    /// Files per scope directory: `"public"` / `"private"` / `"admin"` -> path -> file.
+    /// Files per scope directory: `"public"` / `"private"` / `"owner"` -> path -> file.
     pub scopes: HashMap<String, HashMap<String, CachedFile>>,
-    /// Identity string that maps to [`DashboardScope::Admin`].
+    /// Identity string that maps to [`DashboardScope::Owner`].
     pub owner_identity: String,
     /// Timestamp when this cache entry was loaded.
     pub loaded_at: Instant,
@@ -86,7 +86,7 @@ pub struct DashboardStatsSnapshot {
     pub cache_misses: u64,
     pub scope_public: u64,
     pub scope_private: u64,
-    pub scope_admin: u64,
+    pub scope_owner: u64,
     pub not_found: u64,
 }
 
@@ -97,7 +97,7 @@ pub struct DashboardServerStats {
     pub cache_misses: AtomicU64,
     pub scope_public: AtomicU64,
     pub scope_private: AtomicU64,
-    pub scope_admin: AtomicU64,
+    pub scope_owner: AtomicU64,
     pub not_found: AtomicU64,
 }
 
@@ -288,6 +288,12 @@ impl DashboardServer {
         None
     }
 
+    /// Return the owner identity of a registered domain.
+    pub async fn owner_identity(&self, domain: &str) -> Option<String> {
+        let cache = self.cache.read().await;
+        cache.get(domain).map(|e| e.owner_identity.clone())
+    }
+
     /// Best-effort cache invalidation for `domain`.
     ///
     /// Spawns a background task so the caller is never blocked.
@@ -307,7 +313,7 @@ impl DashboardServer {
             cache_misses: self.stats.cache_misses.load(Ordering::Relaxed),
             scope_public: self.stats.scope_public.load(Ordering::Relaxed),
             scope_private: self.stats.scope_private.load(Ordering::Relaxed),
-            scope_admin: self.stats.scope_admin.load(Ordering::Relaxed),
+            scope_owner: self.stats.scope_owner.load(Ordering::Relaxed),
             not_found: self.stats.not_found.load(Ordering::Relaxed),
         }
     }
@@ -364,7 +370,7 @@ impl DashboardServer {
         match scope {
             DashboardScope::Public => self.stats.scope_public.fetch_add(1, Ordering::Relaxed),
             DashboardScope::Private => self.stats.scope_private.fetch_add(1, Ordering::Relaxed),
-            DashboardScope::Admin => self.stats.scope_admin.fetch_add(1, Ordering::Relaxed),
+            DashboardScope::Owner => self.stats.scope_owner.fetch_add(1, Ordering::Relaxed),
         };
     }
 }
@@ -378,12 +384,12 @@ impl DashboardServer {
 ///
 /// Phase 0 bootstrap pass-through: no authentication subsystem is wired into
 /// the gateway request pipeline. Requests without an identity fall back to
-/// the Public scope. When a PoS-validated identity is eventually plumbed
-/// through (Phase 2), pass `Some(identity)` to unlock Private/Admin.
+/// the Public scope. When a PoS-validated identity is plumbed through,
+/// pass `Some(identity)` to unlock Private/Owner.
 pub fn determine_scope(identity: Option<&str>, owner_identity: &str) -> DashboardScope {
     match identity {
         None => DashboardScope::Public,
-        Some(id) if id == owner_identity => DashboardScope::Admin,
+        Some(id) if id == owner_identity => DashboardScope::Owner,
         Some(_) => DashboardScope::Private,
     }
 }
@@ -460,9 +466,9 @@ mod tests {
     }
 
     #[test]
-    fn scope_owner_identity_is_admin() {
+    fn scope_owner_identity_is_owner() {
         let scope = determine_scope(Some("owner-node"), "owner-node");
-        assert_eq!(scope, DashboardScope::Admin);
+        assert_eq!(scope, DashboardScope::Owner);
     }
 
     // ===== Content-type detection (8 tests) ===============================
@@ -540,14 +546,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn serve_admin_falls_back_to_private_then_public() {
+    async fn serve_owner_falls_back_to_private_then_public() {
         let server = DashboardServer::new(Duration::from_secs(300));
         // Only public scope has the file.
         let cache = make_cache("owner", &[("public", "shared.js", b"var x = 1;")]);
         server.register_dashboard("example.com", cache).await;
 
         let result = server
-            .serve("example.com", "/shared.js", DashboardScope::Admin)
+            .serve("example.com", "/shared.js", DashboardScope::Owner)
             .await;
         let file = result.expect("test: should fall back to public");
         assert_eq!(file.content, b"var x = 1;");
@@ -632,7 +638,7 @@ mod tests {
     async fn load_defaults_populates_all_scopes() {
         let server = DashboardServer::new(Duration::from_secs(300));
         server
-            .load_defaults("d.com", "owner", "<h1>pub</h1>", "<h1>priv</h1>", "<h1>adm</h1>")
+            .load_defaults("d.com", "owner", "<h1>pub</h1>", "<h1>priv</h1>", "<h1>own</h1>")
             .await;
 
         let pub_file = server
@@ -647,11 +653,11 @@ mod tests {
             .expect("test: private index");
         assert_eq!(priv_file.content, b"<h1>priv</h1>");
 
-        let adm_file = server
-            .serve("d.com", "/index.html", DashboardScope::Admin)
+        let own_file = server
+            .serve("d.com", "/index.html", DashboardScope::Owner)
             .await
-            .expect("test: admin index");
-        assert_eq!(adm_file.content, b"<h1>adm</h1>");
+            .expect("test: owner index");
+        assert_eq!(own_file.content, b"<h1>own</h1>");
     }
 
     #[tokio::test]
@@ -742,10 +748,10 @@ mod tests {
     async fn load_from_directory_skips_missing_scope_dirs() {
         let tmp = std::env::temp_dir().join("gw_test_load_skip");
         let _ = std::fs::remove_dir_all(&tmp);
-        // Only create admin dir — no public or private.
-        let admin_dir = tmp.join("admin");
-        std::fs::create_dir_all(&admin_dir).expect("test: create dir");
-        std::fs::write(admin_dir.join("index.html"), b"<h1>admin</h1>").expect("test: write");
+        // Only create owner dir — no public or private.
+        let owner_dir = tmp.join("owner");
+        std::fs::create_dir_all(&owner_dir).expect("test: create dir");
+        std::fs::write(owner_dir.join("index.html"), b"<h1>owner</h1>").expect("test: write");
 
         let server = DashboardServer::new(Duration::from_secs(300));
         let count = server
@@ -760,12 +766,12 @@ mod tests {
             .await;
         assert!(result.is_none());
 
-        // Admin scope has the file.
-        let adm = server
-            .serve("d.com", "/index.html", DashboardScope::Admin)
+        // Owner scope has the file.
+        let own = server
+            .serve("d.com", "/index.html", DashboardScope::Owner)
             .await
-            .expect("test: admin index");
-        assert_eq!(adm.content, b"<h1>admin</h1>");
+            .expect("test: owner index");
+        assert_eq!(own.content, b"<h1>owner</h1>");
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
@@ -776,14 +782,14 @@ mod tests {
     fn scope_as_str_values() {
         assert_eq!(DashboardScope::Public.as_str(), "public");
         assert_eq!(DashboardScope::Private.as_str(), "private");
-        assert_eq!(DashboardScope::Admin.as_str(), "admin");
+        assert_eq!(DashboardScope::Owner.as_str(), "owner");
     }
 
     #[test]
     fn scope_fallback_chain_ordering() {
         assert_eq!(
-            DashboardScope::Admin.fallback_chain(),
-            &["admin", "private", "public"]
+            DashboardScope::Owner.fallback_chain(),
+            &["owner", "private", "public"]
         );
         assert_eq!(
             DashboardScope::Private.fallback_chain(),

@@ -445,7 +445,8 @@ mod identifiers {
         // Display shows first 4 bytes as hex + ellipsis
         let display = id1.to_string();
         assert!(display.ends_with('\u{2026}'), "got: {display}");
-        assert_eq!(display.len(), 9); // 8 hex chars + 1 ellipsis char
+        assert_eq!(display.chars().count(), 9); // 8 hex chars + 1 ellipsis char
+        assert_eq!(display.len(), 11); // 8 ASCII bytes + 3-byte UTF-8 ellipsis
     }
 
     #[test]

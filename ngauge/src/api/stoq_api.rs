@@ -7,13 +7,13 @@
 //! Self-contained API server that speaks STOQ-compatible JSON over QUIC,
 //! avoiding the stoq<->ngauge cyclic dependency. Uses quinn directly.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::organic_detection::{TrafficClassifier, TrafficPattern};
 
@@ -614,6 +614,36 @@ impl NGaugeStoqApi {
         info!("NGauge STOQ API handlers registered ({} endpoints)", handlers.len());
 
         Self { handlers, config }
+    }
+
+    /// Access the server configuration.
+    pub fn config(&self) -> &NGaugeStoqConfig {
+        &self.config
+    }
+
+    /// Route an API request to registered handlers.
+    pub async fn handle_request(&self, request: ApiRequest) -> ApiResponse {
+        let path = format!("{}/{}", request.service, request.method);
+        if let Some(handler) = self.handlers.get(&path) {
+            match handler.handle(request).await {
+                Ok(resp) => resp,
+                Err(e) => ApiResponse {
+                    request_id: String::new(),
+                    success: false,
+                    payload: Bytes::new(),
+                    error: Some(e.to_string()),
+                    metadata: HashMap::new(),
+                },
+            }
+        } else {
+            ApiResponse {
+                request_id: request.id,
+                success: false,
+                payload: Bytes::new(),
+                error: Some(format!("Unknown service/method: {}", path)),
+                metadata: HashMap::new(),
+            }
+        }
     }
 
     /// Start the QUIC/STOQ server using quinn directly.

@@ -2,19 +2,6 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-mod bootstrap;
-mod config;
-mod dashboard_server;
-mod error;
-mod middleware;
-mod onboarding;
-mod pool;
-mod proxy;
-mod router;
-mod sse_ngauge;
-mod stoq_bridge;
-mod stoq_listener;
-
 use anyhow::Result;
 use bytes::{Buf, Bytes};
 use h3::{quic, server::Connection};
@@ -27,10 +14,10 @@ use tokio::io::AsyncReadExt;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use crate::config::{GatewayConfig, StoqAuthMode};
-use crate::router::GatewayRouter;
-use crate::stoq_bridge::{StoqBridge, StoqBridgeConfig};
-use crate::stoq_listener::StoqListener;
+use gateway::config::{GatewayConfig, StoqAuthMode};
+use gateway::router::GatewayRouter;
+use gateway::stoq_bridge::{StoqBridge, StoqBridgeConfig};
+use gateway::stoq_listener::StoqListener;
 
 /// Resolve the directory used to persist this gateway node's FALCON-1024
 /// identity in full-STOQ-PoS mode. Uses `HYPERMESH_DATA` if set, else
@@ -189,6 +176,8 @@ async fn main() -> Result<()> {
                     info!(
                         connection_id = %info.connection_id,
                         remote = %info.remote_addr,
+                        privacy = ?info.privacy_mode,
+                        scope = ?info.blockchain_scope,
                         "Processing STOQ connection"
                     );
                     Ok(())
@@ -199,6 +188,28 @@ async fn main() -> Result<()> {
             }
         })
     });
+
+    // Spawn STOQ bridge maintenance loop (stale connection cleanup & metrics)
+    if let Some(ref bridge) = stoq_bridge {
+        let b = Arc::clone(bridge);
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+                let pruned = b.cleanup_stale();
+                let stats = b.bridge_stats();
+                if stats.active_connections > 0 || pruned > 0 {
+                    info!(
+                        active = stats.active_connections,
+                        accepted = stats.connections_accepted,
+                        bytes = stats.bytes_bridged,
+                        errors = stats.errors,
+                        "STOQ bridge metrics"
+                    );
+                }
+            }
+        });
+    }
 
     // Accept HTTP/3 connections with graceful shutdown
     info!("Gateway ready — press Ctrl+C to stop");
@@ -352,7 +363,7 @@ where
 /// then pumps each `Bytes` chunk received from the bridge into the HTTP/3
 /// response body until the producer closes or the client disconnects.
 async fn handle_sse_request<T>(
-    handshake: crate::sse_ngauge::SseHandshake,
+    handshake: gateway::sse_ngauge::SseHandshake,
     mut stream: h3::server::RequestStream<T, Bytes>,
     router: Arc<GatewayRouter>,
     method: http::Method,
@@ -362,7 +373,7 @@ async fn handle_sse_request<T>(
 where
     T: quic::BidiStream<Bytes>,
 {
-    use crate::sse_ngauge::SseHandshake;
+    use gateway::sse_ngauge::SseHandshake;
 
     match handshake {
         SseHandshake::Error(resp) => {
