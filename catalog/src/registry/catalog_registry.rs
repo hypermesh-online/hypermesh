@@ -44,6 +44,17 @@ pub struct TypeRegistration {
     pub registered_at: i64,
 }
 
+/// Outcome of reserving a type name during registration.
+///
+/// Drives the single-slot relaxation: a fresh name mints a genesis, an existing
+/// name becomes a new version (progression) when a chain is attached.
+pub(crate) enum NameSlot {
+    /// Name was free and is now reserved — this registration is the genesis.
+    Genesis,
+    /// Name is already registered — this registration is a successor version.
+    Exists,
+}
+
 /// Catalog Registry - provides indexing/discovery for asset types
 ///
 /// The registry itself is stored as a BlockMatrix Asset
@@ -286,55 +297,98 @@ impl CatalogRegistry {
         StateProof::new(stake, time, space, work)
     }
 
-    /// Register a new asset type definition
+    /// Register an asset type definition — the on-chain VCS WRITE path.
+    ///
+    /// Single-slot relaxation (Phase 3): a name's FIRST registration mints the
+    /// asset's genesis; a REPEAT registration of a known name is a NEW VERSION
+    /// (progression) appended to that name's asset-chain — *when a chain handle
+    /// is attached*. Without a chain the historical "already registered" reject
+    /// stands, so Catalog standalone behavior is unchanged.
+    ///
+    /// The genesis `asset_hash` is the name-derived `type_def.asset_id.content_hash`
+    /// (stable across versions — Phase-2 model (a)); successors reuse it as the
+    /// chain key while carrying per-version content in their own entry. This is
+    /// exactly what [`asset_hash_for_name`](Self::asset_hash_for_name) resolves,
+    /// so the write side stays consistent with the Phase-2 read view.
     pub async fn register_type(&self, type_def: AssetTypeDefinition) -> Result<AssetRegistration> {
         // Validate Proof of State if required
         if self.trust_policy.require_state_proof {
             self.validate_state_proof(&type_def.state_proof)?;
         }
 
-        // Check if type already exists
-        let mut index = self.index.write().await;
-        if index.contains_key(&type_def.type_name) {
-            return Err(anyhow::anyhow!(
-                "Type '{}' already registered",
-                type_def.type_name
-            ));
+        // Reserve the name atomically: fresh genesis (inserted) or existing.
+        match self.reserve_name_slot(&type_def).await? {
+            NameSlot::Exists => {
+                // Existing name: progression on-chain, or reject standalone.
+                return match self.chain {
+                    Some(_) => self.append_version(type_def).await,
+                    None => Err(anyhow::anyhow!(
+                        "Type '{}' already registered",
+                        type_def.type_name
+                    )),
+                };
+            }
+            NameSlot::Genesis => {}
         }
 
-        // Check registry capacity
+        // Fresh genesis: record in-mem metadata, then mint the asset-chain.
+        let asset_id = type_def.asset_id.clone();
+        self.record_type_registration(&type_def).await?;
+
+        if self.chain.is_some() {
+            self.write_genesis_on_chain(&asset_id, &type_def.state_proof)
+                .await?;
+        }
+
+        tracing::info!("Registered asset type: {}", type_def.type_name);
+        Ok(asset_id)
+    }
+
+    /// Reserve a type name under a single write lock: either insert it (fresh
+    /// genesis) or report it already exists. Holding one lock across the
+    /// check-then-insert keeps concurrent first-registrations from both minting
+    /// a genesis for the same name.
+    async fn reserve_name_slot(&self, type_def: &AssetTypeDefinition) -> Result<NameSlot> {
+        let mut index = self.index.write().await;
+        if index.contains_key(&type_def.type_name) {
+            return Ok(NameSlot::Exists);
+        }
         if index.len() >= self.config.max_entries {
             return Err(anyhow::anyhow!("Registry capacity exceeded"));
         }
+        index.insert(type_def.type_name.clone(), type_def.asset_id.clone());
+        Ok(NameSlot::Genesis)
+    }
 
-        // Store in index
-        let asset_id = type_def.asset_id.clone();
-        let type_name = type_def.type_name.clone();
-        index.insert(type_name.clone(), asset_id.clone());
-
-        // Compute content-addressed type hash (BLAKE3 of canonical schema JSON)
+    /// Record a version's in-mem metadata: its content-addressed
+    /// [`TypeRegistration`] (keyed by schema hash) and its full definition
+    /// (keyed by name — the head definition for scoring). Shared by the genesis
+    /// and progression paths so both leave identical in-mem state.
+    pub(crate) async fn record_type_registration(
+        &self,
+        type_def: &AssetTypeDefinition,
+    ) -> Result<()> {
         let schema_json = serde_json::to_string(&type_def.schema)
             .map_err(|e| anyhow::anyhow!("failed to serialize schema: {e}"))?;
         let type_hash = hex::encode(blake3::hash(schema_json.as_bytes()).as_bytes());
 
         let registration = TypeRegistration {
-            type_name: type_name.clone(),
+            type_name: type_def.type_name.clone(),
             type_hash: type_hash.clone(),
             schema: type_def.schema.clone(),
             version: type_def.metadata.version.clone(),
             registered_at: chrono::Utc::now().timestamp(),
         };
 
-        // Store content-addressed registration
-        let mut regs = self.type_registrations.write().await;
-        regs.insert(type_hash, registration);
-
-        // Store full definition for scoring
-        let mut defs = self.type_definitions.write().await;
-        defs.insert(type_name.clone(), type_def);
-
-        tracing::info!("Registered asset type: {}", type_name);
-        Ok(asset_id)
+        self.type_registrations
+            .write()
+            .await
+            .insert(type_hash, registration);
+        self.type_definitions
+            .write()
+            .await
+            .insert(type_def.type_name.clone(), type_def.clone());
+        Ok(())
     }
 
     /// Find asset type by name

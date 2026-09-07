@@ -16,6 +16,7 @@ pub mod asset_type;
 pub mod catalog_registry;
 pub mod schema_scanner;
 pub mod version_view;
+pub mod version_write;
 
 // Re-export main types
 pub use asset_type::{
