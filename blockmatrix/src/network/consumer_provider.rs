@@ -89,6 +89,34 @@ impl ConsumerProviderManager {
         shards: Vec<(ContentHash, Vec<u8>)>,
         policy: DedupPolicy,
     ) -> ConsumerProviderResult {
+        self.process_in_network_with_policy(self.network_id, shards, policy)
+            .await
+    }
+
+    /// R12 with an EXPLICIT network — used by the DMS handoff seeder to register
+    /// a freshly-published version's shards under the ASSET's network (the
+    /// `(NetworkId, ContentHash)` key half), which in the single-network model
+    /// equals `self.network_id` but is passed explicitly so seed writes and the
+    /// analytics/mirror reads stay keyed on the same network. Defaults to the
+    /// `Full` dedup policy (a published seed is never Anonymous).
+    pub async fn process_fetched_shards_in_network(
+        &self,
+        network: NetworkId,
+        shards: Vec<(ContentHash, Vec<u8>)>,
+    ) -> ConsumerProviderResult {
+        self.process_in_network_with_policy(network, shards, DedupPolicy::Full)
+            .await
+    }
+
+    /// Shared worker: store + (for `Full`) register-provider-in-`network` +
+    /// announce. `process_fetched_shards_with_policy` and
+    /// `process_fetched_shards_in_network` are thin callers.
+    async fn process_in_network_with_policy(
+        &self,
+        network: NetworkId,
+        shards: Vec<(ContentHash, Vec<u8>)>,
+        policy: DedupPolicy,
+    ) -> ConsumerProviderResult {
         if shards.is_empty() {
             return ConsumerProviderResult {
                 shards_stored: 0,
@@ -133,11 +161,12 @@ impl ConsumerProviderManager {
             );
             None
         } else {
-            // Register ourselves as a provider for all shards, in this node's
-            // network.
+            // Register ourselves as a provider for all shards, in the target
+            // network (self's network by default; the asset's network for the
+            // DMS handoff seed).
             self.shard_location_index
                 .register_provider_in_network(
-                    self.network_id,
+                    network,
                     &self.local_node_id,
                     &announced_hashes,
                 )

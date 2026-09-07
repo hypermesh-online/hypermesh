@@ -17,16 +17,22 @@ use async_trait::async_trait;
 
 use ngauge::{DmsError, MirrorAction, MirrorExecutor, ReflectAction, ReflectExecutor};
 
-use crate::network::shard_transport::{ShardTransport, StoqShardTransport};
+use crate::network::shard_transport::ShardTransport;
 use crate::network::swarm_provider::ShardLocationIndex;
 
 /// STOQ-backed executor for [`ngauge::DmsPlan`] actions.
 ///
 /// Wraps the replication service's transport, provider index, node id, and
 /// swarm-analytics handle — all clones of the Arcs the service already owns.
-pub(super) struct StoqDmsExecutor {
+///
+/// The transport is held behind the [`ShardTransport`] trait object rather than
+/// the concrete `StoqShardTransport`: production wires the STOQ transport (which
+/// implements the trait), while a component-level test can inject an in-memory
+/// transport to exercise the fetch → register → count sequence WITHOUT a live
+/// 2-node QUIC round-trip. The decision/register/feedback logic is identical.
+pub struct StoqDmsExecutor {
     /// Shard transport used to pull replicas.
-    transport: Arc<StoqShardTransport>,
+    transport: Arc<dyn ShardTransport>,
     /// Shared provider index (R12) — where new providers are registered.
     index: Arc<ShardLocationIndex>,
     /// This node's id (registered as the new provider after a fetch).
@@ -37,8 +43,8 @@ pub(super) struct StoqDmsExecutor {
 
 impl StoqDmsExecutor {
     /// Build the executor from the replication service's existing handles.
-    pub(super) fn new(
-        transport: Arc<StoqShardTransport>,
+    pub fn new(
+        transport: Arc<dyn ShardTransport>,
         index: Arc<ShardLocationIndex>,
         node_id: String,
         analytics: Arc<Mutex<ngauge::SwarmAnalytics>>,

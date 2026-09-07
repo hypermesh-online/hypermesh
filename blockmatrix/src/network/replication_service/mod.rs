@@ -36,8 +36,14 @@ use crate::network::{NetworkManager, SwarmDemandTracker};
 
 mod executor;
 mod feed;
+mod handoff;
 mod poll;
 mod propagation;
+
+pub use executor::StoqDmsExecutor;
+pub use handoff::{
+    shard_content, ChainHeadObserver, SwarmSeeder, VersionContent, VersionContentSource,
+};
 
 /// The handles the replication/placement loops operate over.
 ///
