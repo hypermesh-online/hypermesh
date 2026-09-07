@@ -81,9 +81,12 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
     }
 
     // Verify proof integrity for each block entry:
-    // proof_hash must equal BLAKE3(serialize(state_proof)) and proof must validate.
+    // proof_hash must equal BLAKE3(state_proof.to_bytes()) and proof must validate.
+    // W1-4: the canonical `proof_hash` preimage is the bincode `to_bytes()`
+    // serialization used by `bind_proof_to_asset` at production time — recompute
+    // with the SAME serializer here or locally-valid blocks would be rejected.
     for (i, entry) in block.entries.iter().enumerate() {
-        let proof_bytes = match serde_json::to_vec(&entry.state_proof) {
+        let proof_bytes = match entry.state_proof.to_bytes() {
             Ok(b) => b,
             Err(e) => {
                 warn!(

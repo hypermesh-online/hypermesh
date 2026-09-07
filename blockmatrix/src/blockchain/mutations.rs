@@ -458,13 +458,13 @@ impl NodeBlockchain {
         // the exact same standard as an announced one.
         for (i, entry) in block.entries.iter().enumerate() {
             // (a) proof_hash integrity: hπ == BLAKE3(serialize(state_proof)).
-            let proof_bytes = serde_json::to_vec(&entry.state_proof).map_err(|e| {
+            let proof_bytes = entry.state_proof.to_bytes().map_err(|e| {
                 format!(
                     "Block {} entry {i} proof serialization failed — mirror rejected: {e}",
                     block.index,
                 )
             })?;
-            let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
+            let computed_hash: [u8; 32] = *blake3::hash(&proof_bytes).as_bytes();
             if computed_hash != entry.proof_hash {
                 return Err(format!(
                     "Block {} entry {i} proof_hash mismatch \
@@ -1091,7 +1091,7 @@ mod tests {
         let asset_b = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let (proof_for_a, _) =
             crate::blockchain::block::bind_proof_to_asset(&[0xAAu8; 32], &StateProof::new_for_testing());
-        let proof_bytes = serde_json::to_vec(&proof_for_a).unwrap_or_default();
+        let proof_bytes = proof_for_a.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         let forged = BlockAssetEntry {
             asset_hash: asset_b,

@@ -77,7 +77,7 @@ pub fn bind_proof_to_asset(
 ) -> (StateProof, [u8; 32]) {
     let mut bound = state_proof.clone();
     bound.space_proof.file_hash = hex::encode(asset_hash);
-    let proof_bytes = serde_json::to_vec(&bound).unwrap_or_default();
+    let proof_bytes = bound.to_bytes().unwrap_or_default();
     let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
     (bound, proof_hash)
 }
@@ -237,28 +237,45 @@ impl BlockAssetEntry {
 
     /// Attach a FALCON-1024 signed envelope over this entry's `state_proof`.
     ///
+    /// Cryptographic commitment over the entry's metadata and proofs:
+    /// (asset_hash || proof_hash || bincode(storage_pointer) || bincode(registration))
+    pub fn entry_commitment(&self) -> [u8; 32] {
+        let mut hasher = Hasher::new();
+        hasher.update(&self.asset_hash);
+        hasher.update(&self.proof_hash);
+        if let Ok(storage_bytes) = bincode::serialize(&self.storage_pointer) {
+            hasher.update(&storage_bytes);
+        }
+        if let Ok(reg_bytes) = bincode::serialize(&self.registration) {
+            hasher.update(&reg_bytes);
+        }
+        *hasher.finalize().as_bytes()
+    }
+
     /// H3: this is the single local-write signing step. It serializes the
     /// **bound** `state_proof` (whose `space_proof.file_hash` already equals
-    /// `hex(asset_hash)`) exactly as `TrustChainProofProvider::generate_proof`
-    /// does, signs `BLAKE3(proof_bytes || nonce)` with the node's FALCON key,
+    /// `hex(asset_hash)`), binds storage pointer and registration metadata,
+    /// signs `BLAKE3(proof_bytes || storage_bytes || reg_bytes || nonce)` with the node's FALCON key,
     /// and stores the resulting [`WireSignedProof`] in `signed_proof`.
-    ///
-    /// The envelope covers the proof bytes (not the block hash), so it does NOT
-    /// perturb `Block::calculate_hash` (which excludes both `state_proof` and
-    /// `signed_proof`). A caller signs at construction so the produced block
-    /// carries the envelope to peers.
     pub fn sign_proof(
         &mut self,
         signer: &(dyn hypermesh_lib::NodeSigner + Send + Sync),
     ) -> Result<(), String> {
-        let proof_bytes = serde_json::to_vec(&self.state_proof)
+        let proof_bytes = self.state_proof.to_bytes()
             .map_err(|e| format!("failed to serialize state_proof for signing: {e}"))?;
+
+        let storage_bytes = bincode::serialize(&self.storage_pointer)
+            .map_err(|e| format!("failed to serialize storage_pointer for signing: {e}"))?;
+        let reg_bytes = bincode::serialize(&self.registration)
+            .map_err(|e| format!("failed to serialize registration for signing: {e}"))?;
 
         let mut nonce = [0u8; 32];
         rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
 
         let mut hasher = Hasher::new();
         hasher.update(&proof_bytes);
+        hasher.update(&storage_bytes);
+        hasher.update(&reg_bytes);
         hasher.update(&nonce);
         let digest = hasher.finalize();
 
@@ -276,13 +293,13 @@ impl BlockAssetEntry {
     }
 
     /// FALCON-verify the attached `signed_proof` and confirm it wraps THIS
-    /// entry's `state_proof`.
+    /// entry's `state_proof`, `storage_pointer`, and `registration`.
     ///
     /// H3 accept-path verify. Returns `Ok(signer_pubkey)` when:
     /// 1. `signed_proof` is present,
-    /// 2. its `proof_bytes` equal the JSON serialization of `self.state_proof`
+    /// 2. its `proof_bytes` equal the canonical binary serialization of `self.state_proof`
     ///    (the envelope signs the proof we actually carry — no bait-and-switch),
-    /// 3. the FALCON-1024 detached signature over `BLAKE3(proof_bytes || nonce)`
+    /// 3. the FALCON-1024 detached signature over `BLAKE3(proof_bytes || storage_bytes || reg_bytes || nonce)`
     ///    verifies against the embedded `signer_pubkey`.
     ///
     /// The caller then binds `BLAKE3(signer_pubkey)` to the entry's claimed
@@ -295,7 +312,7 @@ impl BlockAssetEntry {
             .ok_or_else(|| "entry has no signed_proof envelope".to_string())?;
 
         // (1) The envelope must wrap the proof this entry actually carries.
-        let expected = serde_json::to_vec(&self.state_proof)
+        let expected = self.state_proof.to_bytes()
             .map_err(|e| format!("failed to serialize state_proof: {e}"))?;
         if wire.proof_bytes != expected {
             return Err(
@@ -303,9 +320,16 @@ impl BlockAssetEntry {
             );
         }
 
-        // (2) FALCON-1024 detached signature over BLAKE3(proof_bytes || nonce).
+        let storage_bytes = bincode::serialize(&self.storage_pointer)
+            .map_err(|e| format!("failed to serialize storage_pointer: {e}"))?;
+        let reg_bytes = bincode::serialize(&self.registration)
+            .map_err(|e| format!("failed to serialize registration: {e}"))?;
+
+        // (2) FALCON-1024 detached signature over BLAKE3(proof_bytes || storage_bytes || reg_bytes || nonce).
         let mut hasher = Hasher::new();
         hasher.update(&wire.proof_bytes);
+        hasher.update(&storage_bytes);
+        hasher.update(&reg_bytes);
         hasher.update(&wire.nonce);
         let digest = hasher.finalize();
 
@@ -544,13 +568,12 @@ impl Block {
 
     /// Compute the BLAKE3 hash of all entries (deterministic commitment).
     ///
-    /// Hashes the concatenation of `(asset_hash || proof_hash)` for each entry.
-    /// This is deterministic regardless of serialization format.
+    /// Hashes the concatenation of `entry_commitment()` for each entry.
+    /// This is deterministic and cryptographically authenticates all proofs and metadata.
     pub fn compute_entries_hash(&self) -> [u8; 32] {
         let mut hasher = Hasher::new();
         for entry in &self.entries {
-            hasher.update(&entry.asset_hash);
-            hasher.update(&entry.proof_hash);
+            hasher.update(&entry.entry_commitment());
         }
         *hasher.finalize().as_bytes()
     }
@@ -577,7 +600,7 @@ impl Block {
 
     /// Calculate the hash of this block using BLAKE3.
     ///
-    /// `block_hash = BLAKE3(index || prev_hash || entries...)`
+    /// `block_hash = BLAKE3(index || prev_hash || entry_commitments...)`
     pub fn calculate_hash(&self) -> String {
         let mut hasher = Hasher::new();
 
@@ -585,8 +608,7 @@ impl Block {
         hasher.update(self.previous_hash.as_bytes());
 
         for entry in &self.entries {
-            hasher.update(&entry.asset_hash);
-            hasher.update(&entry.proof_hash);
+            hasher.update(&entry.entry_commitment());
         }
 
         format!("{}", hasher.finalize())
@@ -671,7 +693,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
 
         BlockAssetEntry {
@@ -724,14 +746,31 @@ mod tests {
         let previous_hash =
             "0000000000000000000000000000000000000000000000000000000000000000".to_string();
 
-        // Compute the expected digest exactly as `calculate_hash` must:
-        // index(LE) || previous_hash bytes || (asset_hash || proof_hash).
+        // Compute the expected digest exactly as `calculate_hash` must (C1):
+        // index(LE) || previous_hash bytes || entry_commitment, where
+        // entry_commitment = BLAKE3(asset_hash || proof_hash ||
+        //                           bincode(storage_pointer) || bincode(registration)).
+        // Derived here from primitives so it independently pins BOTH the
+        // entry_commitment field order AND the block-hash field order.
         let expected = {
+            let entry_commitment = {
+                let mut h = Hasher::new();
+                h.update(&[0x11u8; 32]);
+                h.update(&[0x22u8; 32]);
+                h.update(
+                    &bincode::serialize(&StoragePointer::Genesis)
+                        .expect("test: serialize storage pointer"),
+                );
+                h.update(
+                    &bincode::serialize(&entry.registration)
+                        .expect("test: serialize registration"),
+                );
+                *h.finalize().as_bytes()
+            };
             let mut h = Hasher::new();
             h.update(&7u64.to_le_bytes());
             h.update(previous_hash.as_bytes());
-            h.update(&[0x11u8; 32]);
-            h.update(&[0x22u8; 32]);
+            h.update(&entry_commitment);
             format!("{}", h.finalize())
         };
 
@@ -747,24 +786,44 @@ mod tests {
         assert_eq!(
             block.calculate_hash(),
             expected,
-            "calculate_hash algorithm changed — device-auth hash-safety broken"
+            "calculate_hash algorithm changed — C1 entry_commitment preimage broken"
         );
 
-        // (2) The digest must NOT depend on state_proof/registration content
-        //     (only on asset_hash || proof_hash). This is precisely what makes
-        //     the device-auth proof-derivation change hash-safe: a fresh
-        //     genesis with different proof content re-hashes to the same block
-        //     hash as long as asset_hash + proof_hash are held fixed.
+        // (2a) The digest must NOT depend on state_proof CONTENT (only its
+        //      digest, proof_hash, reaches the commitment). Holding proof_hash,
+        //      storage_pointer, and registration fixed while swapping the inner
+        //      state_proof re-hashes to the SAME block hash — this is what keeps
+        //      the device-auth proof-derivation change hash-safe.
         let mut block_other_proof = block.clone();
         block_other_proof.entries[0].state_proof = StateProof::new_for_testing();
-        block_other_proof.entries[0].registration = AssetRegistration::genesis(
-            MatrixCoordinate::new(9, 9, 9).expect("test: valid coord"),
-        );
         assert_eq!(
             block.calculate_hash(),
             block_other_proof.calculate_hash(),
-            "calculate_hash must ignore state_proof/registration content \
-             (commits only to asset_hash || proof_hash)"
+            "calculate_hash must ignore state_proof content (commits via proof_hash)"
+        );
+
+        // (2b) C1: registration IS now bound into the block hash — tampering
+        //      with registration metadata MUST change the block hash.
+        let mut block_tampered_reg = block.clone();
+        block_tampered_reg.entries[0].registration = AssetRegistration::genesis(
+            MatrixCoordinate::new(9, 9, 9).expect("test: valid coord"),
+        );
+        assert_ne!(
+            block.calculate_hash(),
+            block_tampered_reg.calculate_hash(),
+            "C1: registration must be bound into the block hash (entry_commitment)"
+        );
+
+        // (2c) C1: storage_pointer IS now bound into the block hash — a relay
+        //      rewriting the storage pointer MUST change the block hash.
+        let mut block_tampered_ptr = block.clone();
+        block_tampered_ptr.entries[0].storage_pointer = StoragePointer::Local {
+            path: "/hijacked/path".to_string(),
+        };
+        assert_ne!(
+            block.calculate_hash(),
+            block_tampered_ptr.calculate_hash(),
+            "C1: storage_pointer must be bound into the block hash (entry_commitment)"
         );
 
         // (3) Deterministic across calls — no hidden state.

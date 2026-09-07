@@ -183,7 +183,7 @@ impl AssetLineage {
                 return Err(LineageBreak::WrongAsset { position });
             }
 
-            let proof_bytes = serde_json::to_vec(&entry.state_proof).unwrap_or_default();
+            let proof_bytes = entry.state_proof.to_bytes().unwrap_or_default();
             if *blake3::hash(&proof_bytes).as_bytes() != entry.proof_hash {
                 return Err(LineageBreak::ProofHashMismatch { position });
             }

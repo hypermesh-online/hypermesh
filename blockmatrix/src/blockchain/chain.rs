@@ -905,7 +905,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,
@@ -1423,7 +1423,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,

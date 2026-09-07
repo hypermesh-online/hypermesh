@@ -216,7 +216,7 @@ mod tests {
         // Set space proof node_id to match coordinate (for belongs_to_node checks)
         state_proof.space_proof.node_id =
             format!("({},{},{})", coord.x, coord.y, coord.z);
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,
