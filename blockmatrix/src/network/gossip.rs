@@ -10,12 +10,11 @@
 //!
 //! Transport: messages are serialized as JSON and sent over STOQ streams.
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::matrix::coordinate::MatrixCoordinate;
 

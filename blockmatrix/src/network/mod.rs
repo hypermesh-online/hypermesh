@@ -45,7 +45,7 @@ use std::collections::HashMap;
 use std::net::{Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::blockchain::propagation::BlockPropagator;

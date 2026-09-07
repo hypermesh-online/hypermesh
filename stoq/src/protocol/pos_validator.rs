@@ -503,7 +503,6 @@ pub(crate) mod test_support {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hypermesh_lib::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 
     use super::test_support::{canonical_test_proof, signed_test_token};
 

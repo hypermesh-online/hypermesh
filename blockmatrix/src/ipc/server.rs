@@ -225,6 +225,7 @@ async fn handle_connection(
 }
 
 /// Check whether a process with the given PID is alive.
+#[allow(unsafe_code)]
 fn process_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {

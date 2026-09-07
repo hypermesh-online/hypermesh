@@ -17,7 +17,7 @@ use tracing::{info, warn};
 
 use super::message::DirectMessage;
 use crate::assets::core::asset_id::{
-    AssetCategory, AssetData, BaseSystemType, NetworkScope,
+    AssetCategory, AssetData, NetworkScope,
 };
 use crate::assets::core::AssetRegistration;
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};

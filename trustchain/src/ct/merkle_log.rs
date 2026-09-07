@@ -16,7 +16,6 @@ use tracing::debug;
 
 use super::LogEntry;
 use crate::errors::{CTError, Result as TrustChainResult};
-use crate::proof_of_state::StateProofOps;
 
 /// Simplified merkle tree-based CT log
 pub struct MerkleLog {
@@ -335,7 +334,7 @@ impl MerklePath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof_of_state::StateProof;
+    use crate::proof_of_state::{StateProof, StateProofOps};
     use std::time::SystemTime;
 
     async fn create_test_entry(seq_num: u64) -> anyhow::Result<LogEntry> {

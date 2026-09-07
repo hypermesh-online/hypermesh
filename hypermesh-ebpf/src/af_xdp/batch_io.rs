@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 #[cfg(feature = "kernel-attach")]
-use super::kernel_types::{KernelState, XdpDesc};
+use super::kernel_types::XdpDesc;
 
 use super::manager::AfXdpSocket;
 

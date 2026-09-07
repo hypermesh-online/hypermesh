@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetError, AssetResult, ProxyCapabilities, ProxyNodeInfo};
+use crate::assets::core::{AssetError, AssetResult, ProxyNodeInfo};
 
 /// TrustChain integration handler
 pub struct TrustChainIntegration {

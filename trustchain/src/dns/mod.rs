@@ -463,17 +463,9 @@ impl DnsResolver {
         Ok(())
     }
 
-    fn clone_for_task(&self) -> Self {
-        Self {
-            server_id: self.server_id.clone(),
-            stoq_client: Arc::clone(&self.stoq_client),
-            resolver: Arc::clone(&self.resolver),
-            cache: Arc::clone(&self.cache),
-            cert_validator: Arc::clone(&self.cert_validator),
-            config: Arc::clone(&self.config),
-            state_proof_context: Arc::clone(&self.state_proof_context),
-            task_handles: Arc::clone(&self.task_handles),
-        }
+    /// Access the state proof validation context
+    pub fn state_proof_context(&self) -> &Arc<StateProofContext> {
+        &self.state_proof_context
     }
 
     // REMOVED: handle_connection - STOQ handles connection management

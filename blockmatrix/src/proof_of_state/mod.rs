@@ -26,7 +26,6 @@ pub use state_proof_impl::{
 
 // BlockMatrix-specific types that extend TrustChain
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Access level for resources in the HyperMesh network
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

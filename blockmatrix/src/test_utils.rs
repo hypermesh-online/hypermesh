@@ -5,7 +5,7 @@
 //! Test utilities for creating AssetRegistration instances in tests
 
 use crate::assets::core::{
-    ApplicationDomain, AssetCategory, AssetData, AssetRegistration, AssetType, BaseSystemType,
+    AssetCategory, AssetData, AssetRegistration, AssetType, BaseSystemType,
     NetworkScope,
 };
 

@@ -14,13 +14,11 @@ pub mod types;
 pub use operations::CertificateTransparencyLog;
 pub use types::*;
 
-use crate::proof_of_state::StateProofOps;
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ca::{CertificateMetadata, CertificateStatus, IssuedCertificate};
-    use crate::proof_of_state::StateProof;
+    use crate::proof_of_state::{StateProof, StateProofOps};
     use std::time::{Duration, SystemTime};
 
     #[tokio::test]

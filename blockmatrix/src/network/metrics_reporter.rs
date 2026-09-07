@@ -9,8 +9,7 @@
 //! `CONN_TYPE_METRICS` (0x02) discriminator byte.
 
 use hypermesh_ebpf::metrics::HyperMeshMetrics;
-use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use super::NetworkNode;
 

@@ -230,6 +230,7 @@ pub fn collect_storage() -> io::Result<StorageMetrics> {
 }
 
 #[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
 fn collect_storage_statvfs() -> io::Result<StorageMetrics> {
     use std::ffi::CString;
     use std::mem::MaybeUninit;
@@ -298,7 +299,8 @@ mod tests {
         let net = collect_network().expect("test: collect network on Linux");
         // System should have at least one non-loopback interface in most cases
         // but we don't assert on interface count since containers may differ
-        assert!(net.total_rx_bytes + net.total_tx_bytes >= 0);
+        let total_traffic = net.total_rx_bytes + net.total_tx_bytes;
+        assert!(total_traffic < u64::MAX);
     }
 
     #[cfg(target_os = "linux")]

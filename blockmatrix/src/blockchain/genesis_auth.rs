@@ -19,7 +19,7 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use chacha20poly1305::aead::{KeyInit, OsRng};
+use chacha20poly1305::aead::OsRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};

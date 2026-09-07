@@ -414,13 +414,11 @@ mod tests {
     use std::sync::Arc;
     use trustchain::FalconIdentity;
 
-    /// Construct a `DaemonState` with the capability token issuer wired up.
-    async fn test_state_with_issuer() -> Arc<DaemonState> {
+    /// Construct a `DaemonState` and issuer pair for tests.
+    async fn test_state_with_issuer() -> (Arc<DaemonState>, Arc<CapabilityTokenIssuer>) {
         let state = test_state().await;
-        // Replace via Arc::get_mut would require unwrap; instead build a new
-        // state by hand. Simpler: construct fresh. The tests below call
-        // helpers that construct their own state.
-        state
+        let issuer = Arc::new(CapabilityTokenIssuer::new(Arc::new(FalconIdentity::generate())));
+        (state, issuer)
     }
 
     #[tokio::test]
@@ -442,10 +440,16 @@ mod tests {
         assert!(err.message.contains("alpha-default inert"));
     }
 
-    /// Build a `DaemonState` carrying a capability token issuer for the
-    /// happy-path tests in `tests/k1_light_client_capability_tests.rs`.
-    pub(crate) async fn _doc_helper() {
-        let _ = test_state_with_issuer;
-        let _ = CapabilityTokenIssuer::new(Arc::new(FalconIdentity::generate()));
+    #[tokio::test]
+    async fn test_capability_token_issuer_session() {
+        let (_state, issuer) = test_state_with_issuer().await;
+        let token = issuer
+            .issue(
+                vec![1, 2, 3, 4],
+                vec![crate::auth::Capability::ViewOnly],
+                std::time::Duration::from_secs(300),
+            )
+            .expect("token issuance");
+        assert!(!token.signature.is_empty());
     }
 }

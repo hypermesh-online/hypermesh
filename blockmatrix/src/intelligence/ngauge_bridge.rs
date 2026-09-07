@@ -19,9 +19,9 @@ use std::sync::Arc;
 #[cfg(feature = "intelligence")]
 use ngauge::{
     PathPolicyRecommendation, ReplicationConfig, ReplicationSignal, ReplicationTrigger,
-    RoutingAdvisor, RoutingIntelligence, SwarmAnalytics, TensorWeightModifier,
+    SwarmAnalytics, TensorWeightModifier,
 };
-use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId};
+use hypermesh_lib::{MatrixPosition, NetworkId, NodeId};
 
 use crate::blockchain::propagation::PropagationWeight;
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -210,6 +210,7 @@ impl NGaugeBridge {
 #[cfg(feature = "intelligence")]
 mod tests {
     use super::*;
+    use hypermesh_lib::ContentHash;
     use ngauge::PathPolicyRecommendation;
     use ngauge::routing_intel::SchedulingStrategy;
 

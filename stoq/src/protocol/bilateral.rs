@@ -487,6 +487,7 @@ mod tests {
     }
 
     /// Minimal StateProofProvider for testing.
+    #[allow(dead_code)]
     struct TestProofProvider;
 
     #[async_trait::async_trait]
