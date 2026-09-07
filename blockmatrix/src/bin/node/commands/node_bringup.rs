@@ -407,6 +407,13 @@ pub(crate) async fn start_network(
         shard_location_index: shard_location_index.clone(),
         shard_transport: shard_transport.clone(),
         ebpf: ebpf_orchestrator.clone(),
+        // Phase-4 DMS handoff: the observer reads asset-chain heads from the
+        // live NodeBlockchain (versions arrive via block propagation) and seeds
+        // each on-chain StoragePointer::Sharded set into the same swarm — no
+        // catalog dependency.
+        blockchain: bootstrap.blockchain().clone(),
+        shard_store: shard_store.clone(),
+        consumer_provider: consumer_provider_manager.clone(),
     }
     .spawn()
     .await?;

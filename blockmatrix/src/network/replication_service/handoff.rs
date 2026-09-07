@@ -37,9 +37,11 @@ use async_trait::async_trait;
 use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId};
 use ngauge::{Sharder, SwarmAnalytics};
 
+use crate::blockchain::block::StoragePointer;
 use crate::blockchain::NodeBlockchain;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::consumer_provider::ConsumerProviderManager;
+use crate::network::shard_store::ShardStore;
 use crate::network::swarm_provider::ShardLocationIndex;
 
 /// The content of a newly-headed asset version, resolved for seeding.
@@ -78,9 +80,14 @@ pub struct SwarmSeeder {
     index: Arc<ShardLocationIndex>,
     /// Swarm analytics — demand + replica-count feed that fires the mirror loop.
     analytics: Arc<Mutex<SwarmAnalytics>>,
+    /// Local shard store — the chain-shard-set seed path consults it to register
+    /// this node as a provider ONLY for shards it actually holds (never advertise
+    /// bytes we cannot serve).
+    shard_store: Arc<ShardStore>,
     /// This node's matrix position (the demand cell recorded for seeded shards).
     position: MatrixPosition,
-    /// This node's id (the demand consumer recorded for seeded shards).
+    /// This node's id (the demand consumer recorded for seeded shards, and the
+    /// provider string registered in the location index via [`NodeId::to_hex`]).
     node_id: NodeId,
 }
 
@@ -90,6 +97,7 @@ impl SwarmSeeder {
         consumer_provider: Arc<ConsumerProviderManager>,
         index: Arc<ShardLocationIndex>,
         analytics: Arc<Mutex<SwarmAnalytics>>,
+        shard_store: Arc<ShardStore>,
         coord: MatrixCoordinate,
         node_id: NodeId,
     ) -> Self {
@@ -97,6 +105,7 @@ impl SwarmSeeder {
             consumer_provider,
             index,
             analytics,
+            shard_store,
             position: MatrixPosition {
                 x: coord.x as f64,
                 y: coord.y as f64,
@@ -139,6 +148,52 @@ impl SwarmSeeder {
 
         self.feed_analytics(network, &hashes).await;
         Ok(hashes)
+    }
+
+    /// Seed a shard set discovered FROM THE CHAIN entry (hashes only, no bytes).
+    ///
+    /// This is the propagated-version path: a new asset head arrived via block
+    /// propagation carrying a `StoragePointer::Sharded { shard_hashes }`, and the
+    /// observer bridges that on-chain set into the LIVE swarm state without any
+    /// content bytes and without a catalog dependency:
+    ///
+    /// - REFLECT: for each shard hash this node actually HOLDS locally
+    ///   ([`ShardStore::has`]), register THIS node as a provider in `network` so
+    ///   consumers (and the mirror loop's candidate gather) can find it. Shards
+    ///   the node does not hold are never advertised.
+    /// - MIRROR trigger: feed [`SwarmAnalytics`] for the WHOLE set (demand +
+    ///   true replica count) so the [`DmsDriver`](ngauge::DmsDriver) mirror loop
+    ///   fires for any shard still below `min_replicas`.
+    ///
+    /// Returns the shard hashes this node registered itself as a provider for.
+    pub async fn seed_onchain_shard_set(
+        &self,
+        network: NetworkId,
+        shard_hashes: &[[u8; 32]],
+    ) -> Vec<ContentHash> {
+        if shard_hashes.is_empty() {
+            return Vec::new();
+        }
+        let hashes: Vec<ContentHash> = shard_hashes.iter().map(|h| ContentHash(*h)).collect();
+
+        // REFLECT: register self ONLY for shards actually held (byte-free — the
+        // bytes are already in the local store, placed there by the node hosting
+        // its own asset version).
+        let mut held: Vec<ContentHash> = Vec::with_capacity(hashes.len());
+        for hash in &hashes {
+            if self.shard_store.has(hash).await {
+                held.push(*hash);
+            }
+        }
+        if !held.is_empty() {
+            self.index
+                .register_provider_in_network(network, &self.node_id.to_hex(), &held)
+                .await;
+        }
+
+        // MIRROR trigger: demand + true replica count for the whole set.
+        self.feed_analytics(network, &hashes).await;
+        held
     }
 
     /// Feed [`SwarmAnalytics`]: record demand for each seeded shard (so the
@@ -245,6 +300,56 @@ impl ChainHeadObserver {
         seeded
     }
 
+    /// One diff-and-seed pass driven ENTIRELY by the chain (no content source,
+    /// no catalog). For each asset whose head has advanced, read the head entry's
+    /// `StoragePointer::Sharded { shard_hashes }` FROM THE CHAIN and seed that set
+    /// into every joined `network` via [`SwarmSeeder::seed_onchain_shard_set`].
+    ///
+    /// This is the daemon-wired path: it covers BOTH the local-author case (the
+    /// node stored the bytes, so it registers itself as a provider) and the
+    /// propagated case (bytes absent, so only demand is fed and the mirror loop
+    /// pulls copies). Heads whose pointer is not `Sharded` (e.g. genesis hardware
+    /// assets) are marked examined and skipped so they are not rescanned.
+    ///
+    /// Returns the asset hashes whose shard set was seeded this pass.
+    ///
+    /// Lock discipline: the `seeded` guard is taken only for the synchronous diff
+    /// and the synchronous mark; the per-head chain read + seed happen with NO
+    /// `seeded` guard held (and the seeder never holds the analytics guard across
+    /// an `.await`).
+    pub async fn poll_once_from_chain(
+        &self,
+        chain: &NodeBlockchain,
+        seeder: &SwarmSeeder,
+        networks: &[NetworkId],
+    ) -> Vec<[u8; 32]> {
+        if networks.is_empty() {
+            return Vec::new();
+        }
+        let snapshot = chain.asset_index_snapshot().await;
+        let pending = self.pending_heads(&snapshot);
+
+        let mut seeded = Vec::new();
+        for (asset_hash, key) in pending {
+            // Mark the head examined regardless of outcome so a non-Sharded head
+            // (genesis asset) is not rescanned every tick; a later advance to a
+            // Sharded entry changes the key and is re-detected.
+            self.mark_seeded(asset_hash, key);
+
+            let Some(shard_hashes) = head_shard_set(chain, &snapshot, &asset_hash).await else {
+                continue;
+            };
+            if shard_hashes.is_empty() {
+                continue;
+            }
+            for network in networks {
+                seeder.seed_onchain_shard_set(*network, &shard_hashes).await;
+            }
+            seeded.push(asset_hash);
+        }
+        seeded
+    }
+
     /// Build the list of `(asset_hash, head_key)` whose head has advanced since
     /// the last seeded pass. Pure + synchronous — holds only the `seeded` guard.
     fn pending_heads(
@@ -273,5 +378,211 @@ impl ChainHeadObserver {
         if let Ok(mut guard) = self.seeded.lock() {
             guard.insert(asset_hash, key);
         }
+    }
+}
+
+/// Read the on-chain shard set for `asset_hash`'s current head.
+///
+/// The `snapshot` locates the head entry `(block_index, entry_ix)`; the block is
+/// materialized from `chain` and the entry's [`StoragePointer`] is inspected.
+/// Returns the shard hashes iff the pointer is [`StoragePointer::Sharded`],
+/// otherwise `None` (genesis / registration entries carry no shard set).
+async fn head_shard_set(
+    chain: &NodeBlockchain,
+    snapshot: &crate::blockchain::asset_index::AssetChainIndex,
+    asset_hash: &[u8; 32],
+) -> Option<Vec<[u8; 32]>> {
+    let head = snapshot.asset_head(asset_hash)?;
+    let block = chain.get_block(head.block_index).await?;
+    let entry = block.entries.get(head.entry_ix)?;
+    match &entry.storage_pointer {
+        StoragePointer::Sharded { shard_hashes, .. } => Some(shard_hashes.clone()),
+        _ => None,
+    }
+}
+
+/// Spawn the DMS handoff observer loop (Phase 4, chain-shard-set path).
+///
+/// Every 20s the observer diffs the asset-chain heads read from `&NodeBlockchain`
+/// alone and seeds each newly-headed version's on-chain `StoragePointer::Sharded`
+/// set into the swarm the E.2 poll loop already drives — REFLECTing held shards
+/// (register self as provider) and feeding demand so the mirror loop converges.
+///
+/// Reads ONLY `&NodeBlockchain` for versions (they arrive via block propagation),
+/// the joined-network set (via the sync manager), and the daemon's existing
+/// swarm handles. No content bytes, no catalog dependency.
+pub(super) fn spawn(svc: &super::ReplicationService) {
+    let chain = svc.blockchain.clone();
+    let sync_manager = svc.sync_manager.clone();
+    let seeder = Arc::new(SwarmSeeder::new(
+        svc.consumer_provider.clone(),
+        svc.shard_location_index.clone(),
+        svc.ngauge_analytics.clone(),
+        svc.shard_store.clone(),
+        svc.coord,
+        node_id_from_hex(&svc.node_id),
+    ));
+    let observer = Arc::new(ChainHeadObserver::new());
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(20));
+        // Skip the immediate tick so the first pass runs after bring-up settles.
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            let networks = super::joined_networks(&sync_manager).await;
+            if networks.is_empty() {
+                continue;
+            }
+            let seeded = observer
+                .poll_once_from_chain(&chain, &seeder, &networks)
+                .await;
+            if !seeded.is_empty() {
+                tracing::info!(
+                    "dms-handoff: seeded {} on-chain shard set(s) into the swarm",
+                    seeded.len()
+                );
+            }
+        }
+    });
+    tracing::info!("DMS handoff observer loop started (interval=20s)");
+}
+
+/// Reconstruct a [`NodeId`] from the daemon's hex node-id string.
+///
+/// The daemon id is `hex(BLAKE3(FALCON pubkey))`; decoding it yields the SAME
+/// 32 bytes whose `to_hex()` the location index is keyed by, so the seeder
+/// registers under the identical provider string other components use. A
+/// non-hex id (test fixtures) falls back to hashing the string — self-consistent
+/// within that process.
+fn node_id_from_hex(node_id: &str) -> NodeId {
+    hex::decode(node_id)
+        .ok()
+        .and_then(|v| <[u8; 32]>::try_from(v).ok())
+        .map(NodeId::from_bytes)
+        .unwrap_or_else(|| NodeId::from_public_key(node_id.as_bytes()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ipc::handler::RequestHandler;
+    use crate::ipc::protocol::RpcRequest;
+    use hypermesh_lib::DEFAULT_NETWORK;
+    use ngauge::{DmsDriver, ShardCandidates};
+
+    /// Phase-4 DMS handoff, daemon/component level, with ZERO catalog import and
+    /// NO manual seeding:
+    ///
+    /// 1. The node HOSTS a version through the real store/host path (the `store`
+    ///    IPC entrypoint), which shards + stores locally and records the shard
+    ///    set on-chain as `StoragePointer::Sharded`.
+    /// 2. The daemon-wired [`ChainHeadObserver::poll_once_from_chain`] reads the
+    ///    new asset head from `&NodeBlockchain` ALONE and seeds its on-chain shard
+    ///    set into the live swarm handles.
+    /// 3. Assert the shard set is registered in the live [`ShardLocationIndex`]
+    ///    AND [`DmsDriver::plan`] produces a mirror for it.
+    ///
+    /// In-process/component (not 2-node QUIC): the handoff seam is entirely local
+    /// state (chain read → index/analytics writes → plan), so a component test
+    /// exercises the exact daemon code path deterministically without transport
+    /// flakiness.
+    #[tokio::test]
+    async fn daemon_observer_mirrors_a_hosted_version_from_chain() {
+        let state = crate::ipc::handlers::tests::test_state().await;
+
+        // (1) Host a version through the node store/host path (IPC `store`).
+        let tmp = tempfile::TempDir::new().expect("test: tmpdir");
+        let file_path = tmp.path().join("version.bin");
+        let data = b"HYPERMESH-DMS-PHASE4-HANDOFF-".repeat(500);
+        std::fs::write(&file_path, &data).expect("test: write payload");
+
+        let mut handler = RequestHandler::new();
+        crate::ipc::handlers::store::register(&mut handler, &state);
+        let resp = handler
+            .dispatch(RpcRequest::new(
+                "store",
+                serde_json::json!({ "path": file_path.to_string_lossy() }),
+            ))
+            .await;
+        assert!(resp.error.is_none(), "store must succeed: {:?}", resp.error);
+        let result = resp.result.expect("test: store result present");
+        let shard_hashes: Vec<[u8; 32]> = result["shard_hashes"]
+            .as_array()
+            .expect("test: shard_hashes array")
+            .iter()
+            .map(|h| {
+                let hex = h.as_str().expect("test: shard hash is hex");
+                <[u8; 32]>::try_from(hex::decode(hex).expect("test: decode hex"))
+                    .expect("test: 32-byte hash")
+            })
+            .collect();
+        assert!(!shard_hashes.is_empty(), "asset must produce shards");
+
+        // Build the daemon's swarm handles (test_state carries none of these).
+        let network = DEFAULT_NETWORK;
+        let index = Arc::new(ShardLocationIndex::new());
+        let analytics = Arc::new(Mutex::new(SwarmAnalytics::new()));
+        let consumer_provider = Arc::new(ConsumerProviderManager::new(
+            state.shard_store.clone(),
+            index.clone(),
+            state.node_id.clone(),
+            network,
+        ));
+        let seeder = SwarmSeeder::new(
+            consumer_provider,
+            index.clone(),
+            analytics.clone(),
+            state.shard_store.clone(),
+            state.coordinate,
+            node_id_from_hex(&state.node_id),
+        );
+        let observer = ChainHeadObserver::new();
+
+        // (2) The EXACT daemon-wired path: read heads from &NodeBlockchain only,
+        // seed the on-chain shard set. No manual seeding, no catalog.
+        let asset_hash = *blake3::hash(&data).as_bytes();
+        let seeded = observer
+            .poll_once_from_chain(&state.blockchain, &seeder, &[network])
+            .await;
+        assert!(
+            seeded.iter().any(|a| *a == asset_hash),
+            "the hosted version's asset head must be seeded from the chain",
+        );
+
+        // (3a) The shard set is registered in the LIVE ShardLocationIndex.
+        let provider_id = node_id_from_hex(&state.node_id).to_hex();
+        for shard in &shard_hashes {
+            let providers = index
+                .get_providers_in_network(network, &ContentHash(*shard))
+                .await;
+            assert!(
+                providers.contains(&provider_id),
+                "shard {} must register this node as provider",
+                hex::encode(&shard[..4]),
+            );
+        }
+
+        // (3b) DmsDriver::plan mirrors the seeded set. Gather candidates from the
+        // SAME live index (no hand-seeding), then plan under the analytics guard.
+        let mut bundles = Vec::new();
+        for shard in &shard_hashes {
+            let providers = index
+                .get_providers_in_network(network, &ContentHash(*shard))
+                .await;
+            bundles.push(ShardCandidates {
+                shard_id: ContentHash(*shard),
+                positioned: Vec::new(),
+                all_ids: providers,
+            });
+        }
+        let plan = {
+            let guard = analytics.lock().expect("test: analytics lock");
+            DmsDriver::plan(&guard, network, &bundles, 0.5)
+        };
+        assert!(
+            !plan.mirror.is_empty(),
+            "DmsDriver must mirror the under-replicated on-chain shard set",
+        );
     }
 }

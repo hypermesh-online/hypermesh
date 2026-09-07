@@ -28,8 +28,11 @@ use hypermesh_lib::NetworkId;
 
 use crate::blockchain::propagation::BlockPropagator;
 use crate::blockchain::sync_manager::SyncManager;
+use crate::blockchain::NodeBlockchain;
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
+use crate::network::consumer_provider::ConsumerProviderManager;
+use crate::network::shard_store::ShardStore;
 use crate::network::shard_transport::StoqShardTransport;
 use crate::network::swarm_provider::ShardLocationIndex;
 use crate::network::{NetworkManager, SwarmDemandTracker};
@@ -80,6 +83,16 @@ pub struct ReplicationService {
     /// Optional shared eBPF orchestrator (kernel-map feedback); `None` in the
     /// userspace-only tier.
     pub ebpf: Option<Arc<hypermesh_ebpf::HyperMeshEbpf>>,
+    /// The live per-node blockchain — the DMS handoff observer reads asset-chain
+    /// heads (arriving via block propagation) from this, and ONLY this, to seed
+    /// each version's on-chain `StoragePointer::Sharded` set. No catalog handle.
+    pub blockchain: Arc<NodeBlockchain>,
+    /// Local shard store — the handoff seeder registers this node as a provider
+    /// only for on-chain shards it actually holds.
+    pub shard_store: Arc<ShardStore>,
+    /// Consumer-becomes-provider manager (R12) — carried so the seeder is whole
+    /// for both handoff paths (the chain-shard-set path registers directly).
+    pub consumer_provider: Arc<ConsumerProviderManager>,
 }
 
 impl ReplicationService {
@@ -92,6 +105,7 @@ impl ReplicationService {
     pub async fn spawn(self) -> anyhow::Result<()> {
         feed::spawn(&self);
         propagation::spawn(&self);
+        handoff::spawn(&self);
         poll::spawn(&self).await?;
         Ok(())
     }

@@ -121,6 +121,7 @@ async fn dms_handoff_new_version_mirrors_and_reflects() {
         consumer_provider,
         index.clone(),
         analytics.clone(),
+        store.clone(),
         coord,
         NodeId::from_public_key(SEED_NODE.as_bytes()),
     );
