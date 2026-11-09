@@ -67,3 +67,6 @@ mobile/assets/
 # trustchain suite (default data dir `trustchain-data/`). It is runtime state,
 # not source — running tests must not dirty the worktree.
 trustchain/trustchain-data/
+
+# SQLite in-memory URLs written as paths by tests (unclonable on Windows)
+sqlite::memory:/
