@@ -23,6 +23,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     let rp_analytics = svc.ngauge_analytics.clone();
     let rp_index = svc.shard_location_index.clone();
     let rp_transport = svc.shard_transport.clone();
+    let rp_store = svc.shard_store.clone();
     let rp_network = svc.network.clone();
     let rp_sync_manager = svc.sync_manager.clone();
     let rp_local_node_id = svc.node_id.clone();
@@ -32,6 +33,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     // the SAME Arcs the service already holds.
     let executor = super::executor::StoqDmsExecutor::new(
         rp_transport,
+        rp_store,
         rp_index.clone(),
         rp_local_node_id.clone(),
         rp_analytics.clone(),

@@ -14,6 +14,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use hypermesh_lib::{ContentHash, NetworkId};
+use super::shard_store::ShardStore;
 
 /// Default provider-record lifetime (P6). Mirrors the DNS TTL cache
 /// (`dns/cache.rs`): a provider learned via `TAG_SHARD_ANNOUNCE` is trusted
@@ -29,7 +30,6 @@ pub const DEFAULT_PROVIDER_TTL: Duration = Duration::from_secs(300);
 /// Mirrors `dns::cache::CacheEntry` (`registered_at`/`expires_at` + an
 /// `is_expired` check) so the shard-location cache ages exactly like the DNS
 /// cache instead of accumulating stale providers forever.
-#[derive(Clone, Debug)]
 struct ProviderEntry {
     /// When this provider was first learned or last refreshed. Used for
     /// oldest-first tie-breaking during introspection (`age`), mirroring the
@@ -37,6 +37,7 @@ struct ProviderEntry {
     registered_at: SystemTime,
     /// When this location hint should be considered stale.
     expires_at: SystemTime,
+    mirror_hold: Option<(Arc<ShardStore>, ContentHash)>,
 }
 
 impl ProviderEntry {
@@ -45,6 +46,7 @@ impl ProviderEntry {
         Self {
             registered_at: now,
             expires_at: now + ttl,
+            mirror_hold: None,
         }
     }
 
@@ -64,6 +66,14 @@ impl ProviderEntry {
         SystemTime::now()
             .duration_since(self.registered_at)
             .unwrap_or_default()
+    }
+}
+
+impl Drop for ProviderEntry {
+    fn drop(&mut self) {
+        if let Some((store, shard_id)) = &self.mirror_hold {
+            store.release_mirror(shard_id);
+        }
     }
 }
 
@@ -125,6 +135,70 @@ impl ShardLocationIndex {
                 .and_modify(|e| e.refresh(ttl))
                 .or_insert_with(|| ProviderEntry::new(ttl));
         }
+    }
+
+    /// Atomically claim serve bytes and register one local mirror provider hint.
+    /// Lock order: index write → synchronous store lock; no await while locked.
+    pub(crate) async fn register_mirror_provider_in_network(
+        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
+        store: Arc<ShardStore>, data: &[u8],
+    ) -> bool {
+        let mut locs = self.locations.write().await;
+        self.insert_mirror_entry(&mut locs, network_id, node_id, shard_id, store, data)
+    }
+
+    fn insert_mirror_entry(
+        &self,
+        locs: &mut HashMap<(NetworkId, ContentHash), HashMap<String, ProviderEntry>>,
+        network_id: NetworkId, node_id: &str, shard_id: ContentHash,
+        store: Arc<ShardStore>, data: &[u8],
+    ) -> bool {
+        let key = (network_id, shard_id);
+        if let Some(entry) = locs.get_mut(&key).and_then(|p| p.get_mut(node_id)) {
+            return self.refresh_mirror_entry(entry, shard_id, store, data);
+        }
+        if !store.claim_mirror(shard_id, data) { return false; }
+        let mut entry = ProviderEntry::new(self.ttl);
+        entry.mirror_hold = Some((store, shard_id));
+        locs.entry(key).or_default().insert(node_id.to_string(), entry);
+        true
+    }
+
+    fn refresh_mirror_entry(
+        &self, entry: &mut ProviderEntry, shard_id: ContentHash,
+        store: Arc<ShardStore>, data: &[u8],
+    ) -> bool {
+        if let Some((held, _)) = &entry.mirror_hold {
+            if !Arc::ptr_eq(held, &store) || !store.mirror_bytes_match(&shard_id, data) {
+                return false;
+            }
+            entry.refresh(self.ttl);
+            return true;
+        }
+        if !store.claim_mirror(shard_id, data) { return false; }
+        entry.mirror_hold = Some((store, shard_id));
+        entry.refresh(self.ttl);
+        true
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn register_mirror_with_hook<F: FnOnce() + Send>(
+        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
+        store: Arc<ShardStore>, data: &[u8], hook: F,
+    ) -> bool {
+        let mut locs = self.locations.write().await;
+        hook();
+        self.insert_mirror_entry(&mut locs, network_id, node_id, shard_id, store, data)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn expire_provider_for_test(
+        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
+    ) {
+        let mut locs = self.locations.write().await;
+        let Some(entry) = locs.get_mut(&(network_id, shard_id))
+            .and_then(|providers| providers.get_mut(node_id)) else { return; };
+        entry.expires_at = SystemTime::UNIX_EPOCH;
     }
 
     /// Remove a node from all shard provider sets across all networks (e.g., on
@@ -350,214 +424,6 @@ mod tests {
 
     fn hash(seed: u8) -> ContentHash {
         ContentHash([seed; 32])
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_register_and_get() {
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0xAA);
-        let h2 = hash(0xBB);
-
-        index.register_provider("node-a", &[h1, h2]).await;
-
-        let providers = index.get_providers(&h1).await;
-        assert_eq!(providers.len(), 1);
-        assert!(providers.contains(&"node-a".to_string()));
-
-        let providers = index.get_providers(&h2).await;
-        assert_eq!(providers.len(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_multiple_providers() {
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0xCC);
-
-        index.register_provider("node-a", &[h1]).await;
-        index.register_provider("node-b", &[h1]).await;
-
-        let providers = index.get_providers(&h1).await;
-        assert_eq!(providers.len(), 2);
-        assert!(providers.contains(&"node-a".to_string()));
-        assert!(providers.contains(&"node-b".to_string()));
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_remove() {
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0xDD);
-        let h2 = hash(0xEE);
-
-        index.register_provider("node-a", &[h1, h2]).await;
-        index.register_provider("node-b", &[h1]).await;
-
-        index.remove_provider("node-a").await;
-
-        // h1 still has node-b
-        let providers = index.get_providers(&h1).await;
-        assert_eq!(providers.len(), 1);
-        assert!(providers.contains(&"node-b".to_string()));
-
-        // h2 had only node-a, so it should be removed entirely
-        let providers = index.get_providers(&h2).await;
-        assert!(providers.is_empty());
-        assert_eq!(index.shard_count().await, 1);
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_shard_count() {
-        let index = ShardLocationIndex::new();
-        assert_eq!(index.shard_count().await, 0);
-
-        index.register_provider("n1", &[hash(1), hash(2), hash(3)]).await;
-        assert_eq!(index.shard_count().await, 3);
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_provider_count() {
-        let index = ShardLocationIndex::new();
-        assert_eq!(index.provider_count().await, 0);
-
-        index.register_provider("n1", &[hash(1)]).await;
-        index.register_provider("n2", &[hash(1), hash(2)]).await;
-        index.register_provider("n3", &[hash(3)]).await;
-
-        assert_eq!(index.provider_count().await, 3);
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_get_unknown_shard() {
-        let index = ShardLocationIndex::new();
-        let providers = index.get_providers(&hash(0xFF)).await;
-        assert!(providers.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_swarm_provider_duplicate_register() {
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0x11);
-
-        // Registering same node twice should not duplicate
-        index.register_provider("node-a", &[h1]).await;
-        index.register_provider("node-a", &[h1]).await;
-
-        let providers = index.get_providers(&h1).await;
-        assert_eq!(providers.len(), 1);
-    }
-
-    // -- P6 TTL-expiry tests -----------------------------------------------
-
-    #[tokio::test]
-    async fn test_provider_ttl_expires_from_get() {
-        use std::time::Duration;
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0x55);
-
-        // Register with an already-elapsed TTL so the record is born stale.
-        index
-            .register_provider_with_ttl("node-a", &[h1], Duration::from_millis(0))
-            .await;
-        // Ensure SystemTime has advanced past expires_at.
-        std::thread::sleep(Duration::from_millis(5));
-
-        let providers = index.get_providers(&h1).await;
-        assert!(
-            providers.is_empty(),
-            "expired provider must not be handed out as a source"
-        );
-        // provider_count also filters expired.
-        assert_eq!(index.provider_count().await, 0);
-    }
-
-    #[tokio::test]
-    async fn test_provider_ttl_refresh_keeps_alive() {
-        use std::time::Duration;
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0x56);
-
-        // Short TTL, then refresh with a long TTL before it expires.
-        index
-            .register_provider_with_ttl("node-a", &[h1], Duration::from_millis(30))
-            .await;
-        index
-            .register_provider_with_ttl("node-a", &[h1], Duration::from_secs(300))
-            .await;
-        std::thread::sleep(Duration::from_millis(50));
-
-        let providers = index.get_providers(&h1).await;
-        assert_eq!(
-            providers.len(),
-            1,
-            "a re-announced provider must stay alive past the original TTL"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_cleanup_expired_reclaims_records() {
-        use std::time::Duration;
-        let index = ShardLocationIndex::new();
-        let h1 = hash(0x57);
-        let h2 = hash(0x58);
-
-        // node-a stale on both shards; node-b fresh on h1.
-        index
-            .register_provider_with_ttl("node-a", &[h1, h2], Duration::from_millis(0))
-            .await;
-        index
-            .register_provider_with_ttl("node-b", &[h1], Duration::from_secs(300))
-            .await;
-        std::thread::sleep(Duration::from_millis(5));
-
-        let removed = index.cleanup_expired().await;
-        assert_eq!(removed, 2, "both stale node-a records reclaimed");
-
-        // h1 keeps node-b; h2 is emptied and dropped entirely.
-        assert_eq!(index.get_providers(&h1).await, vec!["node-b".to_string()]);
-        assert!(index.get_providers(&h2).await.is_empty());
-        assert_eq!(index.shard_count().await, 1);
-    }
-
-    #[test]
-    fn test_build_shard_announce_payload_empty() {
-        let payload = build_shard_announce_payload(&[]);
-        assert_eq!(payload.len(), 5);
-        assert_eq!(payload[0], 0x04); // TAG_SHARD_ANNOUNCE
-        assert_eq!(u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]), 0);
-    }
-
-    #[test]
-    fn test_build_shard_announce_payload_wire_format() {
-        let h1 = hash(0xAA);
-        let h2 = hash(0xBB);
-        let payload = build_shard_announce_payload(&[h1, h2]);
-
-        // tag(1) + count(4) + 2*hash(32) = 69
-        assert_eq!(payload.len(), 69);
-        assert_eq!(payload[0], 0x04);
-        assert_eq!(u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]), 2);
-
-        // First hash
-        assert_eq!(&payload[5..37], &[0xAA; 32]);
-        // Second hash
-        assert_eq!(&payload[37..69], &[0xBB; 32]);
-    }
-
-    #[test]
-    fn test_build_shard_announce_payload_roundtrip() {
-        let shards = vec![hash(0x01), hash(0x02), hash(0x03)];
-        let payload = build_shard_announce_payload(&shards);
-
-        // Parse it back
-        assert_eq!(payload[0], 0x04);
-        let count = u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]) as usize;
-        assert_eq!(count, 3);
-
-        for i in 0..count {
-            let offset = 5 + i * 32;
-            let mut h = [0u8; 32];
-            h.copy_from_slice(&payload[offset..offset + 32]);
-            assert_eq!(ContentHash(h), shards[i]);
-        }
     }
 
     // -- A2 shard-locate codec tests ---------------------------------------

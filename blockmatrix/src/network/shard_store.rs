@@ -11,13 +11,14 @@ use hypermesh_lib::ContentHash;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use parking_lot::RwLock;
+use tracing::{info, warn};
 
 /// Internal shard entry with reference counting for dedup.
 struct ShardEntry {
     data: Vec<u8>,
     ref_count: u32,
+    mirror_refs: u32,
 }
 
 /// Local shard storage with optional disk persistence.
@@ -74,7 +75,7 @@ impl ShardStore {
                             hash.copy_from_slice(&bytes);
                             // Load refcount from companion .ref file, default to 1.
                             let ref_count = Self::load_ref_count(&dir, &name_str);
-                            map.insert(ContentHash(hash), ShardEntry { data, ref_count });
+                            map.insert(ContentHash(hash), ShardEntry { data, ref_count, mirror_refs: 0 });
                         }
                         Err(e) => {
                             warn!("Failed to read shard file {}: {e}", name_str);
@@ -104,126 +105,179 @@ impl ShardStore {
             .await;
     }
 
-    /// Store a shard with dedup policy awareness.
-    ///
-    /// - `Full`: if shard exists, increment refcount and return `Deduplicated`.
-    /// - `HashOnly`: if shard exists, skip (return `Deduplicated` with rc=1); if new, store with rc=1.
-    /// - `None`: always overwrite with refcount 1 (no cross-asset correlation).
+    /// Store with the requested owner dedup policy. Mirror claims are separate.
     pub async fn store_with_dedup(
         &self,
         shard_id: ContentHash,
         data: Vec<u8>,
         policy: DedupPolicy,
     ) -> ShardStoreResult {
-        debug!(
-            "Storing shard {} (policy={:?})",
-            hex::encode(shard_id.0),
-            policy
-        );
-
-        let mut shards = self.shards.write().await;
-
-        let result = match policy {
-            DedupPolicy::Full => {
-                if let Some(entry) = shards.get_mut(&shard_id) {
-                    entry.ref_count = entry.ref_count.saturating_add(1);
-                    let rc = entry.ref_count;
-                    self.persist_ref_count(&shard_id, rc);
-                    ShardStoreResult::Deduplicated { ref_count: rc }
-                } else {
-                    self.persist_shard_data(&shard_id, &data);
-                    self.persist_ref_count(&shard_id, 1);
-                    shards.insert(shard_id, ShardEntry { data, ref_count: 1 });
-                    ShardStoreResult::Stored
-                }
-            }
-            DedupPolicy::HashOnly => {
-                // Anonymous R4: detect dupe by hash to save storage,
-                // but never increment refcount (no provider tracking).
-                if shards.contains_key(&shard_id) {
-                    ShardStoreResult::Deduplicated { ref_count: 1 }
-                } else {
-                    self.persist_shard_data(&shard_id, &data);
-                    self.persist_ref_count(&shard_id, 1);
-                    shards.insert(shard_id, ShardEntry { data, ref_count: 1 });
-                    ShardStoreResult::Stored
-                }
-            }
-            DedupPolicy::None => {
-                // Always store fresh with refcount 1 (no dedup at all).
-                self.persist_shard_data(&shard_id, &data);
-                self.persist_ref_count(&shard_id, 1);
-                shards.insert(shard_id, ShardEntry { data, ref_count: 1 });
-                ShardStoreResult::Stored
-            }
-        };
-
-        result
-    }
-
-    /// Increment reference count for an existing shard.
-    ///
-    /// Returns new refcount, or `None` if shard doesn't exist.
-    pub async fn acquire(&self, shard_id: &ContentHash) -> Option<u32> {
-        let mut shards = self.shards.write().await;
-        let entry = shards.get_mut(shard_id)?;
-        entry.ref_count = entry.ref_count.saturating_add(1);
-        let rc = entry.ref_count;
-        self.persist_ref_count(shard_id, rc);
-        Some(rc)
-    }
-
-    /// Decrement reference count. Removes shard data when refcount reaches 0.
-    ///
-    /// Returns new refcount (0 means removed), or `None` if shard doesn't exist.
-    pub async fn release(&self, shard_id: &ContentHash) -> Option<u32> {
-        let mut shards = self.shards.write().await;
-        let entry = shards.get_mut(shard_id)?;
-
-        if entry.ref_count <= 1 {
-            shards.remove(shard_id);
-            self.remove_shard_files(shard_id);
-            Some(0)
-        } else {
-            entry.ref_count -= 1;
-            let rc = entry.ref_count;
-            self.persist_ref_count(shard_id, rc);
-            Some(rc)
+        match policy {
+            DedupPolicy::Full => self.store_full(shard_id, data),
+            DedupPolicy::HashOnly => self.store_hash_only(shard_id, data),
+            DedupPolicy::None => self.store_none(shard_id, data),
         }
     }
 
-    /// Get the current reference count for a shard.
-    pub async fn ref_count(&self, shard_id: &ContentHash) -> Option<u32> {
-        self.shards
-            .read()
-            .await
-            .get(shard_id)
-            .map(|e| e.ref_count)
+    fn store_full(&self, shard_id: ContentHash, data: Vec<u8>) -> ShardStoreResult {
+        let mut shards = self.shards.write();
+        if let Some(entry) = shards.get_mut(&shard_id) {
+            if entry.ref_count == 0 {
+                self.persist_shard_data(&shard_id, &entry.data);
+            }
+            entry.ref_count = entry.ref_count.saturating_add(1);
+            self.persist_ref_count(&shard_id, entry.ref_count);
+            return ShardStoreResult::Deduplicated {
+                ref_count: entry.ref_count.saturating_add(entry.mirror_refs),
+            };
+        }
+        self.persist_shard_data(&shard_id, &data);
+        self.persist_ref_count(&shard_id, 1);
+        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        ShardStoreResult::Stored
     }
 
-    /// Force-remove a shard from memory and disk (ignores refcount).
+    fn store_hash_only(&self, shard_id: ContentHash, data: Vec<u8>) -> ShardStoreResult {
+        let mut shards = self.shards.write();
+        if let Some(entry) = shards.get_mut(&shard_id) {
+            if entry.ref_count > 0 {
+                return ShardStoreResult::Deduplicated { ref_count: 1 };
+            }
+            self.persist_shard_data(&shard_id, &entry.data);
+            self.persist_ref_count(&shard_id, 1);
+            entry.ref_count = 1;
+            return ShardStoreResult::Stored;
+        }
+        self.persist_shard_data(&shard_id, &data);
+        self.persist_ref_count(&shard_id, 1);
+        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        ShardStoreResult::Stored
+    }
+
+    fn store_none(&self, shard_id: ContentHash, data: Vec<u8>) -> ShardStoreResult {
+        let mut shards = self.shards.write();
+        if let Some(entry) = shards.get_mut(&shard_id) {
+            if entry.mirror_refs > 0 && entry.data != data {
+                return ShardStoreResult::Deduplicated {
+                    ref_count: entry.ref_count.saturating_add(entry.mirror_refs),
+                };
+            }
+            entry.data = data;
+            entry.ref_count = 1;
+            self.persist_shard_data(&shard_id, &entry.data);
+            self.persist_ref_count(&shard_id, 1);
+            return ShardStoreResult::Stored;
+        }
+        self.persist_shard_data(&shard_id, &data);
+        self.persist_ref_count(&shard_id, 1);
+        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        ShardStoreResult::Stored
+    }
+
+    /// Claim verified mirror bytes under the store lock. Caller holds the index
+    /// write lock first; neither lock crosses an await. Mirror-only bytes stay
+    /// in RAM and are freed when the final provider claim is removed or expires.
+    pub(crate) fn claim_mirror(&self, shard_id: ContentHash, data: &[u8]) -> bool {
+        let mut shards = self.shards.write();
+        if let Some(entry) = shards.get_mut(&shard_id) {
+            if entry.data != data {
+                return false;
+            }
+            let Some(next) = entry.mirror_refs.checked_add(1) else { return false; };
+            entry.mirror_refs = next;
+            return true;
+        }
+        shards.insert(shard_id, ShardEntry {
+            data: data.to_vec(), ref_count: 0, mirror_refs: 1,
+        });
+        true
+    }
+
+    /// Confirm an existing provider claim still points to these serve bytes.
+    pub(crate) fn mirror_bytes_match(&self, shard_id: &ContentHash, data: &[u8]) -> bool {
+        self.shards.read().get(shard_id).is_some_and(|entry| entry.data == data)
+    }
+
+    /// Release one provider-owned mirror hold; remove mirror-only bytes at zero.
+    pub(crate) fn release_mirror(&self, shard_id: &ContentHash) {
+        let mut shards = self.shards.write();
+        let Some(entry) = shards.get_mut(shard_id) else { return; };
+        entry.mirror_refs = entry.mirror_refs.saturating_sub(1);
+        if entry.mirror_refs == 0 && entry.ref_count == 0 {
+            shards.remove(shard_id);
+            self.remove_shard_files(shard_id);
+        }
+    }
+
+    /// Increment an owner reference without changing any mirror claim.
+    pub async fn acquire(&self, shard_id: &ContentHash) -> Option<u32> {
+        let mut shards = self.shards.write();
+        let entry = shards.get_mut(shard_id)?;
+        if entry.ref_count == 0 {
+            self.persist_shard_data(shard_id, &entry.data);
+        }
+        entry.ref_count = entry.ref_count.saturating_add(1);
+        self.persist_ref_count(shard_id, entry.ref_count);
+        Some(entry.ref_count.saturating_add(entry.mirror_refs))
+    }
+
+    /// Release one owner reference; active mirror claims keep bytes servable.
+    pub async fn release(&self, shard_id: &ContentHash) -> Option<u32> {
+        self.release_owner_now(shard_id)
+    }
+
+    pub(crate) fn release_owner_now(&self, shard_id: &ContentHash) -> Option<u32> {
+        let mut shards = self.shards.write();
+        let entry = shards.get_mut(shard_id)?;
+        if entry.ref_count == 0 { return None; }
+        entry.ref_count -= 1;
+        let total = entry.ref_count.saturating_add(entry.mirror_refs);
+        if entry.ref_count == 0 {
+            self.remove_shard_files(shard_id);
+            if entry.mirror_refs == 0 { shards.remove(shard_id); }
+        } else {
+            self.persist_ref_count(shard_id, entry.ref_count);
+        }
+        Some(total)
+    }
+
+    /// Total owner plus active mirror references for this shard.
+    pub async fn ref_count(&self, shard_id: &ContentHash) -> Option<u32> {
+        self.shards.read().get(shard_id)
+            .map(|e| e.ref_count.saturating_add(e.mirror_refs))
+    }
+
+    /// Remove owner references; an active mirror claim defers byte removal.
     pub async fn remove(&self, shard_id: &ContentHash) {
-        self.shards.write().await.remove(shard_id);
+        self.remove_owner_now(shard_id);
+    }
+
+    pub(crate) fn remove_owner_now(&self, shard_id: &ContentHash) {
+        let mut shards = self.shards.write();
+        if let Some(entry) = shards.get_mut(shard_id) {
+            if entry.mirror_refs > 0 {
+                entry.ref_count = 0;
+                self.remove_shard_files(shard_id);
+                return;
+            }
+        }
+        shards.remove(shard_id);
         self.remove_shard_files(shard_id);
     }
 
-    /// Retrieve a shard by its content hash.
+    /// Retrieve bytes currently held by an owner or active mirror.
     pub async fn get(&self, shard_id: &ContentHash) -> Option<Vec<u8>> {
-        self.shards
-            .read()
-            .await
-            .get(shard_id)
-            .map(|e| e.data.clone())
+        self.shards.read().get(shard_id).map(|e| e.data.clone())
     }
 
-    /// Check if a shard exists.
+    /// Check if a shard is currently held.
     pub async fn has(&self, shard_id: &ContentHash) -> bool {
-        self.shards.read().await.contains_key(shard_id)
+        self.shards.read().contains_key(shard_id)
     }
 
-    /// Number of stored shards.
+    /// Number of currently held shards.
     pub async fn count(&self) -> usize {
-        self.shards.read().await.len()
+        self.shards.read().len()
     }
 
     // ── Disk persistence helpers ────────────────────────────────────
@@ -289,374 +343,5 @@ impl Default for ShardStore {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_hash(seed: u8) -> ContentHash {
-        ContentHash([seed; 32])
-    }
-
-    // ── Backward-compatible tests (original API) ────────────────────
-
-    #[tokio::test]
-    async fn test_store_and_get() {
-        let store = ShardStore::new();
-        let hash = test_hash(1);
-        let data = vec![0xAB; 256];
-
-        store.store(hash, data.clone()).await;
-
-        let fetched = store.get(&hash).await;
-        assert_eq!(fetched, Some(data));
-    }
-
-    #[tokio::test]
-    async fn test_get_nonexistent() {
-        let store = ShardStore::new();
-        let hash = test_hash(2);
-        assert_eq!(store.get(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_has() {
-        let store = ShardStore::new();
-        let hash = test_hash(3);
-        assert!(!store.has(&hash).await);
-
-        store.store(hash, vec![1, 2, 3]).await;
-        assert!(store.has(&hash).await);
-    }
-
-    #[tokio::test]
-    async fn test_count() {
-        let store = ShardStore::new();
-        assert_eq!(store.count().await, 0);
-
-        store.store(test_hash(10), vec![1]).await;
-        store.store(test_hash(11), vec![2]).await;
-        assert_eq!(store.count().await, 2);
-    }
-
-    #[tokio::test]
-    async fn test_default() {
-        let store = ShardStore::default();
-        assert_eq!(store.count().await, 0);
-    }
-
-    #[tokio::test]
-    async fn test_disk_persistence_roundtrip() {
-        let tmp = std::env::temp_dir().join(format!(
-            "shard_store_test_roundtrip_{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        // Store a shard with disk backing
-        {
-            let store = ShardStore::new_with_dir(tmp.clone());
-            let hash = test_hash(42);
-            store.store(hash, vec![0xDE, 0xAD]).await;
-            assert_eq!(store.count().await, 1);
-        }
-
-        // Create a new store from the same directory — shard should reload
-        {
-            let store = ShardStore::new_with_dir(tmp.clone());
-            assert_eq!(store.count().await, 1);
-            let fetched = store.get(&test_hash(42)).await;
-            assert_eq!(fetched, Some(vec![0xDE, 0xAD]));
-        }
-
-        let _ = std::fs::remove_dir_all(&tmp);
-    }
-
-    #[tokio::test]
-    async fn test_disk_store_and_remove() {
-        let tmp = std::env::temp_dir().join(format!(
-            "shard_store_test_remove_{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        let store = ShardStore::new_with_dir(tmp.clone());
-        let hash = test_hash(99);
-        let hex_name = hex::encode(hash.0);
-
-        // Store and verify file exists on disk
-        store.store(hash, vec![1, 2, 3]).await;
-        assert!(tmp.join(&hex_name).exists());
-
-        // Remove and verify file is gone
-        store.remove(&hash).await;
-        assert!(!store.has(&hash).await);
-        assert!(!tmp.join(&hex_name).exists());
-
-        let _ = std::fs::remove_dir_all(&tmp);
-    }
-
-    // ── Dedup-aware tests ───────────────────────────────────────────
-
-    #[tokio::test]
-    async fn test_store_with_dedup_full_new_shard() {
-        let store = ShardStore::new();
-        let hash = test_hash(50);
-        let result = store
-            .store_with_dedup(hash, vec![0xAA; 64], DedupPolicy::Full)
-            .await;
-        assert_eq!(result, ShardStoreResult::Stored);
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_store_with_dedup_full_duplicate() {
-        let store = ShardStore::new();
-        let hash = test_hash(51);
-
-        let r1 = store
-            .store_with_dedup(hash, vec![0xBB; 64], DedupPolicy::Full)
-            .await;
-        assert_eq!(r1, ShardStoreResult::Stored);
-
-        let r2 = store
-            .store_with_dedup(hash, vec![0xBB; 64], DedupPolicy::Full)
-            .await;
-        assert_eq!(r2, ShardStoreResult::Deduplicated { ref_count: 2 });
-        assert_eq!(store.ref_count(&hash).await, Some(2));
-
-        // Data is still accessible
-        assert_eq!(store.get(&hash).await, Some(vec![0xBB; 64]));
-    }
-
-    #[tokio::test]
-    async fn test_store_with_dedup_none_always_overwrites() {
-        let store = ShardStore::new();
-        let hash = test_hash(52);
-
-        // First store
-        let r1 = store
-            .store_with_dedup(hash, vec![0xCC; 32], DedupPolicy::None)
-            .await;
-        assert_eq!(r1, ShardStoreResult::Stored);
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-
-        // Second store with None: overwrites, refcount stays 1
-        let r2 = store
-            .store_with_dedup(hash, vec![0xCC; 32], DedupPolicy::None)
-            .await;
-        assert_eq!(r2, ShardStoreResult::Stored);
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_acquire_increments_refcount() {
-        let store = ShardStore::new();
-        let hash = test_hash(53);
-        store.store(hash, vec![1]).await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-
-        let rc = store.acquire(&hash).await;
-        assert_eq!(rc, Some(2));
-        assert_eq!(store.ref_count(&hash).await, Some(2));
-
-        let rc = store.acquire(&hash).await;
-        assert_eq!(rc, Some(3));
-    }
-
-    #[tokio::test]
-    async fn test_acquire_nonexistent_returns_none() {
-        let store = ShardStore::new();
-        let hash = test_hash(54);
-        assert_eq!(store.acquire(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_release_decrements_refcount() {
-        let store = ShardStore::new();
-        let hash = test_hash(55);
-        store.store(hash, vec![1]).await;
-
-        // Bump to refcount 3
-        store.acquire(&hash).await;
-        store.acquire(&hash).await;
-        assert_eq!(store.ref_count(&hash).await, Some(3));
-
-        // Release: 3 -> 2
-        let rc = store.release(&hash).await;
-        assert_eq!(rc, Some(2));
-        assert!(store.has(&hash).await);
-
-        // Release: 2 -> 1
-        let rc = store.release(&hash).await;
-        assert_eq!(rc, Some(1));
-        assert!(store.has(&hash).await);
-
-        // Release: 1 -> 0 (removed)
-        let rc = store.release(&hash).await;
-        assert_eq!(rc, Some(0));
-        assert!(!store.has(&hash).await);
-        assert_eq!(store.get(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_release_nonexistent_returns_none() {
-        let store = ShardStore::new();
-        let hash = test_hash(56);
-        assert_eq!(store.release(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_ref_count_returns_none_for_missing() {
-        let store = ShardStore::new();
-        let hash = test_hash(57);
-        assert_eq!(store.ref_count(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_force_remove_ignores_refcount() {
-        let store = ShardStore::new();
-        let hash = test_hash(58);
-        store.store(hash, vec![1]).await;
-        store.acquire(&hash).await;
-        store.acquire(&hash).await;
-        assert_eq!(store.ref_count(&hash).await, Some(3));
-
-        // Force remove: gone regardless of refcount
-        store.remove(&hash).await;
-        assert!(!store.has(&hash).await);
-        assert_eq!(store.ref_count(&hash).await, None);
-    }
-
-    #[tokio::test]
-    async fn test_backward_compat_store_creates_refcount_1() {
-        let store = ShardStore::new();
-        let hash = test_hash(59);
-        store.store(hash, vec![0xFF]).await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_backward_compat_store_deduplicates() {
-        let store = ShardStore::new();
-        let hash = test_hash(60);
-        store.store(hash, vec![0xFF]).await;
-        store.store(hash, vec![0xFF]).await;
-        // Default store uses Full dedup, so refcount increments
-        assert_eq!(store.ref_count(&hash).await, Some(2));
-    }
-
-    #[tokio::test]
-    async fn test_disk_persistence_with_refcount() {
-        let tmp = std::env::temp_dir().join(format!(
-            "shard_store_test_refcount_{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        let hash = test_hash(70);
-
-        // Store with refcount 3
-        {
-            let store = ShardStore::new_with_dir(tmp.clone());
-            store.store(hash, vec![0xAA]).await;
-            store.acquire(&hash).await;
-            store.acquire(&hash).await;
-            assert_eq!(store.ref_count(&hash).await, Some(3));
-        }
-
-        // Reload from disk — refcount should survive
-        {
-            let store = ShardStore::new_with_dir(tmp.clone());
-            assert_eq!(store.ref_count(&hash).await, Some(3));
-            assert_eq!(store.get(&hash).await, Some(vec![0xAA]));
-        }
-
-        let _ = std::fs::remove_dir_all(&tmp);
-    }
-
-    #[tokio::test]
-    async fn test_store_with_hash_only_skips_duplicate() {
-        let store = ShardStore::new();
-        let hash = test_hash(80);
-
-        let r1 = store
-            .store_with_dedup(hash, vec![0xDD; 64], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(r1, ShardStoreResult::Stored);
-
-        let r2 = store
-            .store_with_dedup(hash, vec![0xDD; 64], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(r2, ShardStoreResult::Deduplicated { ref_count: 1 });
-
-        // Data is still accessible
-        assert_eq!(store.get(&hash).await, Some(vec![0xDD; 64]));
-    }
-
-    #[tokio::test]
-    async fn test_store_with_hash_only_no_refcount_increment() {
-        let store = ShardStore::new();
-        let hash = test_hash(81);
-
-        store
-            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-
-        // Second store with HashOnly: refcount stays 1 (no tracking)
-        store
-            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-
-        // Third store: still 1
-        store
-            .store_with_dedup(hash, vec![0xEE; 32], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-    }
-
-    #[tokio::test]
-    async fn test_hash_only_release_does_not_auto_remove() {
-        let store = ShardStore::new();
-        let hash = test_hash(82);
-
-        // Store with HashOnly (rc=1 sentinel)
-        store
-            .store_with_dedup(hash, vec![0xFF; 16], DedupPolicy::HashOnly)
-            .await;
-        assert_eq!(store.ref_count(&hash).await, Some(1));
-
-        // Release: refcount goes to 0, shard is removed.
-        // For HashOnly shards the caller should NOT call release() since
-        // refcount is not tracked. But if they do, the behavior is defined:
-        // rc=1 -> 0 -> removed. This is safe — the shard can be re-fetched.
-        let rc = store.release(&hash).await;
-        assert_eq!(rc, Some(0));
-        assert!(!store.has(&hash).await);
-    }
-
-    #[tokio::test]
-    async fn test_release_removes_disk_files() {
-        let tmp = std::env::temp_dir().join(format!(
-            "shard_store_test_release_disk_{}",
-            std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&tmp);
-
-        let store = ShardStore::new_with_dir(tmp.clone());
-        let hash = test_hash(71);
-        let hex_name = hex::encode(hash.0);
-
-        store.store(hash, vec![1, 2]).await;
-        assert!(tmp.join(&hex_name).exists());
-        assert!(tmp.join(format!("{hex_name}.ref")).exists());
-
-        // Release to 0 — both files should be removed
-        let rc = store.release(&hash).await;
-        assert_eq!(rc, Some(0));
-        assert!(!tmp.join(&hex_name).exists());
-        assert!(!tmp.join(format!("{hex_name}.ref")).exists());
-
-        let _ = std::fs::remove_dir_all(&tmp);
-    }
-}
+#[path = "tests/mirror_store.rs"]
+mod tests;
