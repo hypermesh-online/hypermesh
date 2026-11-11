@@ -9,6 +9,24 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
+// x86_64 syscall exit tracepoint layout: trace_entry, nr, padding, ret.
+// Source: Linux v7.2 include/linux/trace_events.h and kernel/trace/trace.h.
+// This compile-time layout does not verify the running kernel's tracepoint ABI.
+struct syscall_exit_ctx {
+    __u16 common_type;
+    __u8 common_flags;
+    __u8 common_preempt_count;
+    __s32 common_pid;
+    __s32 nr;
+    __u32 padding;
+    long ret;
+};
+
+_Static_assert(sizeof(long) == 8, "x86_64 syscall return width");
+_Static_assert(__builtin_offsetof(struct syscall_exit_ctx, nr) == 8, "syscall number offset");
+_Static_assert(__builtin_offsetof(struct syscall_exit_ctx, ret) == 16, "return offset");
+_Static_assert(sizeof(struct syscall_exit_ctx) == 24, "syscall exit context size");
+
 // Network event types
 enum net_event_type {
     NET_EVENT_CONNECT = 1,
@@ -80,7 +98,7 @@ int trace_accept_enter(void *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_sendto")
-int trace_sendto_exit(struct trace_event_raw_sys_exit *ctx)
+int trace_sendto_exit(struct syscall_exit_ctx *ctx)
 {
     if (ctx->ret > 0)
         record_event(NET_EVENT_SEND, ctx->ret);
@@ -88,7 +106,7 @@ int trace_sendto_exit(struct trace_event_raw_sys_exit *ctx)
 }
 
 SEC("tracepoint/syscalls/sys_exit_recvfrom")
-int trace_recvfrom_exit(struct trace_event_raw_sys_exit *ctx)
+int trace_recvfrom_exit(struct syscall_exit_ctx *ctx)
 {
     if (ctx->ret > 0)
         record_event(NET_EVENT_RECV, ctx->ret);
