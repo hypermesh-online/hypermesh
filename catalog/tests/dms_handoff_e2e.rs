@@ -37,10 +37,10 @@ use blockmatrix::network::swarm_provider::ShardLocationIndex;
 use catalog::registry::asset_type::AssetTypeDefinition;
 use catalog::registry::catalog_registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
 
+use blockmatrix::assets::StateProof;
 use blockmatrix::proof_of_state::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof,
 };
-use blockmatrix::assets::StateProof;
 
 use async_trait::async_trait;
 use hypermesh_lib::{ContentHash, NetworkId, NodeId, PrivacyMode, DEFAULT_NETWORK};
@@ -93,9 +93,17 @@ impl VersionContentSource for FixedContentSource {
     }
 }
 
-/// The full handoff: catalog write → observer seed → NGauge mirror → reflect.
-#[tokio::test]
-async fn dms_handoff_new_version_mirrors_and_reflects() {
+struct Fixture {
+    network: NetworkId,
+    chain: Arc<NodeBlockchain>,
+    registry: CatalogRegistry,
+    index: Arc<ShardLocationIndex>,
+    store: Arc<ShardStore>,
+    analytics: Arc<Mutex<SwarmAnalytics>>,
+    seeder: SwarmSeeder,
+}
+
+fn fixture() -> Fixture {
     let network = DEFAULT_NETWORK;
     let coord = MatrixCoordinate::new(4, 4, 4).expect("test: valid coordinate");
 
@@ -126,12 +134,26 @@ async fn dms_handoff_new_version_mirrors_and_reflects() {
         NodeId::from_public_key(SEED_NODE.as_bytes()),
     );
 
+    Fixture {
+        network,
+        chain,
+        registry,
+        index,
+        store,
+        analytics,
+        seeder,
+    }
+}
+
+async fn seed_version(fixture: &Fixture) -> Vec<(ContentHash, Vec<u8>)> {
     // --- Phase 3 write: register a Catalog asset version ---------------------
-    registry
+    fixture
+        .registry
         .register_type(type_def("dataset", "1.0.0"))
         .await
         .expect("test: register dataset v1 on-chain");
-    let asset_hash = registry
+    let asset_hash = fixture
+        .registry
         .asset_hash_for_name("dataset")
         .await
         .expect("test: dataset resolves to a genesis asset_hash");
@@ -140,65 +162,96 @@ async fn dms_handoff_new_version_mirrors_and_reflects() {
     let content = b"dataset-v1-distributable-payload-bytes-for-the-swarm".to_vec();
     let source = FixedContentSource {
         asset_hash,
-        network,
+        network: fixture.network,
         bytes: content.clone(),
     };
 
     // --- Observer: new asset head → seed the swarm ---------------------------
     let observer = ChainHeadObserver::new();
-    let seeded = observer.poll_once(&chain, &seeder, &source).await;
+    let seeded = observer
+        .poll_once(&fixture.chain, &fixture.seeder, &source)
+        .await;
     assert!(
         seeded.contains(&asset_hash),
         "observer seeds the newly-headed version into the swarm"
     );
 
     // A second pass is a no-op — the head has not advanced.
-    let again = observer.poll_once(&chain, &seeder, &source).await;
+    let again = observer
+        .poll_once(&fixture.chain, &fixture.seeder, &source)
+        .await;
     assert!(again.is_empty(), "no re-seed when the head is unchanged");
 
     // --- SEED assertion: shards under the asset's (network, content) key ------
     let shards = shard_content(&content).expect("test: reshard content to learn shard ids");
+    assert_seeded(fixture, &shards).await;
+    shards
+}
+
+async fn assert_seeded(fixture: &Fixture, shards: &[(ContentHash, Vec<u8>)]) {
     assert!(!shards.is_empty(), "content shards into >= 1 shard");
-    for (shard_id, _) in &shards {
-        let providers = index.get_providers_in_network(network, shard_id).await;
+    for (shard_id, _) in shards {
+        let providers = fixture
+            .index
+            .get_providers_in_network(fixture.network, shard_id)
+            .await;
         assert!(
             providers.contains(&SEED_NODE.to_string()),
             "seed registered the publisher as a provider under (network, shard)"
         );
-        assert!(store.has(shard_id).await, "shard bytes are stored locally");
+        assert!(
+            fixture.store.has(shard_id).await,
+            "shard bytes are stored locally"
+        );
     }
+}
 
+fn mirror_plan(
+    analytics: &Mutex<SwarmAnalytics>,
+    network: NetworkId,
+    bundles: &[ShardCandidates],
+) -> ngauge::DmsPlan {
+    {
+        let guard = analytics.lock().expect("test: analytics guard");
+        let plan = DmsDriver::plan(&guard, network, bundles, 0.5);
+        drop(guard); // !Send guard dropped before any await (feed.rs:28 rule).
+        plan
+    }
+}
+
+async fn mirror_executor(fixture: &Fixture, shards: &[(ContentHash, Vec<u8>)]) -> StoqDmsExecutor {
     // --- MIRROR half: NGauge plans, the executor pulls a second replica -------
     // Model a pool peer (SEED_NODE) that already holds the bytes; MIRROR_NODE
     // pulls from it. Only this byte-transfer is the in-memory stand-in.
     let mock = Arc::new(MockShardTransport::new());
     let seed_node_id = NodeId::from_public_key(SEED_NODE.as_bytes());
-    for (shard_id, data) in &shards {
-        mock.insert_shard(&seed_node_id, shard_id, data.clone()).await;
+    for (shard_id, data) in shards {
+        mock.insert_shard(&seed_node_id, shard_id, data.clone())
+            .await;
     }
-    let executor = StoqDmsExecutor::new(
+    StoqDmsExecutor::new(
         mock.clone(),
-        index.clone(),
+        fixture.store.clone(),
+        fixture.index.clone(),
         MIRROR_NODE.to_string(),
-        analytics.clone(),
-    );
+        fixture.analytics.clone(),
+    )
+}
 
+async fn assert_mirrors(fixture: &Fixture, shards: &[(ContentHash, Vec<u8>)]) {
+    let executor = mirror_executor(fixture, shards).await;
     // Gather candidates from the REAL index and let the REAL planner decide.
-    let bundles = candidate_bundles(&index, network, &shards).await;
-    let plan = {
-        let guard = analytics.lock().expect("test: analytics guard");
-        let plan = DmsDriver::plan(&guard, network, &bundles, 0.5);
-        drop(guard); // !Send guard dropped before any await (feed.rs:28 rule).
-        plan
-    };
+    let bundles = candidate_bundles(&fixture.index, fixture.network, shards).await;
+    let plan = mirror_plan(&fixture.analytics, fixture.network, &bundles);
     assert!(
         !plan.mirror.is_empty(),
         "NGauge produces a mirror plan for the under-replicated version"
     );
 
     let action = &plan.mirror[0];
-    let before = index
-        .get_providers_in_network(network, &action.shard_id)
+    let before = fixture
+        .index
+        .get_providers_in_network(fixture.network, &action.shard_id)
         .await
         .len();
     let replica_count = executor
@@ -210,21 +263,32 @@ async fn dms_handoff_new_version_mirrors_and_reflects() {
         "mirror increased the replica count ({before} -> {replica_count})"
     );
     assert!(
-        index
-            .get_providers_in_network(network, &action.shard_id)
+        fixture
+            .index
+            .get_providers_in_network(fixture.network, &action.shard_id)
             .await
             .contains(&MIRROR_NODE.to_string()),
         "the mirroring node is now a registered provider (consumer-becomes-provider)"
     );
 
+    assert_reflects(&fixture.index, fixture.network, &action.shard_id).await;
+}
+
+async fn assert_reflects(index: &ShardLocationIndex, network: NetworkId, shard_id: &ContentHash) {
     // --- REFLECT half: a consumer request resolves the shard to a provider ----
-    let resolved = index
-        .get_providers_in_network(network, &action.shard_id)
-        .await;
+    let resolved = index.get_providers_in_network(network, shard_id).await;
     assert!(
         !resolved.is_empty(),
         "the announced/served shard resolves for a consumer via the location index"
     );
+}
+
+/// The full handoff: catalog write → observer seed → NGauge mirror → reflect.
+#[tokio::test]
+async fn dms_handoff_new_version_mirrors_and_reflects() {
+    let fixture = fixture();
+    let shards = seed_version(&fixture).await;
+    assert_mirrors(&fixture, &shards).await;
 }
 
 /// Build the per-shard candidate bundles the planner consumes: every provider
