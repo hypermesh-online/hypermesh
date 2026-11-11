@@ -153,6 +153,9 @@ pub struct TransportConfig {
     pub enable_falcon_crypto: bool,
     /// FALCON variant to use
     pub falcon_variant: FalconVariant,
+    /// Enable optional eBPF/XDP and AF_XDP acceleration.
+    #[serde(default = "kernel_acceleration_enabled_by_default")]
+    pub enable_kernel_acceleration: bool,
     /// Network interface for eBPF XDP attachment.
     /// When `None`, automatically resolved from `bind_address`
     /// (localhost -> "lo", unspecified/other -> system default).
@@ -181,6 +184,10 @@ pub struct TransportConfig {
     pub public_ipv6: Option<std::net::Ipv6Addr>,
     /// Timeout in milliseconds for connection migration detection (default 3000)
     pub connection_migration_timeout_ms: u64,
+}
+
+fn kernel_acceleration_enabled_by_default() -> bool {
+    true
 }
 
 impl Default for TransportConfig {
@@ -216,6 +223,7 @@ impl Default for TransportConfig {
             enable_large_send_offload: true, // LSO for large transfers
             enable_falcon_crypto: true,      // Quantum-resistant FALCON cryptography
             falcon_variant: FalconVariant::Falcon1024, // Maximum security level
+            enable_kernel_acceleration: true,
             ebpf_interface: None,            // Auto-detect from bind_address
             interface: None,                 // Substrate-injected by the node binary
             ewma_alpha: 0.125,               // Conservative smoothing

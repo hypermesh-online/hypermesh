@@ -23,10 +23,16 @@ use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, Sto
 use super::ebpf::StoqEbpfTransport;
 
 mod connections;
+mod construction;
 mod constructors;
+mod kernel_acceleration;
 mod monitoring;
 mod pos;
 mod trait_impl;
+
+#[cfg(test)]
+#[path = "tests/accept_lifecycle.rs"]
+mod accept_lifecycle_tests;
 
 // Global initialization for crypto provider
 pub(crate) static CRYPTO_INIT: std::sync::Once = std::sync::Once::new();

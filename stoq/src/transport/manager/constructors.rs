@@ -4,79 +4,28 @@
 
 //! STOQ Transport constructors and initialization
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use quinn::{self, TransportConfig as QuinnTransportConfig, VarInt};
-use std::net::{Ipv6Addr, SocketAddr};
+use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::transport::adaptive::AdaptationManager;
 use crate::transport::certificate_strategy::NetworkType;
 use crate::transport::certificates::CertificateManager;
-use crate::transport::config::{CongestionControl, TransportConfig};
-use crate::transport::connection::MemoryPool;
-use crate::transport::ebpf::StoqEbpfTransport;
-use crate::transport::falcon::FalconTransport;
+use crate::transport::config::TransportConfig;
 use crate::transport::metrics::TransportMetrics;
 use crate::transport::stats::PerformanceStats;
 
 use crate::extensions::DefaultStoqExtensions;
-use crate::protocol::pos_fast_validator::{FastValidationConfig, PosFastValidator};
-use crate::protocol::{handshake::StoqHandshakeExtension, StoqPosIntegration, StoqProtocolHandler};
+use crate::protocol::StoqPosIntegration;
 
-use super::{StoqTransport, CRYPTO_INIT};
+use super::{construction, kernel_acceleration, StoqTransport, CRYPTO_INIT};
 
-/// Fallback interface detection when no interface was injected.
-///
-/// The Substrate (`base::Substrate::active_interface()`) is the real, carrier-aware
-/// producer; the node binary injects its result into `config.interface`. This
-/// probe list is only the degraded fallback for callers that construct a transport
-/// without a Substrate (tests, embedded uses). Probes common names and returns the
-/// first that exists, falling back to "lo".
-fn detect_outbound_interface() -> String {
-    // Check common interface names in priority order
-    for iface in &["eth0", "ens3", "ens4", "enp0s3", "wlan0", "wlp2s0"] {
-        let path = format!("/sys/class/net/{}", iface);
-        if std::path::Path::new(&path).exists() {
-            debug!("Fallback-detected outbound interface: {}", iface);
-            return iface.to_string();
-        }
-    }
-    debug!("No outbound interface detected, falling back to lo");
-    "lo".to_string()
-}
-
-/// Resolve the network interface name for eBPF XDP attachment.
-///
-/// Priority:
-/// 1. Explicit `config.ebpf_interface` override (if set)
-/// 2. Substrate-injected `config.interface` (R16 carrier-aware selection)
-/// 3. "lo" when bind_address is localhost (and NOT wan_enabled)
-/// 4. Fallback auto-detection when UNSPECIFIED or wan_enabled or other
-fn resolve_ebpf_interface(config: &TransportConfig) -> String {
-    // Explicit override takes highest priority.
-    if let Some(ref iface) = config.ebpf_interface {
-        return iface.clone();
-    }
-
-    // Substrate-selected interface: the real, carrier-aware choice injected by
-    // the node binary. Preferred over the hardcoded probe list.
-    if let Some(ref iface) = config.interface {
-        debug!("Using Substrate-injected interface: {}", iface);
-        return iface.clone();
-    }
-
-    // Localhost without WAN uses loopback.
-    if config.bind_address == Ipv6Addr::LOCALHOST && !config.wan_enabled {
-        return "lo".to_string();
-    }
-
-    // UNSPECIFIED, wan_enabled, or any other address: fall back to detection.
-    detect_outbound_interface()
-}
+#[cfg(test)]
+use super::kernel_acceleration::resolve_ebpf_interface;
 
 impl StoqTransport {
     /// Create a new STOQ transport using QUIC over IPv6
@@ -159,219 +108,28 @@ impl StoqTransport {
         config: TransportConfig,
         cert_manager: Arc<CertificateManager>,
     ) -> Result<Self> {
-        // Configure QUIC transport for adaptive network tiers performance
-        let mut server_transport_config = QuinnTransportConfig::default();
-        server_transport_config.max_concurrent_bidi_streams(config.max_concurrent_streams.into());
-        server_transport_config.max_concurrent_uni_streams(config.max_concurrent_streams.into());
-        server_transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
-
-        // QUIC performance optimizations
-        server_transport_config.send_window(config.send_buffer_size as u64);
-        server_transport_config.receive_window(
-            VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX),
-        );
-        server_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
-        server_transport_config.datagram_send_buffer_size(config.max_datagram_size);
-
-        // Create client transport config
-        let mut client_transport_config = QuinnTransportConfig::default();
-        client_transport_config.max_concurrent_bidi_streams(config.max_concurrent_streams.into());
-        client_transport_config.max_concurrent_uni_streams(config.max_concurrent_streams.into());
-        client_transport_config.max_idle_timeout(Some(config.max_idle_timeout.try_into()?));
-        client_transport_config.send_window(config.send_buffer_size as u64);
-        client_transport_config.receive_window(
-            VarInt::try_from(config.receive_buffer_size as u64).unwrap_or(VarInt::MAX),
-        );
-        client_transport_config.datagram_receive_buffer_size(Some(config.max_datagram_size));
-        client_transport_config.datagram_send_buffer_size(config.max_datagram_size);
-
-        // Advanced congestion control for high performance
-        match config.congestion_control {
-            CongestionControl::Bbr2 => {
-                // BBR v2 would be configured here when available in Quinn
-                debug!("Using BBR-optimized settings for high performance");
-            }
-            CongestionControl::Cubic => {
-                debug!("Using CUBIC congestion control");
-            }
-            CongestionControl::NewReno => {
-                debug!("Using NewReno congestion control");
-            }
-        }
-
-        // Create server configuration with TLS
+        let server_transport_config = construction::quinn_transport(&config)?;
+        let client_transport_config = construction::quinn_transport(&config)?;
+        construction::log_congestion(&config);
         let rustls_server_config = cert_manager.server_crypto_config().await?;
-        let mut server_config = quinn::ServerConfig::with_crypto(Arc::new(
-            quinn::crypto::rustls::QuicServerConfig::try_from(rustls_server_config)?,
-        ));
+        let mut server_config = construction::server_config(rustls_server_config)?;
         server_config.transport_config(Arc::new(server_transport_config));
-
-        // Create client configuration with TLS and cache it for performance
         let rustls_client_config = cert_manager.client_crypto_config().await?;
-        let mut client_config = quinn::ClientConfig::new(Arc::new(
-            quinn::crypto::rustls::QuicClientConfig::try_from(rustls_client_config)?,
-        ));
+        let mut client_config = construction::client_config(rustls_client_config)?;
         client_config.transport_config(Arc::new(client_transport_config));
-
-        // Bind to IPv6 address ONLY - enforce IPv6-only networking
-        // Use port 0 (OS-assigned random port) for testing to avoid port binding conflicts
-        #[cfg(test)]
-        let bind_port = 0;
-        #[cfg(not(test))]
-        let bind_port = config.port;
-
-        let socket_addr = SocketAddr::from((config.bind_address, bind_port));
-
-        // Verify we're binding to IPv6
-        if !socket_addr.is_ipv6() {
-            return Err(anyhow!(
-                "STOQ only supports IPv6 addresses, got: {socket_addr}"
-            ));
-        }
-
-        let socket = std::net::UdpSocket::bind(socket_addr)?;
-
-        // Set socket options for adaptive network tiers performance
-        let socket = if let SocketAddr::V6(_) = socket_addr {
-            let socket2_sock = socket2::Socket::from(socket);
-
-            // Enable SO_REUSEADDR to allow quick rebinding in tests
-            if let Err(e) = socket2_sock.set_reuse_address(true) {
-                warn!("Could not set SO_REUSEADDR (continuing anyway): {}", e);
-            }
-
-            // IPv6-only flag
-            if let Err(e) = socket2_sock.set_only_v6(true) {
-                warn!(
-                    "Could not set IPv6-only socket option (continuing anyway): {}",
-                    e
-                );
-            }
-
-            // Socket optimizations
-            if let Err(e) = socket2_sock.set_send_buffer_size(config.send_buffer_size) {
-                warn!("Could not set send buffer size: {}", e);
-            }
-            if let Err(e) = socket2_sock.set_recv_buffer_size(config.receive_buffer_size) {
-                warn!("Could not set receive buffer size: {}", e);
-            }
-
-            socket2_sock.into()
-        } else {
-            socket
-        };
-
-        let mut endpoint = quinn::Endpoint::new(
-            quinn::EndpointConfig::default(),
-            Some(server_config),
-            socket,
-            Arc::new(quinn::TokioRuntime),
-        )?;
-
-        endpoint.set_default_client_config(client_config.clone());
-
-        // Initialize metrics and transport optimizations
+        let socket = construction::bind_socket(&config)?;
+        let endpoint = construction::endpoint(server_config, socket, &client_config)?;
         let metrics = Arc::new(TransportMetrics::new());
-
-        // Initialize memory pool for zero-copy operations
-        let memory_pool = Arc::new(MemoryPool::new(
-            config.max_datagram_size,
-            config.memory_pool_size,
-        ));
-
-        // Initialize FALCON quantum-resistant cryptography if enabled
-        let falcon_transport = if config.enable_falcon_crypto {
-            let mut falcon = FalconTransport::new(config.falcon_variant);
-            if let Err(e) = falcon.generate_local_keypair() {
-                warn!("Failed to generate FALCON keypair: {}", e);
-                None
-            } else {
-                info!(
-                    "FALCON quantum-resistant cryptography enabled with {:?}",
-                    config.falcon_variant
-                );
-                Some(Arc::new(RwLock::new(falcon)))
-            }
-        } else {
-            info!("FALCON cryptography disabled");
-            None
-        };
-
-        // Initialize protocol extensions
+        let memory_pool = construction::memory_pool(&config);
+        let falcon_transport = construction::falcon(&config);
         let extensions = Arc::new(DefaultStoqExtensions::with_metrics(metrics.clone()));
-
-        // Create protocol handler
-        let protocol_handler = Arc::new(StoqProtocolHandler::new(
-            extensions.clone(),
-            falcon_transport.clone(),
-            config.max_datagram_size,
-        ));
-
-        // Create handshake extension
-        let handshake_extension = Arc::new(StoqHandshakeExtension::new(
-            falcon_transport.clone(),
-            false,                       // Don't require FALCON (backwards compatibility)
-            config.enable_falcon_crypto, // Use hybrid mode if FALCON enabled
-        ));
-
-        // Create adaptation manager with 1 second interval
+        let protocol_handler =
+            construction::protocol_handler(&extensions, &falcon_transport, &config);
+        let handshake_extension = construction::handshake_extension(&falcon_transport, &config);
         let adaptation_manager = Arc::new(AdaptationManager::new(Duration::from_secs(1)));
-
-        // Create STOQ + PoS integration with 5-minute cache TTL
         let pos_integration = Arc::new(StoqPosIntegration::new(Duration::from_secs(300)));
-
-        // Create fast PoS pre-validator for line-rate filtering
-        let full_pos_validator = Arc::new(crate::protocol::pos_validator::PosTokenValidator::new(
-            Duration::from_secs(300),
-        ));
-        let pos_fast_validator = Arc::new(PosFastValidator::new(
-            FastValidationConfig::default(),
-            full_pos_validator,
-        ));
-
-        // Resolve the network interface for eBPF XDP attachment.
-        // Localhost always uses "lo"; other addresses attempt to detect the
-        // outbound interface by inspecting the bind address.
-        let ebpf_interface = resolve_ebpf_interface(&config);
-        info!("eBPF interface resolved to: {}", ebpf_interface);
-
-        // Initialize eBPF transport acceleration (delegates to hypermesh-ebpf)
-        let (ebpf_transport, af_xdp_socket) = match StoqEbpfTransport::new() {
-            Ok(mut ebpf) => {
-                if ebpf.is_available() {
-                    info!("eBPF transport acceleration available");
-
-                    // Attach XDP program to the resolved interface
-                    if let Err(e) = ebpf.attach_xdp(&ebpf_interface) {
-                        warn!("Failed to attach XDP to {}: {}", ebpf_interface, e);
-                    }
-
-                    // Create a single AF_XDP socket during init and reuse it.
-                    // This avoids the "duplicate socket key" error that occurs
-                    // when create_af_xdp_socket is called on every send().
-                    let socket = match ebpf.create_af_xdp_socket(&ebpf_interface, 0) {
-                        Ok(s) => {
-                            info!("AF_XDP zero-copy socket created for {}:0", ebpf_interface);
-                            Some(Arc::new(s))
-                        }
-                        Err(e) => {
-                            debug!("AF_XDP socket not available (will use standard I/O): {}", e);
-                            None
-                        }
-                    };
-
-                    (Some(Arc::new(RwLock::new(ebpf))), socket)
-                } else {
-                    info!("eBPF not available, using standard transport");
-                    (None, None)
-                }
-            }
-            Err(e) => {
-                warn!("Failed to initialize eBPF: {}", e);
-                (None, None)
-            }
-        };
-
+        let pos_fast_validator = construction::pos_fast_validator();
+        let (ebpf_transport, af_xdp_socket) = kernel_acceleration::initialize(&config);
         Ok(Self {
             config,
             endpoint: Arc::new(endpoint),
