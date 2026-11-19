@@ -47,8 +47,8 @@ pub mod trust_signals;
 pub mod udp_ingest;
 
 // Re-export primary types at crate root for convenience.
-pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
 pub use caesar_tracker::CaesarTracker;
+pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
 pub use collective_intel::CollectiveIntelligence;
 pub use compliance::{AttestationLevel, ComplianceChecker, ComplianceResult, KycAttestation};
 pub use ingestion::MetricsIngestionPipeline;

@@ -192,12 +192,24 @@ mod tests {
         let auth = NodeAuthenticator::new(config);
 
         // Test valid node IDs
-        assert!(auth.authenticate_node("node-123").await.expect("test: async operation"));
-        assert!(auth.authenticate_node("hypermesh-abc").await.expect("test: async operation"));
-        assert!(auth.authenticate_node("hm-xyz").await.expect("test: async operation"));
+        assert!(auth
+            .authenticate_node("node-123")
+            .await
+            .expect("test: async operation"));
+        assert!(auth
+            .authenticate_node("hypermesh-abc")
+            .await
+            .expect("test: async operation"));
+        assert!(auth
+            .authenticate_node("hm-xyz")
+            .await
+            .expect("test: async operation"));
 
         // Test invalid node ID
-        assert!(!auth.authenticate_node("invalid").await.expect("test: async operation"));
+        assert!(!auth
+            .authenticate_node("invalid")
+            .await
+            .expect("test: async operation"));
     }
 
     #[test]

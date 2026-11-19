@@ -50,10 +50,7 @@ pub fn parse_manifest(toml_str: &str) -> Result<DashboardManifest, String> {
 /// Validate a parsed manifest against structural and filesystem rules.
 ///
 /// Returns `Ok(())` when valid, or `Err` with a list of validation errors.
-pub fn validate_manifest(
-    manifest: &DashboardManifest,
-    base_dir: &Path,
-) -> Result<(), Vec<String>> {
+pub fn validate_manifest(manifest: &DashboardManifest, base_dir: &Path) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
     if manifest.dashboard.name.is_empty() {
@@ -70,9 +67,7 @@ pub fn validate_manifest(
     }
 
     // At least one access scope must be defined
-    if manifest.access.public.is_none()
-        && manifest.access.private.is_none()
-    {
+    if manifest.access.public.is_none() && manifest.access.private.is_none() {
         errors.push("at least one access scope (public/private) must be defined".into());
     }
 
@@ -257,8 +252,7 @@ public = "dist/"
     fn test_manifest_serde_roundtrip() {
         let original = parse_manifest(FULL_TOML).expect("test: parse");
         let serialized = toml::to_string(&original).expect("test: serialize");
-        let roundtrip: DashboardManifest =
-            toml::from_str(&serialized).expect("test: roundtrip");
+        let roundtrip: DashboardManifest = toml::from_str(&serialized).expect("test: roundtrip");
         assert_eq!(original, roundtrip);
     }
 

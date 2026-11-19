@@ -383,10 +383,15 @@ async fn test_octant_distribution_quality() {
     let nodes = create_car_purchase_nodes();
     let state_proof = MockStateAuthenticator::new(true);
 
-    let result =
-        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
-            .await
-            .unwrap();
+    let result = distribute_shards_pos_aware(
+        &shards,
+        "test-asset",
+        "PrivateNetwork",
+        &nodes,
+        &state_proof,
+    )
+    .await
+    .unwrap();
 
     // Verify multiple octants used
     assert!(
@@ -418,10 +423,15 @@ async fn test_golden_ratio_spacing() {
     let nodes = create_car_purchase_nodes();
     let state_proof = MockStateAuthenticator::new(true);
 
-    let result =
-        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
-            .await
-            .unwrap();
+    let result = distribute_shards_pos_aware(
+        &shards,
+        "test-asset",
+        "PrivateNetwork",
+        &nodes,
+        &state_proof,
+    )
+    .await
+    .unwrap();
 
     // Calculate pairwise distances
     let mut distances = Vec::new();
@@ -455,9 +465,14 @@ async fn test_pos_validation_integration() {
     let nodes = create_car_purchase_nodes();
     let state_proof = MockStateAuthenticator::new(true);
 
-    let result =
-        distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
-            .await;
+    let result = distribute_shards_pos_aware(
+        &shards,
+        "test-asset",
+        "PrivateNetwork",
+        &nodes,
+        &state_proof,
+    )
+    .await;
 
     assert!(result.is_ok(), "PoS validation failed");
 

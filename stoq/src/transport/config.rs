@@ -224,13 +224,13 @@ impl Default for TransportConfig {
             enable_falcon_crypto: true,      // Quantum-resistant FALCON cryptography
             falcon_variant: FalconVariant::Falcon1024, // Maximum security level
             enable_kernel_acceleration: true,
-            ebpf_interface: None,            // Auto-detect from bind_address
-            interface: None,                 // Substrate-injected by the node binary
-            ewma_alpha: 0.125,               // Conservative smoothing
-            mtu_probe_interval_secs: 30,     // Probe every 30 seconds
-            loss_window_size: 10,            // Average over 10 observations
-            wan_enabled: false,              // Localhost behavior by default
-            public_ipv6: None,               // No NAT — use bind address
+            ebpf_interface: None,        // Auto-detect from bind_address
+            interface: None,             // Substrate-injected by the node binary
+            ewma_alpha: 0.125,           // Conservative smoothing
+            mtu_probe_interval_secs: 30, // Probe every 30 seconds
+            loss_window_size: 10,        // Average over 10 observations
+            wan_enabled: false,          // Localhost behavior by default
+            public_ipv6: None,           // No NAT — use bind address
             connection_migration_timeout_ms: 3000, // 3s migration detection window
         }
     }

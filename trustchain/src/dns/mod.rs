@@ -20,8 +20,8 @@ use trust_dns_proto::op::ResponseCode;
 use trust_dns_proto::rr::{DNSClass, Name, RData, Record, RecordType};
 
 use crate::config::DnsConfig;
-use crate::proof_of_state::StateProofContext;
 use crate::errors::{DnsError, Result as TrustChainResult};
+use crate::proof_of_state::StateProofContext;
 
 pub mod bootstrap;
 pub mod cache;

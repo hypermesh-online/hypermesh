@@ -10,10 +10,10 @@
 
 // Submodule for nested import compatibility
 pub mod genesis_proof;
-pub mod state_proof_impl;
-pub mod proof;
-pub mod validation;
 pub mod network_rules;
+pub mod proof;
+pub mod state_proof_impl;
+pub mod validation;
 pub mod validation_service;
 
 // Re-export all types from TrustChain
@@ -21,7 +21,7 @@ pub use trustchain::proof_of_state::*;
 
 // Re-export our concrete implementation types
 pub use state_proof_impl::{
-    AsyncStateProof, StateProofAdapter, StateProofOpResult, StateProofState, DefaultStateProof,
+    AsyncStateProof, DefaultStateProof, StateProofAdapter, StateProofOpResult, StateProofState,
 };
 
 // BlockMatrix-specific types that extend TrustChain
@@ -234,15 +234,11 @@ pub mod stoq_handlers {
             {
                 let state_proof = serde_json::from_slice::<StateProof>(&req.payload)
                     .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof JSON: {e}")))?;
-                self.validation_service
-                    .validate_async(&state_proof)
-                    .await
+                self.validation_service.validate_async(&state_proof).await
             } else {
                 let state_proof = StateProof::from_bytes(&req.payload)
                     .map_err(|e| ApiError::InvalidRequest(format!("Invalid proof bytes: {e}")))?;
-                self.validation_service
-                    .validate_async(&state_proof)
-                    .await
+                self.validation_service.validate_async(&state_proof).await
             };
 
             let response = match validation_result {
@@ -346,9 +342,7 @@ pub mod proof_of_state_integration {
     use super::*;
 
     // Re-export proof types
-    pub use super::{
-        StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
-    };
+    pub use super::{Proof, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
 
     pub struct ProofOfStateIntegration;
 

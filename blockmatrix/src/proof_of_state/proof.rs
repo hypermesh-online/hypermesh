@@ -11,16 +11,16 @@ pub use super::{
     // BlockMatrix-specific types
     AccessLevel,
     AccessPermissions,
-    ProofOfState,
-    StateProofError,
-    // Core state proof
-    StateProof,
     LogIndex,
     NetworkPosition,
     Proof,
+    ProofOfState,
     SpaceProof,
     // Individual proof types
     StakeProof,
+    // Core state proof
+    StateProof,
+    StateProofError,
     TimeProof,
     WorkProof,
 };

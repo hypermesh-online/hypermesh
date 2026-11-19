@@ -115,7 +115,9 @@ impl QualityGate for StateProofValidationGate {
                 status: QualityGateStatus::Fail,
                 score: 0.0,
                 message: "State proof module not found".to_string(),
-                details: vec!["VIOLATION: Missing state proof validation implementation".to_string()],
+                details: vec![
+                    "VIOLATION: Missing state proof validation implementation".to_string()
+                ],
             });
         }
 
@@ -161,7 +163,10 @@ impl QualityGate for StateProofValidationGate {
         Ok(GateResult {
             status,
             score,
-            message: format!("State proof validation implementation: {:.1}%", score * 100.0),
+            message: format!(
+                "State proof validation implementation: {:.1}%",
+                score * 100.0
+            ),
             details,
         })
     }

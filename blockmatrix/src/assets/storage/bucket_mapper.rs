@@ -460,7 +460,9 @@ mod tests {
         pattern.record_access(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         pattern.record_access(MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate"));
 
-        let center = pattern.get_weighted_center().expect("test: expected success");
+        let center = pattern
+            .get_weighted_center()
+            .expect("test: expected success");
         // Center should be closer to (0,0,0) due to more accesses
         assert!(center.x < 5);
         assert!(center.y < 5);

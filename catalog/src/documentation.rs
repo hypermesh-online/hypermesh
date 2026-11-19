@@ -405,11 +405,20 @@ catalog install {{asset.name}}
 
         // Extract functions
         for cap in function_regex.captures_iter(content) {
-            let name = cap.get(1).expect("regex matched so capture group 1 exists").as_str();
-            let params = cap.get(2).expect("regex matched so capture group 2 exists").as_str();
+            let name = cap
+                .get(1)
+                .expect("regex matched so capture group 1 exists")
+                .as_str();
+            let params = cap
+                .get(2)
+                .expect("regex matched so capture group 2 exists")
+                .as_str();
 
             // Look for documentation comment above function
-            let function_start = cap.get(0).expect("regex matched so capture group 0 exists").start();
+            let function_start = cap
+                .get(0)
+                .expect("regex matched so capture group 0 exists")
+                .start();
             let lines_before = content[..function_start].lines().rev().take(10);
             let mut doc_comments = Vec::new();
 
@@ -433,7 +442,10 @@ catalog install {{asset.name}}
 
         // Extract tables
         for cap in table_regex.captures_iter(content) {
-            let name = cap.get(1).expect("regex matched so capture group 1 exists").as_str();
+            let name = cap
+                .get(1)
+                .expect("regex matched so capture group 1 exists")
+                .as_str();
 
             tables.push(serde_json::json!({
                 "name": name,
@@ -600,7 +612,10 @@ mod tests {
         // Create a simple test package
         let package = create_test_package();
 
-        let docs = generator.generate(&package).await.expect("test: async operation");
+        let docs = generator
+            .generate(&package)
+            .await
+            .expect("test: async operation");
 
         assert!(!docs.formats.is_empty());
         assert!(!docs.files.is_empty());
@@ -614,7 +629,10 @@ mod tests {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
 
         let package = create_test_package();
-        let docs = generator.generate(&package).await.expect("test: async operation");
+        let docs = generator
+            .generate(&package)
+            .await
+            .expect("test: async operation");
 
         generator
             .save_to_directory(&docs, temp_dir.path())

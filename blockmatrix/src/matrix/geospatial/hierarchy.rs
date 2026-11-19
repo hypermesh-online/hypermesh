@@ -667,10 +667,14 @@ mod tests {
         hierarchy.add_zone(continent).expect("test: insertion");
 
         // Verify parent-child relationship
-        let global_zone = hierarchy.get_zone("global").expect("test: expected success");
+        let global_zone = hierarchy
+            .get_zone("global")
+            .expect("test: expected success");
         assert!(global_zone.child_ids.contains("continent1"));
 
-        let continent_zone = hierarchy.get_zone("continent1").expect("test: expected success");
+        let continent_zone = hierarchy
+            .get_zone("continent1")
+            .expect("test: expected success");
         assert_eq!(continent_zone.parent_id, Some("global".to_string()));
 
         // Test zone removal

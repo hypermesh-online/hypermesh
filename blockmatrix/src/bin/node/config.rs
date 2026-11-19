@@ -52,14 +52,13 @@ pub(crate) fn handle_config(action: &ConfigCommand, cli: &Cli) -> Result<()> {
     match action {
         ConfigCommand::Show => {
             let config = load_config(cli);
-            let output = serde_json::to_string_pretty(&config)
-                .context("failed to serialize config")?;
+            let output =
+                serde_json::to_string_pretty(&config).context("failed to serialize config")?;
             println!("{output}");
         }
         ConfigCommand::Get { key } => {
             let config = load_config(cli);
-            let value =
-                serde_json::to_value(&config).context("failed to serialize config")?;
+            let value = serde_json::to_value(&config).context("failed to serialize config")?;
             match ipc::config::get_dotpath(&value, key) {
                 Some(v) => {
                     let output =
@@ -79,12 +78,9 @@ pub(crate) fn handle_config(action: &ConfigCommand, cli: &Cli) -> Result<()> {
             let parsed = parse_config_value(value);
             ipc::config::set_dotpath(&mut json_value, key, parsed)
                 .map_err(|e| anyhow::anyhow!("failed to set key: {e}"))?;
-            config = serde_json::from_value(json_value)
-                .context("invalid config after update")?;
+            config = serde_json::from_value(json_value).context("invalid config after update")?;
             match &cli.config {
-                Some(path) => config
-                    .save_to(path)
-                    .map_err(|e| anyhow::anyhow!("{e}"))?,
+                Some(path) => config.save_to(path).map_err(|e| anyhow::anyhow!("{e}"))?,
                 None => config.save().map_err(|e| anyhow::anyhow!("{e}"))?,
             }
             println!("Set {key} = {value}");
@@ -95,9 +91,7 @@ pub(crate) fn handle_config(action: &ConfigCommand, cli: &Cli) -> Result<()> {
                 Some(p) => p.clone(),
                 None => ipc::HypermeshConfig::default_path(),
             };
-            config
-                .save_to(&path)
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            config.save_to(&path).map_err(|e| anyhow::anyhow!("{e}"))?;
             println!("Created {}", path.display());
         }
     }
@@ -171,8 +165,7 @@ pub(crate) fn handle_destroy(chaotic: bool, cli: &Cli) -> Result<()> {
     }
 
     for d in &node_dirs {
-        std::fs::remove_dir_all(d)
-            .context(format!("failed to remove {}", d.display()))?;
+        std::fs::remove_dir_all(d).context(format!("failed to remove {}", d.display()))?;
         println!("Destroyed {}", d.display());
     }
 

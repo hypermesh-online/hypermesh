@@ -90,12 +90,7 @@ pub trait FederationOcspTransport: Send + Sync {
     /// Push a CRL revocation entry to `peer_ca_id`.  Returns `true` on
     /// successful delivery, `false` otherwise.  In alpha this is best-
     /// effort and failures are non-fatal.
-    async fn push_revocation(
-        &self,
-        peer_ca_id: &str,
-        serial_number: &str,
-        reason: &str,
-    ) -> bool;
+    async fn push_revocation(&self, peer_ca_id: &str, serial_number: &str, reason: &str) -> bool;
 }
 
 /// OCSP Responder backed by the TrustChain certificate store.
@@ -137,10 +132,9 @@ impl OcspResponder {
         responder_id: String,
         validity_period: Option<Duration>,
     ) -> TrustChainResult<Self> {
-        let falcon = FalconCrypto::new()
-            .map_err(|e| TrustChainError::CryptoError {
-                reason: format!("Failed to initialize FALCON-1024 for OCSP: {}", e),
-            })?;
+        let falcon = FalconCrypto::new().map_err(|e| TrustChainError::CryptoError {
+            reason: format!("Failed to initialize FALCON-1024 for OCSP: {}", e),
+        })?;
 
         info!(
             "OCSP responder initialized: id={}, validity={}s",
@@ -166,25 +160,23 @@ impl OcspResponder {
     ///
     /// Default behaviour without a transport set: local-only check (alpha
     /// behaviour, mirrors the F.1 pattern of opt-in federation).
-    pub async fn set_federation_transport(
-        &self,
-        transport: Arc<dyn FederationOcspTransport>,
-    ) {
+    pub async fn set_federation_transport(&self, transport: Arc<dyn FederationOcspTransport>) {
         *self.federation_transport.write().await = Some(transport);
     }
 
     /// Check the revocation status of a certificate and return a signed response.
-    pub async fn check_status(
-        &self,
-        request: &OcspRequest,
-    ) -> TrustChainResult<OcspResponse> {
+    pub async fn check_status(&self, request: &OcspRequest) -> TrustChainResult<OcspResponse> {
         debug!("OCSP status check for serial: {}", request.serial_number);
 
         let now = SystemTime::now();
         let next_update = now + self.validity_period;
 
         // Look up certificate in store by serial number
-        let cert_status = match self.store.get_certificate_by_serial(&request.serial_number).await? {
+        let cert_status = match self
+            .store
+            .get_certificate_by_serial(&request.serial_number)
+            .await?
+        {
             Some(cert) => self.map_certificate_status(&cert.status),
             None => {
                 warn!("OCSP: certificate not found: {}", request.serial_number);
@@ -193,12 +185,8 @@ impl OcspResponder {
         };
 
         // Build the response payload for signing
-        let payload = self.build_signing_payload(
-            &cert_status,
-            &request.serial_number,
-            now,
-            next_update,
-        );
+        let payload =
+            self.build_signing_payload(&cert_status, &request.serial_number, now, next_update);
 
         // Sign with FALCON-1024
         let signature = self
@@ -287,7 +275,10 @@ impl OcspResponder {
                 .query_peer_revocation(&peer.ca_id, serial_number)
                 .await
             {
-                Some(OcspCertStatus::Revoked { revocation_time, reason }) => {
+                Some(OcspCertStatus::Revoked {
+                    revocation_time,
+                    reason,
+                }) => {
                     info!(
                         "OCSP federated check: peer '{}' reports serial={} REVOKED",
                         peer.ca_id, serial_number
@@ -323,12 +314,10 @@ impl OcspResponder {
     fn map_certificate_status(&self, status: &CertificateStatus) -> OcspCertStatus {
         match status {
             CertificateStatus::Valid => OcspCertStatus::Good,
-            CertificateStatus::Revoked { reason, revoked_at } => {
-                OcspCertStatus::Revoked {
-                    revocation_time: *revoked_at,
-                    reason: Self::parse_revocation_reason(reason),
-                }
-            }
+            CertificateStatus::Revoked { reason, revoked_at } => OcspCertStatus::Revoked {
+                revocation_time: *revoked_at,
+                reason: Self::parse_revocation_reason(reason),
+            },
             CertificateStatus::Expired => OcspCertStatus::Good,
             // Expired certificates are not revoked; the client should
             // check validity dates separately per RFC 6960.
@@ -341,9 +330,7 @@ impl OcspResponder {
             "keycompromise" | "key_compromise" | "key compromise" => {
                 RevocationReason::KeyCompromise
             }
-            "cacompromise" | "ca_compromise" | "ca compromise" => {
-                RevocationReason::CaCompromise
-            }
+            "cacompromise" | "ca_compromise" | "ca compromise" => RevocationReason::CaCompromise,
             "affiliationchanged" | "affiliation_changed" | "affiliation changed" => {
                 RevocationReason::AffiliationChanged
             }
@@ -565,10 +552,7 @@ mod tests {
         use super::super::federation::{FederationManager, FederationPolicy};
 
         let (store, responder) = setup_responder().await;
-        let fm = FederationManager::new(
-            "local-ca".into(),
-            FederationPolicy::default(),
-        );
+        let fm = FederationManager::new("local-ca".into(), FederationPolicy::default());
 
         // Store a revoked certificate locally
         let revoked_at = SystemTime::now();
@@ -596,10 +580,7 @@ mod tests {
         use super::super::federation::{FederationManager, FederationPolicy};
 
         let (store, responder) = setup_responder().await;
-        let fm = FederationManager::new(
-            "local-ca".into(),
-            FederationPolicy::default(),
-        );
+        let fm = FederationManager::new("local-ca".into(), FederationPolicy::default());
 
         let cert = create_test_certificate("serial-fed-good", CertificateStatus::Valid);
         store
@@ -619,14 +600,9 @@ mod tests {
         use super::super::federation::{FederationManager, FederationPolicy};
 
         let (_store, responder) = setup_responder().await;
-        let fm = FederationManager::new(
-            "local-ca".into(),
-            FederationPolicy::default(),
-        );
+        let fm = FederationManager::new("local-ca".into(), FederationPolicy::default());
 
-        let status = responder
-            .federated_check("serial-nonexistent", &fm)
-            .await;
+        let status = responder.federated_check("serial-nonexistent", &fm).await;
         assert!(
             matches!(status, OcspCertStatus::Unknown),
             "unknown cert should return Unknown in alpha (no remote query)"

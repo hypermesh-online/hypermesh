@@ -83,9 +83,17 @@ impl MirrorExecutor for StoqDmsExecutor {
         if blake3::hash(&data).as_bytes() != &action.shard_id.0 {
             return Err(DmsError::Fetch("shard hash mismatch".to_string()));
         }
-        if !self.index.register_mirror_provider_in_network(
-            action.network, &self.node_id, action.shard_id, self.store.clone(), &data,
-        ).await {
+        if !self
+            .index
+            .register_mirror_provider_in_network(
+                action.network,
+                &self.node_id,
+                action.shard_id,
+                self.store.clone(),
+                &data,
+            )
+            .await
+        {
             return Err(DmsError::Fetch("shard not locally servable".to_string()));
         }
         let replica_count = self

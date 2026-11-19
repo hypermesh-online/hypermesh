@@ -8,15 +8,15 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::multi_node::{
-    AllocationDecision, MigrationPlan, MigrationPriority, MultiNodeEvent,
-    NodeId, PrivacyMode, ProposalData, ProposalType, ResourceAmount, ResourceSharingRequest,
+    AllocationDecision, MigrationPlan, MigrationPriority, MultiNodeEvent, NodeId, PrivacyMode,
+    ProposalData, ProposalType, ResourceAmount, ResourceSharingRequest,
 };
 use blockmatrix::assets::proxy::{
     GlobalAddress, MemoryOperationType, MemoryPermissions, RemoteMemoryTransport, TransportConfig,
 };
 use blockmatrix::assets::{
-    AssetManager, AssetRegistration, AssetType, StateProof,
-    MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo,
+    AssetManager, AssetRegistration, AssetType, MultiNodeCoordinator, NetworkTopology,
+    NodeCapabilities, NodeInfo, StateProof,
 };
 use std::time::{Duration, SystemTime};
 use tokio;
@@ -52,7 +52,7 @@ async fn test_multi_node_coordinator_initialization() {
 #[tokio::test]
 async fn test_state_verification_manager() {
     use blockmatrix::assets::multi_node::state_verification::{
-        StateVerificationManager, StateVerificationConfig,
+        StateVerificationConfig, StateVerificationManager,
     };
 
     let config = StateVerificationConfig::default();

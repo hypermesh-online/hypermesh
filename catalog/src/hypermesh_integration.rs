@@ -20,7 +20,8 @@ pub struct HyperMeshClient {
     /// Asset adapter for HyperMesh integration
     _asset_adapter: HyperMeshAssetAdapter,
     /// Active execution contexts keyed by execution_id
-    active_executions: std::sync::Arc<tokio::sync::RwLock<HashMap<String, CatalogExecutionContext>>>,
+    active_executions:
+        std::sync::Arc<tokio::sync::RwLock<HashMap<String, CatalogExecutionContext>>>,
 }
 
 /// HyperMesh Asset Adapter for catalog assets

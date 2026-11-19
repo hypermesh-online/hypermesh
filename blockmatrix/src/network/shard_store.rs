@@ -8,10 +8,10 @@
 
 use super::shard_dedup::{DedupPolicy, ShardStoreResult};
 use hypermesh_lib::ContentHash;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use parking_lot::RwLock;
 use tracing::{info, warn};
 
 /// Internal shard entry with reference counting for dedup.
@@ -75,7 +75,14 @@ impl ShardStore {
                             hash.copy_from_slice(&bytes);
                             // Load refcount from companion .ref file, default to 1.
                             let ref_count = Self::load_ref_count(&dir, &name_str);
-                            map.insert(ContentHash(hash), ShardEntry { data, ref_count, mirror_refs: 0 });
+                            map.insert(
+                                ContentHash(hash),
+                                ShardEntry {
+                                    data,
+                                    ref_count,
+                                    mirror_refs: 0,
+                                },
+                            );
                         }
                         Err(e) => {
                             warn!("Failed to read shard file {}: {e}", name_str);
@@ -133,7 +140,14 @@ impl ShardStore {
         }
         self.persist_shard_data(&shard_id, &data);
         self.persist_ref_count(&shard_id, 1);
-        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        shards.insert(
+            shard_id,
+            ShardEntry {
+                data,
+                ref_count: 1,
+                mirror_refs: 0,
+            },
+        );
         ShardStoreResult::Stored
     }
 
@@ -150,7 +164,14 @@ impl ShardStore {
         }
         self.persist_shard_data(&shard_id, &data);
         self.persist_ref_count(&shard_id, 1);
-        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        shards.insert(
+            shard_id,
+            ShardEntry {
+                data,
+                ref_count: 1,
+                mirror_refs: 0,
+            },
+        );
         ShardStoreResult::Stored
     }
 
@@ -170,7 +191,14 @@ impl ShardStore {
         }
         self.persist_shard_data(&shard_id, &data);
         self.persist_ref_count(&shard_id, 1);
-        shards.insert(shard_id, ShardEntry { data, ref_count: 1, mirror_refs: 0 });
+        shards.insert(
+            shard_id,
+            ShardEntry {
+                data,
+                ref_count: 1,
+                mirror_refs: 0,
+            },
+        );
         ShardStoreResult::Stored
     }
 
@@ -183,25 +211,37 @@ impl ShardStore {
             if entry.data != data {
                 return false;
             }
-            let Some(next) = entry.mirror_refs.checked_add(1) else { return false; };
+            let Some(next) = entry.mirror_refs.checked_add(1) else {
+                return false;
+            };
             entry.mirror_refs = next;
             return true;
         }
-        shards.insert(shard_id, ShardEntry {
-            data: data.to_vec(), ref_count: 0, mirror_refs: 1,
-        });
+        shards.insert(
+            shard_id,
+            ShardEntry {
+                data: data.to_vec(),
+                ref_count: 0,
+                mirror_refs: 1,
+            },
+        );
         true
     }
 
     /// Confirm an existing provider claim still points to these serve bytes.
     pub(crate) fn mirror_bytes_match(&self, shard_id: &ContentHash, data: &[u8]) -> bool {
-        self.shards.read().get(shard_id).is_some_and(|entry| entry.data == data)
+        self.shards
+            .read()
+            .get(shard_id)
+            .is_some_and(|entry| entry.data == data)
     }
 
     /// Release one provider-owned mirror hold; remove mirror-only bytes at zero.
     pub(crate) fn release_mirror(&self, shard_id: &ContentHash) {
         let mut shards = self.shards.write();
-        let Some(entry) = shards.get_mut(shard_id) else { return; };
+        let Some(entry) = shards.get_mut(shard_id) else {
+            return;
+        };
         entry.mirror_refs = entry.mirror_refs.saturating_sub(1);
         if entry.mirror_refs == 0 && entry.ref_count == 0 {
             shards.remove(shard_id);
@@ -229,12 +269,16 @@ impl ShardStore {
     pub(crate) fn release_owner_now(&self, shard_id: &ContentHash) -> Option<u32> {
         let mut shards = self.shards.write();
         let entry = shards.get_mut(shard_id)?;
-        if entry.ref_count == 0 { return None; }
+        if entry.ref_count == 0 {
+            return None;
+        }
         entry.ref_count -= 1;
         let total = entry.ref_count.saturating_add(entry.mirror_refs);
         if entry.ref_count == 0 {
             self.remove_shard_files(shard_id);
-            if entry.mirror_refs == 0 { shards.remove(shard_id); }
+            if entry.mirror_refs == 0 {
+                shards.remove(shard_id);
+            }
         } else {
             self.persist_ref_count(shard_id, entry.ref_count);
         }
@@ -243,7 +287,9 @@ impl ShardStore {
 
     /// Total owner plus active mirror references for this shard.
     pub async fn ref_count(&self, shard_id: &ContentHash) -> Option<u32> {
-        self.shards.read().get(shard_id)
+        self.shards
+            .read()
+            .get(shard_id)
             .map(|e| e.ref_count.saturating_add(e.mirror_refs))
     }
 
@@ -326,10 +372,7 @@ impl ShardStore {
             let ref_path = dir.join(format!("{hex_name}.ref"));
             if let Err(e) = std::fs::remove_file(&ref_path) {
                 if e.kind() != std::io::ErrorKind::NotFound {
-                    warn!(
-                        "Failed to remove refcount file {}: {e}",
-                        ref_path.display()
-                    );
+                    warn!("Failed to remove refcount file {}: {e}", ref_path.display());
                 }
             }
         }

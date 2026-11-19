@@ -19,7 +19,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use super::{PeerInfo, SharePermission};
-use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
+use crate::{AssetPackage, AssetRegistration, PackageSpecMetadata};
 
 /// Discovery service for asset search and indexing
 pub struct DiscoveryService {
@@ -108,7 +108,9 @@ impl DiscoveryService {
             results.sort_by(|a, b| {
                 let score_a = self.calculate_relevance(&a.1, query);
                 let score_b = self.calculate_relevance(&b.1, query);
-                score_b.partial_cmp(&score_a).expect("relevance scores should be valid for comparison")
+                score_b
+                    .partial_cmp(&score_a)
+                    .expect("relevance scores should be valid for comparison")
             });
         }
 
@@ -326,7 +328,9 @@ impl DiscoveryService {
         popular.sort_by(|a, b| {
             let pop_a = self.get_cached_popularity(&a.0);
             let pop_b = self.get_cached_popularity(&b.0);
-            pop_b.partial_cmp(&pop_a).expect("popularity scores should be valid for comparison")
+            pop_b
+                .partial_cmp(&pop_a)
+                .expect("popularity scores should be valid for comparison")
         });
 
         Ok(popular)
@@ -369,7 +373,11 @@ impl DiscoveryService {
         }
 
         // Sort by score and limit
-        recommendations.sort_by(|a, b| b.score.partial_cmp(&a.score).expect("recommendation scores should be valid for comparison"));
+        recommendations.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .expect("recommendation scores should be valid for comparison")
+        });
         recommendations.truncate(count);
 
         Ok(recommendations)
@@ -498,7 +506,10 @@ mod tests {
 
         // Verify it's in the local index
         assert!(
-            service.has_package(&asset_id).await.expect("test: has_package"),
+            service
+                .has_package(&asset_id)
+                .await
+                .expect("test: has_package"),
             "package should be in local index after announce"
         );
 
@@ -524,6 +535,9 @@ mod tests {
             .discover_via_dht("nonexistent-package")
             .await
             .expect("test: discover should succeed");
-        assert!(results.is_empty(), "should return empty for unknown package");
+        assert!(
+            results.is_empty(),
+            "should return empty for unknown package"
+        );
     }
 }

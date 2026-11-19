@@ -215,10 +215,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "blockchain.block",
-            serde_json::json!({"index": 0}),
-        );
+        let req = RpcRequest::new("blockchain.block", serde_json::json!({"index": 0}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

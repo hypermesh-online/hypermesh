@@ -134,8 +134,12 @@ fn parse_recipient_kyber_pubkey(params: &serde_json::Value) -> Result<Vec<u8>, R
                  public key is required to wrap the decryption key for them",
             )
         })?;
-    hex::decode(hex_key)
-        .map_err(|e| rpc_err(INVALID_PARAMS, format!("invalid recipient_kyber_pubkey hex: {e}")))
+    hex::decode(hex_key).map_err(|e| {
+        rpc_err(
+            INVALID_PARAMS,
+            format!("invalid recipient_kyber_pubkey hex: {e}"),
+        )
+    })
 }
 
 /// Handle `share.send` -- build and deliver a transmission payload to a peer.
@@ -186,19 +190,25 @@ async fn handle_share_send(
     //      carries an empty envelope and the recipient reconstructs directly.
     let (encrypted_key, key_kem_ciphertext) = match &map.key_envelope {
         Some(env) => {
-            let decryption_key = env
-                .unwrap_with(identity.kyber_secret_key_bytes())
+            let decryption_key =
+                env.unwrap_with(identity.kyber_secret_key_bytes())
+                    .map_err(|e| {
+                        rpc_err(
+                            INTERNAL_ERROR,
+                            format!("failed to unwrap owner key envelope: {e}"),
+                        )
+                    })?;
+            let recipient_env = KeyEnvelope::wrap_for(&decryption_key, &recipient_kyber_pubkey)
                 .map_err(|e| {
                     rpc_err(
                         INTERNAL_ERROR,
-                        format!("failed to unwrap owner key envelope: {e}"),
+                        format!("failed to wrap key for recipient: {e}"),
                     )
                 })?;
-            let recipient_env = KeyEnvelope::wrap_for(&decryption_key, &recipient_kyber_pubkey)
-                .map_err(|e| {
-                    rpc_err(INTERNAL_ERROR, format!("failed to wrap key for recipient: {e}"))
-                })?;
-            (recipient_env.encrypted_key, recipient_env.key_kem_ciphertext)
+            (
+                recipient_env.encrypted_key,
+                recipient_env.key_kem_ciphertext,
+            )
         }
         None => (Vec::new(), Vec::new()),
     };
@@ -260,8 +270,7 @@ async fn handle_share_send(
     //    peer (no network, dial not possible, stream failed), the invite is
     //    still created and signed — we degrade to `created_undelivered` with
     //    an error field rather than hard-failing the IPC call.
-    let (delivered, status, delivery_error) =
-        deliver_invite(state, recipient, &invite_wire).await;
+    let (delivered, status, delivery_error) = deliver_invite(state, recipient, &invite_wire).await;
 
     let mut response = serde_json::json!({
         "invite_id": invite_id,
@@ -333,10 +342,7 @@ async fn handle_share_inbox(
     params: serde_json::Value,
     state: &DaemonState,
 ) -> Result<serde_json::Value, RpcError> {
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(50) as usize;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
     let inbox = match state.inbox_store.as_ref() {
         Some(inbox) => inbox,
@@ -420,9 +426,10 @@ async fn handle_share_accept(
         .and_then(|v| v.as_str())
         .ok_or_else(|| rpc_err(INVALID_PARAMS, "missing or invalid 'invite_id' parameter"))?;
 
-    let inbox = state.inbox_store.as_ref().ok_or_else(|| {
-        rpc_err(INTERNAL_ERROR, "sharing inbox not configured on this node")
-    })?;
+    let inbox = state
+        .inbox_store
+        .as_ref()
+        .ok_or_else(|| rpc_err(INTERNAL_ERROR, "sharing inbox not configured on this node"))?;
     let identity = load_node_identity(state)?;
 
     let invite = inbox
@@ -532,10 +539,7 @@ mod tests {
     }
 
     /// Build a DaemonState with an optional inbox, rooted at `data_dir`.
-    async fn test_state_at(
-        data_dir: PathBuf,
-        inbox: Option<Arc<InboxStore>>,
-    ) -> Arc<DaemonState> {
+    async fn test_state_at(data_dir: PathBuf, inbox: Option<Arc<InboxStore>>) -> Arc<DaemonState> {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let bc = Arc::new(NodeBlockchain::new(coord));
         let config = PersistenceConfig {
@@ -606,10 +610,7 @@ mod tests {
                 original_size: 100,
                 secret_key: vec![0xEE; 3168],
             };
-            Some(
-                KeyEnvelope::wrap_for(&dk, &owner.kyber_public_key)
-                    .expect("test: wrap for owner"),
-            )
+            Some(KeyEnvelope::wrap_for(&dk, &owner.kyber_public_key).expect("test: wrap for owner"))
         } else {
             None
         };
@@ -725,7 +726,11 @@ mod tests {
             }),
         );
         let send_resp = sender_handler.dispatch(send_req).await;
-        assert!(send_resp.error.is_none(), "send failed: {:?}", send_resp.error);
+        assert!(
+            send_resp.error.is_none(),
+            "send failed: {:?}",
+            send_resp.error
+        );
         let send_result = send_resp.result.expect("test: send result");
         assert_eq!(send_result["encrypted"], true);
         assert_eq!(send_result["signed"], true);
@@ -737,8 +742,8 @@ mod tests {
         // Reconstruct the invite the sender would have transmitted and inject
         // it into the recipient's inbox (simulating the TAG_SHARE_INVITE wire).
         let (encrypted_key, kem_ct) = {
-            let map = load_owner_shard_map(send_dir.path(), asset_id)
-                .expect("test: load owner map");
+            let map =
+                load_owner_shard_map(send_dir.path(), asset_id).expect("test: load owner map");
             let dk = map
                 .key_envelope
                 .as_ref()
@@ -750,9 +755,11 @@ mod tests {
             (env.encrypted_key, env.key_kem_ciphertext)
         };
         let travel_map = {
-            let map = load_owner_shard_map(send_dir.path(), asset_id)
-                .expect("test: reload");
-            ShardMap { key_envelope: None, ..map }
+            let map = load_owner_shard_map(send_dir.path(), asset_id).expect("test: reload");
+            ShardMap {
+                key_envelope: None,
+                ..map
+            }
         };
         let shard_map_json = serde_json::to_vec(&travel_map).expect("test: ser travel");
         let mut invite = ShareInvite::new(
@@ -807,11 +814,14 @@ mod tests {
         assert_eq!(accept_result["encrypted"], true);
 
         // The recipient's local map is secret-free and self-custodied.
-        let local_map = load_owner_shard_map(recv_dir.path(), asset_id)
-            .expect("test: load recipient map");
+        let local_map =
+            load_owner_shard_map(recv_dir.path(), asset_id).expect("test: load recipient map");
         assert!(local_map.key_envelope.is_some());
         let local_json = std::fs::read(
-            recv_dir.path().join("shard_maps").join(format!("{asset_id}.json")),
+            recv_dir
+                .path()
+                .join("shard_maps")
+                .join(format!("{asset_id}.json")),
         )
         .expect("test: read local map");
         assert!(
@@ -879,7 +889,11 @@ mod tests {
             }),
         );
         let send_resp = sender_handler.dispatch(send_req).await;
-        assert!(send_resp.error.is_none(), "send failed: {:?}", send_resp.error);
+        assert!(
+            send_resp.error.is_none(),
+            "send failed: {:?}",
+            send_resp.error
+        );
         let send_result = send_resp.result.expect("test: send result");
         // Graceful degradation: no network manager in test state.
         assert_eq!(send_result["delivered"], false);
@@ -902,7 +916,10 @@ mod tests {
                 .expect("test: unwrap owner");
             let recipient_env = KeyEnvelope::wrap_for(&dk, &recipient.kyber_public_key)
                 .expect("test: wrap recipient");
-            let travel_map = ShardMap { key_envelope: None, ..map.clone() };
+            let travel_map = ShardMap {
+                key_envelope: None,
+                ..map.clone()
+            };
             let shard_map_json = serde_json::to_vec(&travel_map).expect("test: ser travel");
             let mut invite = ShareInvite::new(
                 invite_id.clone(),

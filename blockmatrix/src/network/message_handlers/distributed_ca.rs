@@ -20,13 +20,12 @@ pub(super) async fn handle_ca_key_share(
     _ctx: &PeerContext,
 ) -> Result<()> {
     let msg_data = &data[1..]; // skip tag
-    let msg: serde_json::Value = serde_json::from_slice(msg_data)
-        .map_err(|e| anyhow!("Invalid CA key share JSON: {e}"))?;
+    let msg: serde_json::Value =
+        serde_json::from_slice(msg_data).map_err(|e| anyhow!("Invalid CA key share JSON: {e}"))?;
 
-    let share_index = msg.get("share_index")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0) as u8;
-    let fingerprint_hex = msg.get("fingerprint")
+    let share_index = msg.get("share_index").and_then(|v| v.as_u64()).unwrap_or(0) as u8;
+    let fingerprint_hex = msg
+        .get("fingerprint")
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
@@ -56,7 +55,8 @@ pub(super) async fn handle_ca_sign_request(
     let msg: serde_json::Value = serde_json::from_slice(msg_data)
         .map_err(|e| anyhow!("Invalid CA sign request JSON: {e}"))?;
 
-    let request_id = msg.get("request_id")
+    let request_id = msg
+        .get("request_id")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
 
@@ -85,10 +85,12 @@ pub(super) async fn handle_ca_sign_response(
     let msg: serde_json::Value = serde_json::from_slice(msg_data)
         .map_err(|e| anyhow!("Invalid CA sign response JSON: {e}"))?;
 
-    let request_id = msg.get("request_id")
+    let request_id = msg
+        .get("request_id")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
-    let accepted = msg.get("accepted")
+    let accepted = msg
+        .get("accepted")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
@@ -109,10 +111,13 @@ pub(super) async fn handle_crl_request(
     _ctx: &PeerContext,
 ) -> Result<()> {
     let msg_data = &data[1..];
-    let msg: serde_json::Value = serde_json::from_slice(msg_data)
-        .map_err(|e| anyhow!("Invalid CRL request JSON: {e}"))?;
+    let msg: serde_json::Value =
+        serde_json::from_slice(msg_data).map_err(|e| anyhow!("Invalid CRL request JSON: {e}"))?;
 
-    let ca_id = msg.get("ca_id").and_then(|v| v.as_str()).unwrap_or("unknown");
+    let ca_id = msg
+        .get("ca_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
     info!(
         peer = %&peer_node_id[..8.min(peer_node_id.len())],
         ca_id = ca_id,
@@ -128,11 +133,17 @@ pub(super) async fn handle_crl_response(
     _ctx: &PeerContext,
 ) -> Result<()> {
     let msg_data = &data[1..];
-    let msg: serde_json::Value = serde_json::from_slice(msg_data)
-        .map_err(|e| anyhow!("Invalid CRL response JSON: {e}"))?;
+    let msg: serde_json::Value =
+        serde_json::from_slice(msg_data).map_err(|e| anyhow!("Invalid CRL response JSON: {e}"))?;
 
-    let ca_id = msg.get("ca_id").and_then(|v| v.as_str()).unwrap_or("unknown");
-    let count = msg.get("revoked_count").and_then(|v| v.as_u64()).unwrap_or(0);
+    let ca_id = msg
+        .get("ca_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+    let count = msg
+        .get("revoked_count")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
     info!(
         peer = %&peer_node_id[..8.min(peer_node_id.len())],
         ca_id = ca_id,

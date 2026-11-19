@@ -19,9 +19,9 @@ use tracing::{debug, error, info, warn};
 
 #[allow(hidden_glob_reexports)]
 use crate::config::CTConfig;
-use crate::proof_of_state::{StateProofContext, StateProof};
 use crate::errors::{CTError, Result as TrustChainResult, TrustChainError};
 use crate::proof_of_state::StateProofOps;
+use crate::proof_of_state::{StateProof, StateProofContext};
 
 pub mod fingerprint_tracker;
 pub mod merkle_log;
@@ -568,9 +568,15 @@ mod tests {
     async fn create_test_ct() -> (CertificateTransparency, TempDir) {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
         let mut config = CTConfig::testing(); // Use testing config with port 0
-        config.storage_path = temp_dir.path().to_str().expect("test: expected success").to_string();
+        config.storage_path = temp_dir
+            .path()
+            .to_str()
+            .expect("test: expected success")
+            .to_string();
 
-        let ct = CertificateTransparency::new(config).await.expect("test: async operation");
+        let ct = CertificateTransparency::new(config)
+            .await
+            .expect("test: async operation");
         (ct, temp_dir)
     }
 
@@ -579,7 +585,10 @@ mod tests {
         let (ct, _temp_dir) = create_test_ct().await;
 
         let test_cert = b"test certificate data";
-        let sct = ct.log_certificate(test_cert).await.expect("test: async operation");
+        let sct = ct
+            .log_certificate(test_cert)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(sct.version, 1);
         assert!(!sct.signature.is_empty());
@@ -590,9 +599,14 @@ mod tests {
         let (ct, _temp_dir) = create_test_ct().await;
 
         let test_cert = b"test certificate data";
-        ct.log_certificate(test_cert).await.expect("test: async operation");
+        ct.log_certificate(test_cert)
+            .await
+            .expect("test: async operation");
 
-        let is_verified = ct.verify_certificate_in_logs(test_cert).await.expect("test: async operation");
+        let is_verified = ct
+            .verify_certificate_in_logs(test_cert)
+            .await
+            .expect("test: async operation");
         assert!(is_verified);
 
         let not_logged_cert = b"not logged certificate";
@@ -608,9 +622,14 @@ mod tests {
         let (ct, _temp_dir) = create_test_ct().await;
 
         let test_cert = b"test certificate for inclusion proof";
-        ct.log_certificate(test_cert).await.expect("test: async operation");
+        ct.log_certificate(test_cert)
+            .await
+            .expect("test: async operation");
 
-        let proof = ct.get_inclusion_proof(test_cert).await.expect("test: async operation");
+        let proof = ct
+            .get_inclusion_proof(test_cert)
+            .await
+            .expect("test: async operation");
         assert_eq!(proof.log_id, ct.log_id);
         assert_eq!(proof.sequence_number, 0); // First entry
     }
@@ -620,7 +639,9 @@ mod tests {
         let (ct, _temp_dir) = create_test_ct().await;
 
         let test_cert = b"test certificate for stats";
-        ct.log_certificate(test_cert).await.expect("test: async operation");
+        ct.log_certificate(test_cert)
+            .await
+            .expect("test: async operation");
 
         let stats = ct.get_log_stats().await.expect("test: async operation");
         assert_eq!(stats.total_entries, 1);
@@ -634,7 +655,9 @@ mod tests {
         // Log multiple certificates
         for i in 0..5 {
             let cert_data = format!("test certificate {i}");
-            ct.log_certificate(cert_data.as_bytes()).await.expect("test: async operation");
+            ct.log_certificate(cert_data.as_bytes())
+                .await
+                .expect("test: async operation");
         }
 
         let entries = ct.get_entries(0, 3).await.expect("test: async operation");

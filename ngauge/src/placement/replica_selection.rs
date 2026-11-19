@@ -45,7 +45,10 @@ impl FallbackStrategy {
 
     /// Whether this strategy fetches candidates in parallel.
     pub fn uses_parallel(&self) -> bool {
-        matches!(self, FallbackStrategy::Parallel | FallbackStrategy::Adaptive)
+        matches!(
+            self,
+            FallbackStrategy::Parallel | FallbackStrategy::Adaptive
+        )
     }
 }
 
@@ -329,7 +332,8 @@ mod tests {
 
     #[test]
     fn test_select_replicas_limits_and_ranks() {
-        let selector = ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Sequential);
+        let selector =
+            ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Sequential);
         let candidates = vec![
             candidate("a", 0.0, 0.9, 10),
             candidate("b", 1.0, 0.8, 20),
@@ -341,7 +345,8 @@ mod tests {
 
     #[test]
     fn test_failure_tracking_and_rate() {
-        let mut selector = ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Adaptive);
+        let mut selector =
+            ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Adaptive);
         selector.mark_failed("a");
         selector.mark_successful("b");
         assert_eq!(selector.failure_rate(), 0.5);
@@ -354,7 +359,8 @@ mod tests {
 
     #[test]
     fn test_strategy_recommendation() {
-        let mut selector = ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Adaptive);
+        let mut selector =
+            ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Adaptive);
 
         // 1/5 = 0.2 (not > 0.2): Sequential.
         for id in ["s0", "s1", "s2", "s3"] {
@@ -376,7 +382,8 @@ mod tests {
 
     #[test]
     fn test_successful_candidates_ranked_first() {
-        let mut selector = ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Sequential);
+        let mut selector =
+            ReplicaSelector::new(SelectionCriteria::default(), FallbackStrategy::Sequential);
         selector.mark_successful("b");
         let candidates = vec![
             candidate("a", 0.0, 1.0, 0), // higher suitability (nearer)

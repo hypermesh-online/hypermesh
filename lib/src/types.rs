@@ -114,7 +114,10 @@ impl NetworkId {
     /// (it is retained at the CLI-parse + JSON-wire boundary), never
     /// reconstructed from a `NetworkId`, so free-form labels survive byte-exact.
     pub fn from_wire_str(s: &str) -> NetworkId {
-        if s.len() == 32 && s.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+        if s.len() == 32
+            && s.bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        {
             if let Ok(bytes) = hex::decode(s) {
                 if bytes.len() == 16 {
                     let mut id = [0u8; 16];
@@ -972,7 +975,11 @@ mod tests {
 
     #[test]
     fn privacy_mode_serde_roundtrip() {
-        let modes = [PrivacyMode::ANONYMOUS, PrivacyMode::PRIVATE, PrivacyMode::PUBLIC];
+        let modes = [
+            PrivacyMode::ANONYMOUS,
+            PrivacyMode::PRIVATE,
+            PrivacyMode::PUBLIC,
+        ];
         for mode in &modes {
             let json = serde_json::to_string(mode).expect("test: serialize");
             let back: PrivacyMode = serde_json::from_str(&json).expect("test: deserialize");

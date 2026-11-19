@@ -608,7 +608,10 @@ mod tests {
         intel.ingest(make_capacity_frame("high-bw", 2_000_000_000)); // 2 Gbps
         intel.ingest(make_capacity_frame("low-bw", 10_000_000)); // 10 Mbps
 
-        let candidates = vec![NodeId::from_public_key(b"high-bw"), NodeId::from_public_key(b"low-bw")];
+        let candidates = vec![
+            NodeId::from_public_key(b"high-bw"),
+            NodeId::from_public_key(b"low-bw"),
+        ];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert!(
@@ -623,7 +626,11 @@ mod tests {
         intel.ingest(make_congestion_frame("a", 0.1));
         intel.ingest(make_congestion_frame("b", 0.9));
 
-        let candidates = vec![NodeId::from_public_key(b"a"), NodeId::from_public_key(b"b"), NodeId::from_public_key(b"c")];
+        let candidates = vec![
+            NodeId::from_public_key(b"a"),
+            NodeId::from_public_key(b"b"),
+            NodeId::from_public_key(b"c"),
+        ];
         let weights = intel.compute_weight_adjustments(&origin(), &dest(), &candidates);
 
         assert_eq!(weights.len(), 3);
@@ -785,10 +792,7 @@ mod tests {
         let candidates = vec![NodeId::from_public_key(b"node-a")];
         feed.publish_update(&origin(), &dest(), &candidates);
 
-        let actions = feedback
-            .actions_applied
-            .lock()
-            .expect("test: lock");
+        let actions = feedback.actions_applied.lock().expect("test: lock");
         assert_eq!(actions.len(), 1);
         // Empty aggregator produces 0 congestion → Relax
         assert_eq!(actions[0], EbpfPrivacyAction::Relax);
@@ -825,7 +829,9 @@ mod tests {
         assert_eq!(update.path_weights.len(), 2);
         // "slow" should have a congestion alert.
         assert!(
-            update.congestion_alerts.contains(&NodeId::from_public_key(b"slow")),
+            update
+                .congestion_alerts
+                .contains(&NodeId::from_public_key(b"slow")),
             "slow node should be in congestion alerts"
         );
     }

@@ -11,8 +11,8 @@ use tracing::debug;
 
 use stoq::api::{ApiError, ApiHandler, ApiRequest, ApiResponse};
 
-use crate::registry::SortCriteria;
 use crate::registry::asset_type::AssetTypeDefinition;
+use crate::registry::SortCriteria;
 
 use super::config_state::CatalogAppState;
 use super::message_types::{
@@ -106,10 +106,7 @@ pub(crate) fn build_package_response(
         },
         None => GetPackageResponse {
             name: req.name.clone(),
-            version: req
-                .version
-                .clone()
-                .unwrap_or_else(|| "latest".to_string()),
+            version: req.version.clone().unwrap_or_else(|| "latest".to_string()),
             description: None,
             author: None,
             license: None,
@@ -162,11 +159,7 @@ impl ApiHandler for BrowseHandler {
                     let mut summaries = Vec::with_capacity(search_results.results.len());
                     for r in &search_results.results {
                         let meta = registry.get_type_definition(&r.type_name).await;
-                        summaries.push(to_package_summary(
-                            &r.type_name,
-                            r.score,
-                            meta.as_ref(),
-                        ));
+                        summaries.push(to_package_summary(&r.type_name, r.score, meta.as_ref()));
                     }
                     let count = search_results.total_count as u64;
                     (summaries, count)
@@ -239,11 +232,7 @@ impl ApiHandler for SearchHandler {
                     let mut summaries = Vec::with_capacity(search_results.results.len());
                     for r in &search_results.results {
                         let meta = registry.get_type_definition(&r.type_name).await;
-                        summaries.push(to_package_summary(
-                            &r.type_name,
-                            r.score,
-                            meta.as_ref(),
-                        ));
+                        summaries.push(to_package_summary(&r.type_name, r.score, meta.as_ref()));
                     }
                     let count = search_results.total_count as u64;
                     (summaries, count)
@@ -391,23 +380,24 @@ impl ApiHandler for RegistryStatsHandler {
         debug!("Handling catalog/stats: {}", request.id);
 
         // Pull live counts from the registry when available
-        let (total_packages, total_publishers) =
-            if let Some(ref registry) = self.state.registry {
-                let stats = registry.get_statistics().await;
-                (stats.total_types as u64, self
-                    .state
+        let (total_packages, total_publishers) = if let Some(ref registry) = self.state.registry {
+            let stats = registry.get_statistics().await;
+            (
+                stats.total_types as u64,
+                self.state
                     .publisher_count
-                    .load(std::sync::atomic::Ordering::Relaxed))
-            } else {
-                (
-                    self.state
-                        .package_count
-                        .load(std::sync::atomic::Ordering::Relaxed),
-                    self.state
-                        .publisher_count
-                        .load(std::sync::atomic::Ordering::Relaxed),
-                )
-            };
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+        } else {
+            (
+                self.state
+                    .package_count
+                    .load(std::sync::atomic::Ordering::Relaxed),
+                self.state
+                    .publisher_count
+                    .load(std::sync::atomic::Ordering::Relaxed),
+            )
+        };
 
         let response = RegistryStatsResponse {
             total_packages,
@@ -496,12 +486,11 @@ impl ApiHandler for TypePublishHandler {
 
         // Build a type definition from the request
         let state_proof = crate::registry::CatalogRegistry::builtin_state_proof();
-        let mut type_def =
-            crate::registry::asset_type::AssetTypeDefinition::new(
-                req.type_name.clone(),
-                req.schema.clone(),
-                state_proof,
-            );
+        let mut type_def = crate::registry::asset_type::AssetTypeDefinition::new(
+            req.type_name.clone(),
+            req.schema.clone(),
+            state_proof,
+        );
 
         // Apply optional metadata
         type_def.metadata.version = req.version.clone();

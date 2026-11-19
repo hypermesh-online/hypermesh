@@ -16,26 +16,28 @@
 use std::sync::Arc;
 
 use blockmatrix::intelligence::EbpfFeedbackAdapter;
+use hypermesh_ebpf::{EbpfConfig, HyperMeshEbpf};
+use hypermesh_lib::{MatrixPosition, NodeId};
 use ngauge::routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, RoutingIntelFeed,
 };
-use hypermesh_ebpf::{EbpfConfig, HyperMeshEbpf};
-use hypermesh_lib::{MatrixPosition, NodeId};
 
 #[test]
 fn adapter_attaches_to_routing_intel_feed() {
-    let ebpf = Arc::new(
-        HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"),
-    );
+    let ebpf =
+        Arc::new(HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"));
     let mut feed = RoutingIntelFeed::new(30);
-    let adapter: Box<dyn EbpfPolicyFeedback> =
-        Box::new(EbpfFeedbackAdapter::new(ebpf.clone()));
+    let adapter: Box<dyn EbpfPolicyFeedback> = Box::new(EbpfFeedbackAdapter::new(ebpf.clone()));
     feed.set_ebpf_feedback(adapter);
 
     // publish_update with no candidates exercises the empty-candidates branch
     // and still drives the privacy-action feedback path (NoChange when there
     // is no congestion data — the orchestrator stays untouched).
-    let pos = MatrixPosition { x: 0.0, y: 0.0, z: 0.0 };
+    let pos = MatrixPosition {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
     let candidates: Vec<NodeId> = vec![];
     let _update = feed.publish_update(&pos, &pos, &candidates);
 
@@ -47,14 +49,21 @@ fn adapter_attaches_to_routing_intel_feed() {
 
 #[test]
 fn apply_routing_rules_mutates_ebpf_state() {
-    let ebpf = Arc::new(
-        HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"),
-    );
+    let ebpf =
+        Arc::new(HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"));
     let adapter = EbpfFeedbackAdapter::new(ebpf.clone());
 
     let rules = vec![EbpfRoutingRule {
-        dest: MatrixPosition { x: 100.0, y: 200.0, z: 300.0 },
-        next_hop: MatrixPosition { x: 400.0, y: 500.0, z: 600.0 },
+        dest: MatrixPosition {
+            x: 100.0,
+            y: 200.0,
+            z: 300.0,
+        },
+        next_hop: MatrixPosition {
+            x: 400.0,
+            y: 500.0,
+            z: 600.0,
+        },
     }];
 
     assert_eq!(ebpf.routing_rule_count(), 0);
@@ -64,7 +73,11 @@ fn apply_routing_rules_mutates_ebpf_state() {
     assert_eq!(ebpf.routing_rule_count(), 1);
 
     let stored = ebpf
-        .get_routing_rule(&MatrixPosition { x: 100.0, y: 200.0, z: 300.0 })
+        .get_routing_rule(&MatrixPosition {
+            x: 100.0,
+            y: 200.0,
+            z: 300.0,
+        })
         .expect("rule should be present after push");
     assert_eq!(stored.x, 400.0);
     assert_eq!(stored.y, 500.0);
@@ -73,9 +86,8 @@ fn apply_routing_rules_mutates_ebpf_state() {
 
 #[test]
 fn apply_privacy_action_propagates_through_adapter() {
-    let ebpf = Arc::new(
-        HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"),
-    );
+    let ebpf =
+        Arc::new(HyperMeshEbpf::new(EbpfConfig::default()).expect("construct HyperMeshEbpf"));
     let adapter = EbpfFeedbackAdapter::new(ebpf.clone());
 
     // All three variants should round-trip without error.

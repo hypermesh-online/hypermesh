@@ -296,9 +296,15 @@ mod tests {
         let manager = DnsPoolManager::new();
         let record = create_test_record("nike", "node-1");
 
-        manager.register_public(record).await.expect("test: async operation");
+        manager
+            .register_public(record)
+            .await
+            .expect("test: async operation");
 
-        let records = manager.query_public("nike").await.expect("test: async operation");
+        let records = manager
+            .query_public("nike")
+            .await
+            .expect("test: async operation");
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].domain, "nike");
     }
@@ -344,13 +350,19 @@ mod tests {
         record.ttl = 0;
         record.expires_at = std::time::SystemTime::now();
 
-        manager.register_public(record).await.expect("test: async operation");
+        manager
+            .register_public(record)
+            .await
+            .expect("test: async operation");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
         let removed = manager.cleanup_all().await.expect("test: async operation");
         assert_eq!(removed, 1);
 
-        let records = manager.query_public("test").await.expect("test: async operation");
+        let records = manager
+            .query_public("test")
+            .await
+            .expect("test: async operation");
         assert_eq!(records.len(), 0);
     }
 }

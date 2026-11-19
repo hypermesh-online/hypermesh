@@ -14,8 +14,8 @@ use super::types::*;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, StateProof, ContainerRequirements, NetworkScope, PortMapping,
-    PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage, VolumeMount,
+    AssetType, BaseSystemType, ContainerRequirements, NetworkScope, PortMapping, PrivacyMode,
+    ProxyAddress, ResourceLimits, ResourceUsage, StateProof, VolumeMount,
 };
 
 /// Container Asset Adapter implementation
@@ -206,10 +206,7 @@ impl AssetAdapter for ContainerAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        if !self
-            .validate_state_proof(&request.state_proof)
-            .await?
-        {
+        if !self.validate_state_proof(&request.state_proof).await? {
             return Err(AssetError::StateProofValidationFailed {
                 reason: "Container allocation state proof validation failed".to_string(),
             });
@@ -358,8 +355,7 @@ impl AssetAdapter for ContainerAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                state_requirements:
-                    crate::assets::core::privacy::StateRequirements::default(),
+                state_requirements: crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],

@@ -130,7 +130,10 @@ impl std::fmt::Display for AssetChainWireError {
                 f,
                 "asset-chain payload declares {declared} bytes, limit is {limit}"
             ),
-            Self::LengthMismatch { declared, available } => write!(
+            Self::LengthMismatch {
+                declared,
+                available,
+            } => write!(
                 f,
                 "asset-chain payload declares {declared} bytes but {available} are present"
             ),
@@ -176,10 +179,12 @@ pub fn encode_presented_asset_chain(
 pub fn decode_presented_asset_chain(
     data: &[u8],
 ) -> Result<PresentedAssetChain, AssetChainWireError> {
-    let header = data.get(..HEADER_LEN).ok_or(AssetChainWireError::Truncated {
-        got: data.len(),
-        need: HEADER_LEN,
-    })?;
+    let header = data
+        .get(..HEADER_LEN)
+        .ok_or(AssetChainWireError::Truncated {
+            got: data.len(),
+            need: HEADER_LEN,
+        })?;
 
     if header[0] != ASSET_CHAIN_TAG {
         return Err(AssetChainWireError::WrongTag { got: header[0] });

@@ -56,9 +56,7 @@ impl MeshLoadBalancer {
                 let idx = self.counter.fetch_add(1, Ordering::Relaxed) % eligible.len();
                 Some(eligible[idx])
             }
-            Strategy::LeastConnections => eligible
-                .into_iter()
-                .min_by_key(|ep| ep.connections),
+            Strategy::LeastConnections => eligible.into_iter().min_by_key(|ep| ep.connections),
         }
     }
 

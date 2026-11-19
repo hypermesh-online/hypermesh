@@ -150,7 +150,9 @@ pub async fn allocate_storage_from_devices(
 
     // Sort by available capacity (largest first)
     suitable_devices.sort_by_key(|device_id| {
-        let device = devices.get(device_id).expect("device_id from filtered keys must exist");
+        let device = devices
+            .get(device_id)
+            .expect("device_id from filtered keys must exist");
         std::cmp::Reverse(device.available_capacity_bytes)
     });
 
@@ -170,7 +172,9 @@ pub async fn allocate_storage_from_devices(
 
     // Allocate to multiple devices for replication
     for device_id in suitable_devices.iter().take(required_replicas as usize) {
-        let device = devices.get_mut(device_id).expect("device_id from suitable_devices must exist");
+        let device = devices
+            .get_mut(device_id)
+            .expect("device_id from suitable_devices must exist");
 
         if device.available_capacity_bytes < size_per_replica {
             continue; // Skip if insufficient space
@@ -188,7 +192,9 @@ pub async fn allocate_storage_from_devices(
     if allocated_devices.len() < required_replicas as usize {
         // Rollback partial allocation
         for device_id in &allocated_devices {
-            let device = devices.get_mut(device_id).expect("allocated device_id must exist for rollback");
+            let device = devices
+                .get_mut(device_id)
+                .expect("allocated device_id must exist for rollback");
             device.status = StorageStatus::Available;
             device.allocated_to = None;
             device.available_capacity_bytes += size_per_replica;

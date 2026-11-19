@@ -28,7 +28,7 @@ pub use stoq_bridge::{
 use async_trait::async_trait;
 pub use bootstrap::{
     BootstrapConfig, BootstrapManager, BootstrapPhase, CertificateProvider, ComponentState,
-    ComponentStatus, StateProofProvider, ServiceDiscovery, TransportProvider,
+    ComponentStatus, ServiceDiscovery, StateProofProvider, TransportProvider,
 };
 
 pub use config::IntegrationConfig;

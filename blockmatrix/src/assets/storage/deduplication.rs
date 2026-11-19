@@ -393,7 +393,11 @@ mod tests {
                 .await
                 .expect("test: expected success"),
         );
-        let mapper = Arc::new(BucketMapper::new(foundation).await.expect("test: async operation"));
+        let mapper = Arc::new(
+            BucketMapper::new(foundation)
+                .await
+                .expect("test: async operation"),
+        );
         DeduplicationEngine::new(mapper)
     }
 
@@ -406,7 +410,10 @@ mod tests {
             metadata: Default::default(),
         };
 
-        let result = engine.process_shard(shard).await.expect("test: async operation");
+        let result = engine
+            .process_shard(shard)
+            .await
+            .expect("test: async operation");
         assert!(!result.deduplicated);
         assert_eq!(result.reference_count, 1);
         assert!(!result.positions.is_empty());
@@ -427,11 +434,17 @@ mod tests {
         };
 
         // First shard - new
-        let result1 = engine.process_shard(shard1).await.expect("test: async operation");
+        let result1 = engine
+            .process_shard(shard1)
+            .await
+            .expect("test: async operation");
         assert!(!result1.deduplicated);
 
         // Second shard - deduplicated
-        let result2 = engine.process_shard(shard2).await.expect("test: async operation");
+        let result2 = engine
+            .process_shard(shard2)
+            .await
+            .expect("test: async operation");
         assert!(result2.deduplicated);
         assert_eq!(result2.reference_count, 2);
         assert_eq!(result2.positions, result1.positions); // Same positions
@@ -448,7 +461,10 @@ mod tests {
                 data,
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.expect("test: async operation");
+            engine
+                .process_shard(shard)
+                .await
+                .expect("test: async operation");
         }
 
         let stats = engine.get_stats();
@@ -470,7 +486,10 @@ mod tests {
                 data,
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.expect("test: async operation");
+            engine
+                .process_shard(shard)
+                .await
+                .expect("test: async operation");
         }
 
         let stats = engine.get_stats();
@@ -488,7 +507,10 @@ mod tests {
                 data: vec![i as u8; 100],
                 metadata: Default::default(),
             };
-            engine.process_shard(shard).await.expect("test: async operation");
+            engine
+                .process_shard(shard)
+                .await
+                .expect("test: async operation");
         }
 
         // Verify O(1) performance

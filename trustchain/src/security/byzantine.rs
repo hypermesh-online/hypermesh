@@ -13,8 +13,8 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
-use crate::proof_of_state::{StateProof, SpaceProof, StakeProof, TimeProof, WorkProof};
 use crate::errors::Result as TrustChainResult;
+use crate::proof_of_state::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
 
 /// Byzantine fault detector with state proof integration
 pub struct ByzantineDetector {
@@ -212,10 +212,7 @@ impl ByzantineDetector {
         let mut violations = Vec::new();
 
         // Check stake proof
-        if let Some(violation) = self
-            .analyze_stake_proof(&state_proof.stake_proof)
-            .await?
-        {
+        if let Some(violation) = self.analyze_stake_proof(&state_proof.stake_proof).await? {
             violations.push(violation);
         }
 
@@ -225,10 +222,7 @@ impl ByzantineDetector {
         }
 
         // Check space proof
-        if let Some(violation) = self
-            .analyze_space_proof(&state_proof.space_proof)
-            .await?
-        {
+        if let Some(violation) = self.analyze_space_proof(&state_proof.space_proof).await? {
             violations.push(violation);
         }
 
@@ -595,9 +589,7 @@ impl ByzantineDetector {
             })
             .collect();
 
-        suspicious_nodes.sort_by(|a, b| {
-            b.failed_verifications.cmp(&a.failed_verifications)
-        });
+        suspicious_nodes.sort_by(|a, b| b.failed_verifications.cmp(&a.failed_verifications));
         suspicious_nodes.truncate(5);
 
         Ok(ByzantineDetectionSummary {
@@ -622,13 +614,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_byzantine_detector_creation() {
-        let detector = ByzantineDetector::new(0.5).await.expect("test: async operation");
+        let detector = ByzantineDetector::new(0.5)
+            .await
+            .expect("test: async operation");
         assert_eq!(detector.threshold, 0.5);
     }
 
     #[tokio::test]
     async fn test_valid_state_proof() {
-        let detector = ByzantineDetector::new(0.5).await.expect("test: async operation");
+        let detector = ByzantineDetector::new(0.5)
+            .await
+            .expect("test: async operation");
         let state_proof = StateProof::default_for_testing();
 
         let result = detector
@@ -648,7 +644,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_stake_proof() {
-        let detector = ByzantineDetector::new(0.1).await.expect("test: async operation"); // Low threshold for testing
+        let detector = ByzantineDetector::new(0.1)
+            .await
+            .expect("test: async operation"); // Low threshold for testing
 
         // Create an invalid authorization: unbind the identity (WHO). PoStake
         // is authorization, not an amount, so a malformed proof = empty id.
@@ -673,7 +671,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_time_manipulation_detection() {
-        let detector = ByzantineDetector::new(0.1).await.expect("test: async operation");
+        let detector = ByzantineDetector::new(0.1)
+            .await
+            .expect("test: async operation");
 
         // Create time proof with excessive offset
         let mut state_proof = StateProof::default_for_testing();
@@ -698,7 +698,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_storage_falsification_detection() {
-        let detector = ByzantineDetector::new(0.1).await.expect("test: async operation");
+        let detector = ByzantineDetector::new(0.1)
+            .await
+            .expect("test: async operation");
 
         // Create space proof with falsified storage
         let mut state_proof = StateProof::default_for_testing();
@@ -724,7 +726,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_detection_summary() {
-        let detector = ByzantineDetector::new(0.5).await.expect("test: async operation");
+        let detector = ByzantineDetector::new(0.5)
+            .await
+            .expect("test: async operation");
 
         // Perform some detections to populate data
         let state_proof = StateProof::default_for_testing();
@@ -733,7 +737,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let summary = detector.get_detection_summary().await.expect("test: async operation");
+        let summary = detector
+            .get_detection_summary()
+            .await
+            .expect("test: async operation");
 
         assert_eq!(summary.nodes_monitored, 1);
         // Other fields depend on detection results

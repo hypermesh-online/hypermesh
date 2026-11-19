@@ -553,7 +553,8 @@ mod tests {
         ));
 
         // Create mock content store
-        let storage = super::super::FileBasedStorage::new(storage_dir.clone()).expect("test: creation");
+        let storage =
+            super::super::FileBasedStorage::new(storage_dir.clone()).expect("test: creation");
         let content_store = Arc::new(ContentStore {
             storage: Arc::new(storage),
             index: Arc::new(RwLock::new(super::super::ContentIndex::default())),

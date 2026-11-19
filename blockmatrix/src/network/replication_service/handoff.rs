@@ -207,7 +207,11 @@ impl SwarmSeeder {
     async fn feed_analytics(&self, network: NetworkId, hashes: &[ContentHash]) {
         let mut counts: Vec<(ContentHash, u32)> = Vec::with_capacity(hashes.len());
         for hash in hashes {
-            let n = self.index.get_providers_in_network(network, hash).await.len() as u32;
+            let n = self
+                .index
+                .get_providers_in_network(network, hash)
+                .await
+                .len() as u32;
             counts.push((*hash, n));
         }
         let ts = SystemTime::now()
@@ -228,8 +232,8 @@ impl SwarmSeeder {
 /// `(hash, bytes)` pairs. The hash is BLAKE3 of the shard bytes — the same key
 /// the store, provider index, and analytics are all keyed by.
 pub fn shard_content(content: &[u8]) -> Result<Vec<(ContentHash, Vec<u8>)>> {
-    let sharder = Sharder::default()
-        .map_err(|e| anyhow::anyhow!("failed to build sharder: {e}"))?;
+    let sharder =
+        Sharder::default().map_err(|e| anyhow::anyhow!("failed to build sharder: {e}"))?;
     let (shards, _stats) = sharder
         .shard(content)
         .map_err(|e| anyhow::anyhow!("sharding failed: {e}"))?;

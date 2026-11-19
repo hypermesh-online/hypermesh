@@ -12,20 +12,21 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
 
-use crate::proof_of_state::{StateProof, StateProofResult, FourProofValidator};
 use crate::errors::Result as TrustChainResult;
+use crate::proof_of_state::{FourProofValidator, StateProof, StateProofResult};
 
 pub mod alerts;
+pub mod binary_auth;
 pub mod blockchain_crl;
 pub mod byzantine;
 pub mod cascading_revocation;
 pub mod monitoring;
 pub mod revocation_propagation;
-pub mod binary_auth;
 pub mod types;
 
 #[allow(ambiguous_glob_reexports)]
 pub use alerts::*;
+pub use binary_auth::*;
 pub use blockchain_crl::{BlockchainCrl, CrlBlock, CrlBlockEntry, CrlBlockType};
 pub use byzantine::*;
 pub use cascading_revocation::{CascadeResult, CascadeRevocation, CascadingRevocation};
@@ -34,7 +35,6 @@ pub use monitoring::*;
 pub use revocation_propagation::{
     PropagationMessage, PropagationStatus, RevocationNotice, RevocationPropagator,
 };
-pub use binary_auth::*;
 pub use types::*;
 
 /// Security monitoring system with state proof integration
@@ -88,7 +88,10 @@ impl SecurityMonitor {
 
         let state_proof_start = std::time::Instant::now();
         let state_proof_result = if self.config.mandatory_state_proof {
-            info!("MANDATORY state proof validation required for: {}", operation);
+            info!(
+                "MANDATORY state proof validation required for: {}",
+                operation
+            );
             self.metrics
                 .state_validations
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -329,7 +332,9 @@ mod tests {
     #[tokio::test]
     async fn test_security_monitor_creation() {
         let config = SecurityConfig::default();
-        let monitor = SecurityMonitor::new(config).await.expect("test: async operation");
+        let monitor = SecurityMonitor::new(config)
+            .await
+            .expect("test: async operation");
         let metrics = monitor.get_metrics().await;
         assert_eq!(
             metrics
@@ -345,14 +350,12 @@ mod tests {
             mandatory_state_proof: true,
             ..Default::default()
         };
-        let monitor = SecurityMonitor::new(config).await.expect("test: async operation");
+        let monitor = SecurityMonitor::new(config)
+            .await
+            .expect("test: async operation");
         let state_proof = StateProof::default_for_testing();
         let result = monitor
-            .validate_certificate_operation(
-                "issue_certificate",
-                &state_proof,
-                "test_validation",
-            )
+            .validate_certificate_operation("issue_certificate", &state_proof, "test_validation")
             .await
             .expect("test: expected success");
         assert!(result.state_proof_result.is_some());
@@ -374,15 +377,22 @@ mod tests {
     #[tokio::test]
     async fn test_security_dashboard() {
         let config = SecurityConfig::default();
-        let monitor = SecurityMonitor::new(config).await.expect("test: async operation");
-        let dashboard = monitor.get_monitoring_dashboard().await.expect("test: async operation");
+        let monitor = SecurityMonitor::new(config)
+            .await
+            .expect("test: async operation");
+        let dashboard = monitor
+            .get_monitoring_dashboard()
+            .await
+            .expect("test: async operation");
         assert_eq!(dashboard.metrics.validations_total, 0);
         assert!(dashboard.state_proof_status.enabled);
     }
 
     #[tokio::test]
     async fn test_security_event_logging() {
-        let event_log = SecurityEventLog::new().await.expect("test: async operation");
+        let event_log = SecurityEventLog::new()
+            .await
+            .expect("test: async operation");
         let event = SecurityEvent {
             event_id: "test_event_001".to_string(),
             event_type: "test_event".to_string(),
@@ -392,8 +402,14 @@ mod tests {
             state_proof: None,
             metadata: HashMap::new(),
         };
-        event_log.log_event(event).await.expect("test: async operation");
-        let recent_events = event_log.get_recent_events(10).await.expect("test: async operation");
+        event_log
+            .log_event(event)
+            .await
+            .expect("test: async operation");
+        let recent_events = event_log
+            .get_recent_events(10)
+            .await
+            .expect("test: async operation");
         assert_eq!(recent_events.len(), 1);
         assert_eq!(recent_events[0].event_type, "test_event");
     }

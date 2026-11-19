@@ -115,15 +115,18 @@ async fn main() -> Result<()> {
         derived
     };
 
-    let metadata_path = data_dir
-        .join(&nid)
-        .join("blockchain")
-        .join("metadata.json");
+    let metadata_path = data_dir.join(&nid).join("blockchain").join("metadata.json");
     let has_persisted_state = metadata_path.exists();
 
     let (boot, persistence) = if has_persisted_state {
-        bootstrap::resume_node(&data_dir, &nid, &identity_dir, coord, cli.require_hardware_auth)
-            .await?
+        bootstrap::resume_node(
+            &data_dir,
+            &nid,
+            &identity_dir,
+            coord,
+            cli.require_hardware_auth,
+        )
+        .await?
     } else {
         bootstrap::fresh_boot(
             &data_dir,

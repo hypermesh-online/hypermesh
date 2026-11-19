@@ -42,11 +42,7 @@ use trustchain::proof_of_state::StateProofOps;
 /// Informational on the receiver side: the originating chain holds the
 /// canonical lock entry. Logging is enough; coordinator reflection is
 /// not required because the source broadcasts independently.
-pub(super) async fn handle_transfer_lock(
-    data: &[u8],
-    peer_node_id: &str,
-    _ctx: &PeerContext,
-) {
+pub(super) async fn handle_transfer_lock(data: &[u8], peer_node_id: &str, _ctx: &PeerContext) {
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
     let msg: TransferLockMessage = match serde_json::from_slice(data) {
         Ok(m) => m,
@@ -57,11 +53,7 @@ pub(super) async fn handle_transfer_lock(
     };
     info!(
         "TAG_TRANSFER_LOCK {} from {}: asset={} (src={} → tgt={})",
-        msg.transfer_id,
-        short_id,
-        msg.asset_id,
-        msg.source_chain_id,
-        msg.target_chain_id,
+        msg.transfer_id, short_id, msg.asset_id, msg.source_chain_id, msg.target_chain_id,
     );
 }
 
@@ -83,10 +75,7 @@ pub(super) async fn handle_transfer_register_req(
     let req: TransferRegisterRequest = match serde_json::from_slice(data) {
         Ok(r) => r,
         Err(e) => {
-            warn!(
-                "Invalid TAG_TRANSFER_REGISTER_REQ from {}: {}",
-                short_id, e
-            );
+            warn!("Invalid TAG_TRANSFER_REGISTER_REQ from {}: {}", short_id, e);
             return;
         }
     };
@@ -204,10 +193,7 @@ pub(super) async fn handle_transfer_register_ack(
     let ack: TransferRegisterAck = match serde_json::from_slice(data) {
         Ok(a) => a,
         Err(e) => {
-            warn!(
-                "Invalid TAG_TRANSFER_REGISTER_ACK from {}: {}",
-                short_id, e
-            );
+            warn!("Invalid TAG_TRANSFER_REGISTER_ACK from {}: {}", short_id, e);
             return;
         }
     };
@@ -232,11 +218,7 @@ pub(super) async fn handle_transfer_register_ack(
 ///
 /// Informational: receiver's chain already records the registration +
 /// receipt; the originating chain holds the canonical release.
-pub(super) async fn handle_transfer_release(
-    data: &[u8],
-    peer_node_id: &str,
-    _ctx: &PeerContext,
-) {
+pub(super) async fn handle_transfer_release(data: &[u8], peer_node_id: &str, _ctx: &PeerContext) {
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
     let rel: TransferRelease = match serde_json::from_slice(data) {
         Ok(r) => r,
@@ -256,11 +238,7 @@ pub(super) async fn handle_transfer_release(
 /// Informational: the receiver did not write a registration entry yet
 /// (or did, in which case the source-side rollback is the operational
 /// signal that target-side cleanup should follow).
-pub(super) async fn handle_transfer_rollback(
-    data: &[u8],
-    peer_node_id: &str,
-    _ctx: &PeerContext,
-) {
+pub(super) async fn handle_transfer_rollback(data: &[u8], peer_node_id: &str, _ctx: &PeerContext) {
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
     let rb: TransferRollback = match serde_json::from_slice(data) {
         Ok(r) => r,

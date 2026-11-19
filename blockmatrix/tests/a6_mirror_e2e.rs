@@ -91,9 +91,17 @@ impl Node {
     /// Dump this node's captured stdout/stderr to the test output (for
     /// debugging a failed poll or assertion).
     fn dump_logs(&self) {
-        eprintln!("──── node {} stdout ({}) ────", self.name, self.stdout_log.display());
+        eprintln!(
+            "──── node {} stdout ({}) ────",
+            self.name,
+            self.stdout_log.display()
+        );
         eprintln!("{}", read_to_string_lossy(&self.stdout_log));
-        eprintln!("──── node {} stderr ({}) ────", self.name, self.stderr_log.display());
+        eprintln!(
+            "──── node {} stderr ({}) ────",
+            self.name,
+            self.stderr_log.display()
+        );
         eprintln!("{}", read_to_string_lossy(&self.stderr_log));
     }
 }
@@ -148,9 +156,7 @@ fn locate_binary() -> Option<PathBuf> {
 /// prints a skip message and returns `None`.
 fn preflight() -> Option<PathBuf> {
     if std::env::var("HM_RUN_SUBPROCESS_HARNESS").ok().as_deref() != Some("1") {
-        eprintln!(
-            "skipping A6.4 mirror E2E — set HM_RUN_SUBPROCESS_HARNESS=1 to enable"
-        );
+        eprintln!("skipping A6.4 mirror E2E — set HM_RUN_SUBPROCESS_HARNESS=1 to enable");
         return None;
     }
     match locate_binary() {
@@ -373,20 +379,29 @@ async fn a6_mirror_torrent_flow_three_nodes() {
     // the registration block live to B, and B forward it to C. So: bring the mesh
     // fully up first, then store on A.
     let node_a = spawn_node(&bin, "A", wd, port_a, network_id, &[]);
-    wait_ready(&node_a).await.expect("test: A did not become ready");
+    wait_ready(&node_a)
+        .await
+        .expect("test: A did not become ready");
 
     let node_b = spawn_node(&bin, "B", wd, port_b, network_id, &[addr_a.clone()]);
-    wait_ready(&node_b).await.expect("test: B did not become ready");
+    wait_ready(&node_b)
+        .await
+        .expect("test: B did not become ready");
 
     let node_c = spawn_node(&bin, "C", wd, port_c, network_id, &[addr_b.clone()]);
-    wait_ready(&node_c).await.expect("test: C did not become ready");
+    wait_ready(&node_c)
+        .await
+        .expect("test: C did not become ready");
 
     // ── 2. Wait for the mesh to fully connect: A↔B and B↔C. ──
     // A sees B (inbound), B sees A + C, C sees B. A's push target is B; B forwards
     // to C. Require A>=1 so A has a live peer to receive the registration block.
-    poll_until("A sees a peer (B inbound)", &node_a, READY_TIMEOUT, || async {
-        (peer_count(&node_a).await >= 1).then_some(())
-    })
+    poll_until(
+        "A sees a peer (B inbound)",
+        &node_a,
+        READY_TIMEOUT,
+        || async { (peer_count(&node_a).await >= 1).then_some(()) },
+    )
     .await
     .expect("test: A never saw B connect inbound");
     poll_until("B sees A and C", &node_b, READY_TIMEOUT, || async {
@@ -451,12 +466,16 @@ async fn a6_mirror_torrent_flow_three_nodes() {
 
     // ── 4. A serves its own shards locally. ──
     for h in &shard_hashes {
-        let res = ipc_ok(&node_a.sock, "shard.fetch", serde_json::json!({ "shard_id": h }))
-            .await
-            .unwrap_or_else(|e| {
-                node_a.dump_logs();
-                panic!("test: A shard.fetch({h}) failed: {e}");
-            });
+        let res = ipc_ok(
+            &node_a.sock,
+            "shard.fetch",
+            serde_json::json!({ "shard_id": h }),
+        )
+        .await
+        .unwrap_or_else(|e| {
+            node_a.dump_logs();
+            panic!("test: A shard.fetch({h}) failed: {e}");
+        });
         assert_eq!(
             res.get("source").and_then(Value::as_str),
             Some("local"),
@@ -477,7 +496,13 @@ async fn a6_mirror_torrent_flow_three_nodes() {
     for h in &shard_hashes {
         let mut became_mirror = false;
         for attempt in 0..FETCH_RETRIES {
-            match ipc_call(&node_b.sock, "shard.fetch", serde_json::json!({ "shard_id": h })).await {
+            match ipc_call(
+                &node_b.sock,
+                "shard.fetch",
+                serde_json::json!({ "shard_id": h }),
+            )
+            .await
+            {
                 Ok(resp) => {
                     if let Some(result) = resp.get("result") {
                         let source = result.get("source").and_then(Value::as_str);
@@ -529,7 +554,13 @@ async fn a6_mirror_torrent_flow_three_nodes() {
     for h in &shard_hashes {
         let mut ok = false;
         for attempt in 0..FETCH_RETRIES {
-            match ipc_call(&node_c.sock, "shard.fetch", serde_json::json!({ "shard_id": h })).await {
+            match ipc_call(
+                &node_c.sock,
+                "shard.fetch",
+                serde_json::json!({ "shard_id": h }),
+            )
+            .await
+            {
                 Ok(resp) => {
                     if let Some(result) = resp.get("result") {
                         if result.get("source").and_then(Value::as_str) == Some("network") {
@@ -560,14 +591,15 @@ async fn a6_mirror_torrent_flow_three_nodes() {
 
     // ── 7. NEGATIVE: an unregistered shard id is refused (serve gate holds). ──
     let bogus = hex::encode([0x99u8; 32]);
-    let neg = ipc_call(&node_a.sock, "shard.fetch", serde_json::json!({ "shard_id": bogus }))
-        .await
-        .expect("test: negative shard.fetch should return a response, not a transport error");
-    let refused = neg
-        .get("error")
-        .map(|e| !e.is_null())
-        .unwrap_or(false)
-        || neg.get("result").is_none();
+    let neg = ipc_call(
+        &node_a.sock,
+        "shard.fetch",
+        serde_json::json!({ "shard_id": bogus }),
+    )
+    .await
+    .expect("test: negative shard.fetch should return a response, not a transport error");
+    let refused =
+        neg.get("error").map(|e| !e.is_null()).unwrap_or(false) || neg.get("result").is_none();
     assert!(
         refused,
         "an unregistered shard must be refused (not-found), got: {neg}",

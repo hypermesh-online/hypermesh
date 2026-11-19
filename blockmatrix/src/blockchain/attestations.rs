@@ -668,13 +668,11 @@ impl NodeBlockchain {
                 "S3.3: rejected mirror attestation — structural validity (B1: the \
                  full audit gate) or FALCON signature failed"
             );
-            return Err(
-                "mirror attestation rejected: it failed the audit gate \
+            return Err("mirror attestation rejected: it failed the audit gate \
                  (MirrorAttestation::is_structurally_valid — non-empty mirror, \
                  spine_point, pubkey and signature; envelope covers these fields; \
                  hex(BLAKE3(signer_pubkey)) == mirror) or its FALCON-1024 signature"
-                    .to_string(),
-            );
+                .to_string());
         }
 
         // (3) S3.4: the pool is bounded, and THIS is the authoritative gate —
@@ -797,7 +795,10 @@ impl NodeBlockchain {
     /// something a memory bound gets to do. The byte budget is what makes the
     /// pool bounded; this is the release valve.
     pub async fn clear_mirror_attestations(&self, asset_hash: &[u8; 32]) -> usize {
-        self.mirror_attestations.write().await.clear_asset(asset_hash)
+        self.mirror_attestations
+            .write()
+            .await
+            .clear_asset(asset_hash)
     }
 
     /// Seal the accumulated mirror attestations for `asset_hash` into the
@@ -857,7 +858,11 @@ impl NodeBlockchain {
             "S3.3: sealed mirror attestations into the spine"
         );
 
-        Ok(MirrorSealReceipt { block, seal, attestations })
+        Ok(MirrorSealReceipt {
+            block,
+            seal,
+            attestations,
+        })
     }
 
     /// Verify a previously sealed set: does `attestations` still hash to the
@@ -1016,11 +1021,7 @@ fn seal_time_proof(
 /// Lineage is deliberately left unset: `add_block`'s S3.2 stamper overwrites
 /// caller-supplied lineage under the head reservation, and re-derives
 /// `proof_hash` and the H3 signature after doing so.
-fn build_seal_entry(
-    head: &BlockAssetEntry,
-    sealed_by: &str,
-    seal: MirrorSeal,
-) -> BlockAssetEntry {
+fn build_seal_entry(head: &BlockAssetEntry, sealed_by: &str, seal: MirrorSeal) -> BlockAssetEntry {
     let mut proof = head.state_proof.clone();
     proof.stake_proof.stake_holder_id = sealed_by.to_string();
     proof.time_proof = seal_time_proof(&head.state_proof.time_proof, &head.asset_hash, &seal);

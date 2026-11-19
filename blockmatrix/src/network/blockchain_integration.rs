@@ -24,7 +24,7 @@ use crate::blockchain::node_chain::NodeBlockchain;
 use crate::matrix::coordinate::MatrixCoordinate;
 use trustchain::proof_of_state::validation::{ErrorCode, ProofType, ProofValidation};
 use trustchain::proof_of_state::{
-    StateProof, StateRequirements, SpaceProof, StakeProof, TimeProof, WorkProof,
+    SpaceProof, StakeProof, StateProof, StateRequirements, TimeProof, WorkProof,
 };
 
 /// Matrix position registration on blockchain

@@ -23,8 +23,8 @@
 
 use blockmatrix::blockchain::block::{Block, BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{
-    chain_footprint_bytes, entry_footprint_bytes, PresentedAssetChain, AcceptReject,
-    ReceivedAssetStore, LineageBreak, NodeBlockchain, StoreBound, MAX_RECEIVED_CHAINS,
+    chain_footprint_bytes, entry_footprint_bytes, AcceptReject, LineageBreak, NodeBlockchain,
+    PresentedAssetChain, ReceivedAssetStore, StoreBound, MAX_RECEIVED_CHAINS,
     MAX_RECEIVED_CHAIN_ENTRIES, MAX_RECEIVED_STORE_BYTES,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -197,10 +197,7 @@ async fn s3_4_forged_lineage_is_rejected() {
     let mut gapped = received_chain(&stranger, asset, 3);
     let prev = gapped.entries[1].lineage_id();
     gapped.entries[2] = received_entry(&stranger, asset, Some(prev), 9);
-    assert!(matches!(
-        gapped.entries[2].asset_seq(),
-        9,
-    ));
+    assert!(matches!(gapped.entries[2].asset_seq(), 9,));
     assert!(matches!(
         chain.accept_asset_chain(gapped).await,
         Err(AcceptReject::LineageBroken(LineageBreak::SequenceGap {
@@ -283,7 +280,10 @@ async fn s3_4_bad_signers_are_rejected() {
     entry.set_asset_lineage(Some(wrong_author.entries[0].lineage_id()), 1);
     // Signed by the IMPOSTOR while still claiming the stranger as author.
     entry.sign_proof(&impostor).expect("test: FALCON sign");
-    assert!(entry.verify_signed_proof().is_ok(), "the signature itself is valid");
+    assert!(
+        entry.verify_signed_proof().is_ok(),
+        "the signature itself is valid"
+    );
     wrong_author.entries[1] = entry;
     assert_eq!(
         chain.accept_asset_chain(wrong_author).await,
@@ -599,7 +599,10 @@ async fn s3_4_the_store_bound_is_a_byte_budget_that_fits_r13() {
     // And it is ENFORCED at the byte boundary, not merely declared.
     let store = ReceivedAssetStore::new();
     assert_eq!(store.bytes_held(), 0);
-    assert_eq!(store.admission_check(true, MAX_RECEIVED_STORE_BYTES), Ok(()));
+    assert_eq!(
+        store.admission_check(true, MAX_RECEIVED_STORE_BYTES),
+        Ok(())
+    );
     assert_eq!(
         store.admission_check(true, MAX_RECEIVED_STORE_BYTES + 1),
         Err(AcceptReject::StoreFull(StoreBound::Bytes {
@@ -849,7 +852,10 @@ async fn s3_4_shadowed_received_chains_are_enumerable_and_reclaimable() {
     enumerated.sort_unstable();
     let mut expected = assets.clone();
     expected.sort_unstable();
-    assert_eq!(enumerated, expected, "every adopted chain must be enumerable");
+    assert_eq!(
+        enumerated, expected,
+        "every adopted chain must be enumerable"
+    );
     assert!(
         chain.shadowed_received_asset_chains().await.is_empty(),
         "nothing is shadowed yet"
@@ -924,7 +930,10 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
     let mut added_total = 0usize;
     for task in tasks {
         // A task that neither returned Ok nor Err is the silent-drop failure.
-        match task.await.expect("test: no accept task may panic or be dropped") {
+        match task
+            .await
+            .expect("test: no accept task may panic or be dropped")
+        {
             Ok(receipt) => {
                 accepted += 1;
                 added_total += receipt.added;
@@ -933,8 +942,15 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
         }
     }
 
-    assert_eq!(accepted + refused, WRITERS, "every writer must be accounted");
-    assert_eq!(refused, 0, "nothing here contends for the same key or bound");
+    assert_eq!(
+        accepted + refused,
+        WRITERS,
+        "every writer must be accounted"
+    );
+    assert_eq!(
+        refused, 0,
+        "nothing here contends for the same key or bound"
+    );
     assert_eq!(accepted, WRITERS);
     assert_eq!(added_total, WRITERS * ENTRIES);
 
@@ -970,7 +986,10 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
     let mut outcomes = 0usize;
     let mut added_total = 0usize;
     for task in tasks {
-        match task.await.expect("test: no accept task may panic or be dropped") {
+        match task
+            .await
+            .expect("test: no accept task may panic or be dropped")
+        {
             Ok(receipt) => {
                 outcomes += 1;
                 added_total += receipt.added;
@@ -997,7 +1016,11 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
         .await
         .expect("test: the chain is held");
     assert_eq!(held.entries.len(), WRITERS);
-    assert_eq!(held.verify(), Ok(()), "the merged history must still verify");
+    assert_eq!(
+        held.verify(),
+        Ok(()),
+        "the merged history must still verify"
+    );
     assert_eq!(
         added_total, WRITERS,
         "each entry must be charged as added exactly once — no double count, no gap"

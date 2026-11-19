@@ -19,7 +19,9 @@ use crate::network::stoq_integration::MatrixMessage;
 use hypermesh_lib::MatrixPosition;
 
 use super::dispatcher::{DispatchResponse, SyncDispatcher};
-use super::transport_sync_driver::{filter_missing_hashes, resolve_reflector_addr, TransportSyncDriver};
+use super::transport_sync_driver::{
+    filter_missing_hashes, resolve_reflector_addr, TransportSyncDriver,
+};
 
 /// A trivial BlockProvider that returns predictable hashes.
 struct FakeBlockProvider {
@@ -714,8 +716,7 @@ fn test_block_fetch_request_serialization() {
         block_hashes: vec!["abc123".to_string(), "def456".to_string()],
     };
     let json = serde_json::to_string(&msg).expect("test: serialize");
-    let parsed: MatrixMessage =
-        serde_json::from_str(&json).expect("test: deserialize");
+    let parsed: MatrixMessage = serde_json::from_str(&json).expect("test: deserialize");
     match parsed {
         MatrixMessage::BlockFetchRequest { block_hashes } => {
             assert_eq!(block_hashes.len(), 2);
@@ -730,15 +731,13 @@ fn test_block_fetch_request_serialization() {
 fn test_block_fetch_response_serialization() {
     let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
     let block = Block::genesis(coord);
-    let block_json =
-        serde_json::to_string(&block).expect("test: serialize block");
+    let block_json = serde_json::to_string(&block).expect("test: serialize block");
 
     let msg = MatrixMessage::BlockFetchResponse {
         blocks: vec![block_json.clone()],
     };
     let json = serde_json::to_string(&msg).expect("test: serialize");
-    let parsed: MatrixMessage =
-        serde_json::from_str(&json).expect("test: deserialize");
+    let parsed: MatrixMessage = serde_json::from_str(&json).expect("test: deserialize");
     match parsed {
         MatrixMessage::BlockFetchResponse { blocks } => {
             assert_eq!(blocks.len(), 1);

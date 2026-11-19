@@ -164,8 +164,7 @@ impl Substrate for DefaultSubstrate {
     async fn active_interface(&self) -> SubstrateResult<InterfaceId> {
         let adapter = self.registry.enumerator().ok_or_else(|| {
             SubstrateError::Unsupported(
-                "no backend can enumerate interfaces (netlink/sysfs both absent)"
-                    .to_string(),
+                "no backend can enumerate interfaces (netlink/sysfs both absent)".to_string(),
             )
         })?;
 

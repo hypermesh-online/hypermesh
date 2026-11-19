@@ -142,10 +142,7 @@ async fn handle_message_inbox(
     params: serde_json::Value,
     state: &DaemonState,
 ) -> Result<serde_json::Value, RpcError> {
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(20) as usize;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
 
     // Alpha: return empty inbox (MessageStore not yet in DaemonState).
     let _ = (state, limit);
@@ -175,10 +172,7 @@ async fn handle_message_history(
             data: None,
         })?;
 
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(50) as usize;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
     // Alpha: return empty history (MessageStore not yet in DaemonState).
     let _ = (state, limit);
@@ -247,37 +241,26 @@ mod tests {
         assert!(resp.error.is_none(), "expected success: {:?}", resp.error);
         let result = resp.result.expect("test: result present");
         assert_eq!(result["status"], "created");
-        assert!(
-            result["message_id"]
-                .as_str()
-                .expect("test: message_id")
-                .starts_with("msg-"),
-        );
+        assert!(result["message_id"]
+            .as_str()
+            .expect("test: message_id")
+            .starts_with("msg-"),);
 
         // Missing recipient
-        let req = RpcRequest::new(
-            "message.send",
-            serde_json::json!({"body": "hi"}),
-        );
+        let req = RpcRequest::new("message.send", serde_json::json!({"body": "hi"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error
-                .expect("test: error")
-                .message
-                .contains("recipient"),
-        );
+        assert!(resp
+            .error
+            .expect("test: error")
+            .message
+            .contains("recipient"),);
 
         // Missing body
-        let req = RpcRequest::new(
-            "message.send",
-            serde_json::json!({"recipient": "peer"}),
-        );
+        let req = RpcRequest::new("message.send", serde_json::json!({"recipient": "peer"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error.expect("test: error").message.contains("body"),
-        );
+        assert!(resp.error.expect("test: error").message.contains("body"),);
     }
 
     #[tokio::test]
@@ -315,9 +298,7 @@ mod tests {
         let req = RpcRequest::new("message.history", serde_json::json!({}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error.expect("test: error").message.contains("peer"),
-        );
+        assert!(resp.error.expect("test: error").message.contains("peer"),);
     }
 
     #[tokio::test]
@@ -340,11 +321,10 @@ mod tests {
         let req = RpcRequest::new("message.read", serde_json::json!({}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error
-                .expect("test: error")
-                .message
-                .contains("message_id"),
-        );
+        assert!(resp
+            .error
+            .expect("test: error")
+            .message
+            .contains("message_id"),);
     }
 }

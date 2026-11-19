@@ -65,9 +65,9 @@ impl Default for MetricsFrameHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ngauge::streaming::{CapacitySnapshot, MetricsPayload};
     use hypermesh_lib::types::NodeId;
     use hypermesh_lib::PrivacyMode;
+    use ngauge::streaming::{CapacitySnapshot, MetricsPayload};
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 

@@ -108,9 +108,7 @@ pub fn _parse_asset_kind(s: &str) -> AssetKind {
         "economic" | "token" | "wallet" => AssetKind::System(SystemAssetKind::Economic),
         "blockchain" | "chain" => AssetKind::System(SystemAssetKind::Blockchain),
         "dns" => AssetKind::System(SystemAssetKind::Dns),
-        "transmission" | "relay" | "bandwidth" => {
-            AssetKind::System(SystemAssetKind::Transmission)
-        }
+        "transmission" | "relay" | "bandwidth" => AssetKind::System(SystemAssetKind::Transmission),
         "dashboard" => AssetKind::System(SystemAssetKind::Dashboard),
         other => {
             // Treat anything else as a UserDefined type with a zeroed hash

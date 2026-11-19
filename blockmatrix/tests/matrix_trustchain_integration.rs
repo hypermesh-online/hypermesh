@@ -44,11 +44,7 @@ async fn test_matrix_position_registration_flow() -> Result<()> {
 
     // Step 5: Register position on blockchain with PoS validation
     let registration = validator
-        .register_position(
-            coordinate,
-            "integration_test_node".to_string(),
-            state_proof,
-        )
+        .register_position(coordinate, "integration_test_node".to_string(), state_proof)
         .await?;
 
     // Verify registration succeeded

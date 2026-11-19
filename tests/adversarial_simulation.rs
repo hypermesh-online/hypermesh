@@ -18,9 +18,7 @@ use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{Block, NodeBlockchain};
 use blockmatrix::identity::FalconIdentity;
 use blockmatrix::matrix::MatrixCoordinate;
-use hypermesh_lib::{
-    NodeSigner, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
-};
+use hypermesh_lib::{NodeSigner, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
 
 /// Helper: construct a valid test asset entry signed with a real FALCON identity.
 fn create_signed_asset_entry(
@@ -75,12 +73,18 @@ async fn test_honest_bilateral_state_exchange() {
     let identity_a = Arc::new(FalconIdentity::generate());
     let identity_b = Arc::new(FalconIdentity::generate());
 
-    let coord = MatrixCoordinate { x: 10, y: 20, z: 30 };
+    let coord = MatrixCoordinate {
+        x: 10,
+        y: 20,
+        z: 30,
+    };
 
     let genesis_block = Block::genesis(coord);
 
-    let _chain_a = NodeBlockchain::from_genesis(coord, genesis_block.clone()).with_signer(identity_a.clone());
-    let chain_b = NodeBlockchain::from_genesis(coord, genesis_block.clone()).with_signer(identity_b.clone());
+    let _chain_a =
+        NodeBlockchain::from_genesis(coord, genesis_block.clone()).with_signer(identity_a.clone());
+    let chain_b =
+        NodeBlockchain::from_genesis(coord, genesis_block.clone()).with_signer(identity_b.clone());
 
     // 2. Node A creates a block with a signed state proof asset entry
     let entry = create_signed_asset_entry(&identity_a, "asset-001", "workload-alpha", coord);
@@ -212,7 +216,8 @@ async fn test_multi_node_cluster_adversarial_containment() {
 
     for _ in 0..honest_count {
         let id = Arc::new(FalconIdentity::generate());
-        let chain = NodeBlockchain::from_genesis(coord, network_genesis.clone()).with_signer(id.clone());
+        let chain =
+            NodeBlockchain::from_genesis(coord, network_genesis.clone()).with_signer(id.clone());
         honest_identities.push(id);
         honest_chains.push(chain);
     }
@@ -255,7 +260,9 @@ async fn test_multi_node_cluster_adversarial_containment() {
     // Verify 100% of honest nodes reject the forged Byzantine block
     let mut rejected_count = 0;
     for honest_peer in &honest_chains {
-        let res = honest_peer.insert_received_block(forged_block.clone()).await;
+        let res = honest_peer
+            .insert_received_block(forged_block.clone())
+            .await;
         if res.is_err() {
             rejected_count += 1;
         }
@@ -275,7 +282,8 @@ async fn test_byzantine_tampered_storage_pointer_rejection() {
     let genesis = Block::genesis(coord);
 
     let chain_b = NodeBlockchain::from_genesis(coord, genesis.clone()).with_signer(identity_b);
-    let mut entry = create_signed_asset_entry(&identity_a, "asset-storage-tamper", "work-storage", coord);
+    let mut entry =
+        create_signed_asset_entry(&identity_a, "asset-storage-tamper", "work-storage", coord);
 
     // Relay adversary modifies storage pointer from legitimate path to hijacked path
     entry.storage_pointer = StoragePointer::Local {
@@ -317,4 +325,3 @@ async fn test_byzantine_tampered_registration_rejection() {
         "Tampered registration metadata must fail cryptographic verification (W1-0)"
     );
 }
-

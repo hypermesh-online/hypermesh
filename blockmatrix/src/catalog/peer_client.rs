@@ -209,20 +209,21 @@ impl CatalogPeerClient {
             Ok::<Vec<u8>, PeerSearchError>(resp_bytes)
         };
 
-        let resp_bytes = match tokio::time::timeout(Duration::from_millis(timeout_ms), send_recv)
-            .await
-        {
-            Ok(Ok(bytes)) => bytes,
-            Ok(Err(e)) => return Err(e),
-            Err(_) => return Err(PeerSearchError::Timeout(timeout_ms)),
-        };
+        let resp_bytes =
+            match tokio::time::timeout(Duration::from_millis(timeout_ms), send_recv).await {
+                Ok(Ok(bytes)) => bytes,
+                Ok(Err(e)) => return Err(e),
+                Err(_) => return Err(PeerSearchError::Timeout(timeout_ms)),
+            };
 
         // 4. Decode the ApiResponse envelope.
         let api_resp: WireApiResponse = bincode::deserialize(&resp_bytes)
             .map_err(|e| PeerSearchError::Malformed(format!("ApiResponse decode: {e}")))?;
         if !api_resp.success {
             return Err(PeerSearchError::PeerError(
-                api_resp.error.unwrap_or_else(|| "unknown error".to_string()),
+                api_resp
+                    .error
+                    .unwrap_or_else(|| "unknown error".to_string()),
             ));
         }
 
@@ -346,15 +347,14 @@ mod tests {
         );
         // Build a FALCON identity so the manager has a real signer.
         let dir = tempfile::tempdir().expect("test: tempdir");
-        let identity = crate::identity::FalconIdentity::load_or_create(dir.path())
-            .expect("test: identity");
+        let identity =
+            crate::identity::FalconIdentity::load_or_create(dir.path()).expect("test: identity");
         let signer: Arc<dyn hypermesh_lib::NodeSigner> = Arc::new(identity);
-        let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> = Arc::new(
-            crate::proof_of_state::BlockMatrixProofProvider::new(
+        let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> =
+            Arc::new(crate::proof_of_state::BlockMatrixProofProvider::new(
                 signer.node_id().to_string(),
                 signer.clone(),
-            ),
-        );
+            ));
         let manager = NetworkManager::new(
             coord,
             transport,
@@ -436,8 +436,7 @@ mod tests {
             metadata: HashMap::new(),
         };
         let bytes = bincode::serialize(&req).expect("test: encode request");
-        let decoded: WireApiRequest =
-            bincode::deserialize(&bytes).expect("test: decode request");
+        let decoded: WireApiRequest = bincode::deserialize(&bytes).expect("test: decode request");
         assert_eq!(decoded.service, "catalog");
         assert_eq!(decoded.method, "search");
         assert_eq!(decoded.payload.as_ref(), b"{}");
@@ -450,8 +449,7 @@ mod tests {
             metadata: HashMap::new(),
         };
         let bytes = bincode::serialize(&resp).expect("test: encode response");
-        let decoded: WireApiResponse =
-            bincode::deserialize(&bytes).expect("test: decode response");
+        let decoded: WireApiResponse = bincode::deserialize(&bytes).expect("test: decode response");
         assert!(decoded.success);
         assert_eq!(decoded.payload.as_ref(), b"{\"results\":[]}");
     }

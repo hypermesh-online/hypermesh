@@ -7,14 +7,16 @@
 use anyhow::{Context, Result};
 use tracing::{info, warn};
 
-use blockmatrix::assets::core::{AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope};
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
+use blockmatrix::ipc;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::shard_transport::StoqShardTransport;
 use blockmatrix::network::NetworkManager;
 use blockmatrix::persistence::PersistenceManager;
-use blockmatrix::ipc;
 
 use crate::cli::Cli;
 
@@ -34,10 +36,7 @@ pub async fn service_ipc_call(
                 "message": format!("Service method '{}' requires a running daemon", method),
                 "hint": "Start with: hypermesh connect public",
             });
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&err).unwrap_or_default()
-            );
+            println!("{}", serde_json::to_string_pretty(&err).unwrap_or_default());
         } else {
             eprintln!(
                 "Service '{}' requires a running daemon.\nStart with: hypermesh connect public",
@@ -60,10 +59,7 @@ pub async fn service_ipc_call(
                     "method": method,
                     "message": format!("{e}"),
                 });
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&err).unwrap_or_default()
-                );
+                println!("{}", serde_json::to_string_pretty(&err).unwrap_or_default());
             } else {
                 eprintln!("Error calling {method}: {e}");
             }
@@ -108,9 +104,9 @@ pub async fn run_connect(
     // SAME Arc is handed to the network `PeerContext` (so TAG_SHARE_INVITE
     // deliveries land here) and to the daemon state (so `share.inbox` /
     // `share.accept` read the same store).
-    let share_inbox_store = std::sync::Arc::new(
-        blockmatrix::sharing::inbox::InboxStore::new(Some(data_dir.join(nid).join("inbox"))),
-    );
+    let share_inbox_store = std::sync::Arc::new(blockmatrix::sharing::inbox::InboxStore::new(
+        Some(data_dir.join(nid).join("inbox")),
+    ));
 
     if privacy_mode != PrivacyMode::PRIVATE || has_bootstrap_peers {
         let result = super::node_bringup::start_network(
@@ -147,9 +143,7 @@ pub async fn run_connect(
     let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
     let daemon_shard_store = shard_store_ref.unwrap_or_else(|| {
-        std::sync::Arc::new(ShardStore::new_with_dir(
-            data_dir.join(nid).join("shards"),
-        ))
+        std::sync::Arc::new(ShardStore::new_with_dir(data_dir.join(nid).join("shards")))
     });
 
     #[cfg(feature = "caesar")]
@@ -206,9 +200,9 @@ pub async fn run_connect(
         threshold_coordinator: None,
 
         transfer_coordinator: None,
-            foundation_signing_key: None,
-            dns_registrar: None,
-            release_feed_subscriber: None,
+        foundation_signing_key: None,
+        dns_registrar: None,
+        release_feed_subscriber: None,
         receipt_validator: std::sync::Arc::new(
             blockmatrix::assets::cross_chain::CrossChainReceiptValidator::new(),
         ),
@@ -216,9 +210,7 @@ pub async fn run_connect(
         // these fields after constructing the daemon state when they
         // want capability-token auth or light-mode header sync.
         capability_token_issuer: None,
-        revocation_registry: std::sync::Arc::new(
-            blockmatrix::auth::RevocationRegistry::new(),
-        ),
+        revocation_registry: std::sync::Arc::new(blockmatrix::auth::RevocationRegistry::new()),
         light_sync_manager: None,
         // Phase M.4.5c.1: the adapter that bridges
         // `catalog::CatalogRegistry` into this trait object lives in the
@@ -291,9 +283,8 @@ pub async fn run_connect(
     info!("Press Ctrl+C to stop");
 
     #[cfg(unix)]
-    let mut sigterm = match tokio::signal::unix::signal(
-        tokio::signal::unix::SignalKind::terminate(),
-    ) {
+    let mut sigterm = match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+    {
         Ok(sig) => Some(sig),
         Err(e) => {
             warn!("Failed to install SIGTERM handler: {}", e);
@@ -384,7 +375,10 @@ async fn register_node_dns_name(
     let target_addr = std::net::IpAddr::from(std::net::Ipv6Addr::LOCALHOST);
 
     // Register in the in-memory resolver
-    bootstrap.dns().register(name.to_string(), target_addr).await;
+    bootstrap
+        .dns()
+        .register(name.to_string(), target_addr)
+        .await;
 
     // Persist to disk so the record survives restarts
     super::dns::persist_dns_record(data_dir, node_id, name, target_addr)?;
@@ -403,8 +397,7 @@ async fn register_node_dns_name(
         owner: node_id.to_string(),
         grant_signature: None,
     };
-    let dns_bytes = serde_json::to_vec(&dns_entry)
-        .context("failed to serialize DNS entry")?;
+    let dns_bytes = serde_json::to_vec(&dns_entry).context("failed to serialize DNS entry")?;
 
     let asset_data = AssetData {
         config: name.as_bytes().to_vec(),

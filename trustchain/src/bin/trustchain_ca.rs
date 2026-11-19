@@ -17,8 +17,8 @@ use tracing::{error, info, warn};
 use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 use trustchain::ca::{CAConfig, CAMode, CertificateRequest, TrustChainCA};
-use trustchain::proof_of_state::StateProof;
 use trustchain::http3::{Http3StoqServer, Router};
+use trustchain::proof_of_state::StateProof;
 
 use http::{Response, StatusCode};
 use serde::{Deserialize, Serialize};

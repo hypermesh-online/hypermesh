@@ -17,9 +17,7 @@ use sha2::{Digest, Sha256};
 use trustchain::ca::federation::{
     FederatedCA, FederationManager, FederationPolicy, FederationTrustLevel,
 };
-use trustchain::ca::trust_provider::{
-    PeerCertFingerprint, PeerTrustBand, TrustSignalProvider,
-};
+use trustchain::ca::trust_provider::{PeerCertFingerprint, PeerTrustBand, TrustSignalProvider};
 
 struct StaticProvider {
     band: Option<PeerTrustBand>,

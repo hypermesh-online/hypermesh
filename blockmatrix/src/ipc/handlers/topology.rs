@@ -45,10 +45,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             Arc::new(move |params| {
                 let s = s.clone();
                 Box::pin(async move {
-                    let radius = params
-                        .get("radius")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(5.0);
+                    let radius = params.get("radius").and_then(|v| v.as_f64()).unwrap_or(5.0);
 
                     let center = s.coordinate;
 
@@ -58,8 +55,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         None => Vec::new(),
                     };
 
-                    let found =
-                        neighbors::find_neighbors(&center, &candidates, radius);
+                    let found = neighbors::find_neighbors(&center, &candidates, radius);
 
                     let entries: Vec<serde_json::Value> = found
                         .iter()
@@ -276,10 +272,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "topology.neighbors",
-            serde_json::json!({"radius": 1.5}),
-        );
+        let req = RpcRequest::new("topology.neighbors", serde_json::json!({"radius": 1.5}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

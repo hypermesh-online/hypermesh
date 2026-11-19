@@ -87,9 +87,7 @@ pub extern "C" fn hypermesh_identity_generate() -> *mut HmIdentity {
 ///
 /// `data_dir` must be a valid null-terminated UTF-8 string.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_identity_load(
-    data_dir: *const c_char,
-) -> *mut HmIdentity {
+pub unsafe extern "C" fn hypermesh_identity_load(data_dir: *const c_char) -> *mut HmIdentity {
     catch_ffi(std::ptr::null_mut(), || {
         let dir = match ptr_to_str(data_dir, "data_dir") {
             Some(s) => s,
@@ -292,10 +290,7 @@ pub unsafe extern "C" fn hypermesh_verify_signature(
 ///
 /// `wire` must point to `wire_len` readable bytes.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_signed_proof_verify(
-    wire: *const u8,
-    wire_len: usize,
-) -> c_int {
+pub unsafe extern "C" fn hypermesh_signed_proof_verify(wire: *const u8, wire_len: usize) -> c_int {
     catch_ffi(HM_ERR_INTERNAL, || {
         if wire.is_null() {
             error_state::set_last_error("wire is NULL".into());
@@ -340,11 +335,8 @@ fn verify_wire_proof(wire: &WireSignedProof) -> anyhow::Result<bool> {
     let digest = hasher.finalize();
 
     // 2. Verify the FALCON-1024 detached signature against the embedded pubkey.
-    let ok = FalconIdentity::verify_signature(
-        &wire.signer_pubkey,
-        digest.as_bytes(),
-        &wire.signature,
-    )?;
+    let ok =
+        FalconIdentity::verify_signature(&wire.signer_pubkey, digest.as_bytes(), &wire.signature)?;
     if !ok {
         return Ok(false);
     }
@@ -363,11 +355,7 @@ unsafe fn borrow_identity<'a>(ptr: *const HmIdentity) -> Option<&'a HmIdentity> 
     Some(&*ptr)
 }
 
-unsafe fn slice_from_raw<'a>(
-    ptr: *const u8,
-    len: usize,
-    name: &str,
-) -> Option<&'a [u8]> {
+unsafe fn slice_from_raw<'a>(ptr: *const u8, len: usize, name: &str) -> Option<&'a [u8]> {
     if ptr.is_null() {
         if len == 0 {
             return Some(&[]);
@@ -408,9 +396,7 @@ mod tests {
     fn node_id_written() {
         let h = hypermesh_identity_generate();
         let mut buf = [0i8; 128];
-        let rc = unsafe {
-            hypermesh_identity_node_id(h, buf.as_mut_ptr(), buf.len())
-        };
+        let rc = unsafe { hypermesh_identity_node_id(h, buf.as_mut_ptr(), buf.len()) };
         assert_eq!(rc, HM_OK);
         let s = unsafe { CStr::from_ptr(buf.as_ptr()) }
             .to_str()
@@ -423,9 +409,7 @@ mod tests {
     fn node_id_buffer_too_small() {
         let h = hypermesh_identity_generate();
         let mut buf = [0i8; 8];
-        let rc = unsafe {
-            hypermesh_identity_node_id(h, buf.as_mut_ptr(), buf.len())
-        };
+        let rc = unsafe { hypermesh_identity_node_id(h, buf.as_mut_ptr(), buf.len()) };
         assert_eq!(rc, HM_ERR_BUFFER_TOO_SMALL);
         unsafe { hypermesh_identity_free(h) };
     }
@@ -436,14 +420,11 @@ mod tests {
 
         // Fetch public key (two-call).
         let mut pk_len = 0usize;
-        let rc = unsafe {
-            hypermesh_identity_public_key(h, std::ptr::null_mut(), 0, &mut pk_len)
-        };
+        let rc = unsafe { hypermesh_identity_public_key(h, std::ptr::null_mut(), 0, &mut pk_len) };
         assert_eq!(rc, HM_ERR_BUFFER_TOO_SMALL);
         let mut pk = vec![0u8; pk_len];
-        let rc = unsafe {
-            hypermesh_identity_public_key(h, pk.as_mut_ptr(), pk.len(), &mut pk_len)
-        };
+        let rc =
+            unsafe { hypermesh_identity_public_key(h, pk.as_mut_ptr(), pk.len(), &mut pk_len) };
         assert_eq!(rc, HM_OK);
 
         // Sign. FALCON-1024 signatures are VARIABLE length, so a size probed
@@ -453,7 +434,12 @@ mod tests {
         let mut sig_len = 0usize;
         let _ = unsafe {
             hypermesh_identity_sign(
-                h, msg.as_ptr(), msg.len(), std::ptr::null_mut(), 0, &mut sig_len,
+                h,
+                msg.as_ptr(),
+                msg.len(),
+                std::ptr::null_mut(),
+                0,
+                &mut sig_len,
             )
         };
         let mut sig;
@@ -461,7 +447,12 @@ mod tests {
             sig = vec![0u8; sig_len];
             let rc = unsafe {
                 hypermesh_identity_sign(
-                    h, msg.as_ptr(), msg.len(), sig.as_mut_ptr(), sig.len(), &mut sig_len,
+                    h,
+                    msg.as_ptr(),
+                    msg.len(),
+                    sig.as_mut_ptr(),
+                    sig.len(),
+                    &mut sig_len,
                 )
             };
             if rc == HM_ERR_BUFFER_TOO_SMALL {
@@ -475,8 +466,12 @@ mod tests {
         // Verify: valid.
         let rc = unsafe {
             hypermesh_verify_signature(
-                pk.as_ptr(), pk.len(), msg.as_ptr(), msg.len(),
-                sig.as_ptr(), sig.len(),
+                pk.as_ptr(),
+                pk.len(),
+                msg.as_ptr(),
+                msg.len(),
+                sig.as_ptr(),
+                sig.len(),
             )
         };
         assert_eq!(rc, HM_VERIFY_OK);
@@ -485,8 +480,12 @@ mod tests {
         let bad = b"tampered message";
         let rc = unsafe {
             hypermesh_verify_signature(
-                pk.as_ptr(), pk.len(), bad.as_ptr(), bad.len(),
-                sig.as_ptr(), sig.len(),
+                pk.as_ptr(),
+                pk.len(),
+                bad.as_ptr(),
+                bad.len(),
+                sig.as_ptr(),
+                sig.len(),
             )
         };
         assert_eq!(rc, HM_VERIFY_FAIL);
@@ -497,9 +496,8 @@ mod tests {
     #[test]
     fn null_handle_safe() {
         let mut buf = [0i8; 128];
-        let rc = unsafe {
-            hypermesh_identity_node_id(std::ptr::null(), buf.as_mut_ptr(), buf.len())
-        };
+        let rc =
+            unsafe { hypermesh_identity_node_id(std::ptr::null(), buf.as_mut_ptr(), buf.len()) };
         assert_eq!(rc, HM_ERR_NULL);
         unsafe { hypermesh_identity_free(std::ptr::null_mut()) };
     }
@@ -513,9 +511,7 @@ mod tests {
     #[test]
     fn signed_proof_verify_garbage_is_invalid() {
         let junk = b"not a wire signed proof";
-        let rc = unsafe {
-            hypermesh_signed_proof_verify(junk.as_ptr(), junk.len())
-        };
+        let rc = unsafe { hypermesh_signed_proof_verify(junk.as_ptr(), junk.len()) };
         assert_eq!(rc, HM_ERR_INVALID);
     }
 
@@ -544,9 +540,7 @@ mod tests {
         let wire_json = serde_json::to_vec(&wire).expect("test: serialize wire");
 
         // Authentic proof verifies.
-        let rc = unsafe {
-            hypermesh_signed_proof_verify(wire_json.as_ptr(), wire_json.len())
-        };
+        let rc = unsafe { hypermesh_signed_proof_verify(wire_json.as_ptr(), wire_json.len()) };
         assert_eq!(rc, HM_VERIFY_OK, "authentic proof must verify");
 
         // Tamper the signature — must fail (PoS gate).
@@ -555,9 +549,8 @@ mod tests {
             *b ^= 0xFF;
         }
         let tampered_json = serde_json::to_vec(&tampered).expect("test: serialize");
-        let rc = unsafe {
-            hypermesh_signed_proof_verify(tampered_json.as_ptr(), tampered_json.len())
-        };
+        let rc =
+            unsafe { hypermesh_signed_proof_verify(tampered_json.as_ptr(), tampered_json.len()) };
         assert_eq!(rc, HM_VERIFY_FAIL, "tampered proof must NOT verify");
     }
 }

@@ -128,10 +128,10 @@ pub unsafe extern "C" fn hypermesh_catalog_registry_stats(
         Some(h) => h,
         None => return std::ptr::null_mut(),
     };
-    match h
-        .runtime
-        .block_on(h.client.raw_call("catalog.registry_stats", serde_json::json!({})))
-    {
+    match h.runtime.block_on(
+        h.client
+            .raw_call("catalog.registry_stats", serde_json::json!({})),
+    ) {
         Ok(val) => json_to_cstring(&val),
         Err(e) => {
             error_state::set_last_error(e.to_string());

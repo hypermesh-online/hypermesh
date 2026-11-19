@@ -74,11 +74,11 @@ pub use types::{
 };
 
 pub use asset_types::{
-    AssetCreationSpec, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetUpdate,
-    StateRequirements, StateProofStatus, CpuRequirement, DeploymentResult, DeploymentSpec,
-    ExecutionResult, ExecutionSpec, GpuRequirement, MemoryRequirement, NetworkConfig,
-    OperationResult, PortMapping, ResourceRequirements, SharingResult, SharingSpec,
-    StorageRequirement, TransferResult, TransferSpec, VolumeMount,
+    AssetCreationSpec, AssetOperation, AssetQuery, AssetUpdate, CpuRequirement, DeploymentResult,
+    DeploymentSpec, ExecutionResult, ExecutionSpec, ExtensionAssetRecord, GpuRequirement,
+    MemoryRequirement, NetworkConfig, OperationResult, PortMapping, ResourceRequirements,
+    SharingResult, SharingSpec, StateProofStatus, StateRequirements, StorageRequirement,
+    TransferResult, TransferSpec, VolumeMount,
 };
 
 pub use package_types::{

@@ -540,8 +540,7 @@ impl TrustChainConfig {
         // Validate state proof requirements consistency. Proofs carry no
         // magnitude, so consistency is checked on the WHEN-freshness bound
         // (`max_time_offset`) shared across services.
-        if self.ca.state_requirements.max_time_offset
-            != self.ct.state_requirements.max_time_offset
+        if self.ca.state_requirements.max_time_offset != self.ct.state_requirements.max_time_offset
         {
             return Err(anyhow!(
                 "State proof requirements must be consistent across services"
@@ -580,7 +579,8 @@ mod tests {
     fn test_config_serialization() {
         let config = TrustChainConfig::localhost_testing();
         let toml_str = toml::to_string(&config).expect("test: expected success");
-        let deserialized: TrustChainConfig = toml::from_str(&toml_str).expect("test: expected success");
+        let deserialized: TrustChainConfig =
+            toml::from_str(&toml_str).expect("test: expected success");
 
         assert_eq!(config.ca.ca_id, deserialized.ca.ca_id);
     }
@@ -590,10 +590,16 @@ mod tests {
         let config = TrustChainConfig::localhost_testing();
 
         // Test TOML (use Builder to add .toml suffix)
-        let toml_file = tempfile::Builder::new().suffix(".toml").tempfile().expect("test: creation");
-        config.to_file(toml_file.path().to_str().expect("test: expected success")).expect("test: expected success");
+        let toml_file = tempfile::Builder::new()
+            .suffix(".toml")
+            .tempfile()
+            .expect("test: creation");
+        config
+            .to_file(toml_file.path().to_str().expect("test: expected success"))
+            .expect("test: expected success");
         let loaded_config =
-            TrustChainConfig::from_file(toml_file.path().to_str().expect("test: expected success")).expect("test: expected success");
+            TrustChainConfig::from_file(toml_file.path().to_str().expect("test: expected success"))
+                .expect("test: expected success");
         assert_eq!(config.ca.ca_id, loaded_config.ca.ca_id);
     }
 

@@ -28,8 +28,8 @@ pub use hybrid::*;
 pub use kyber::*;
 pub use threshold::{KeyShare, SecretShare, ThresholdConfig, ThresholdScheme, ThresholdSigner};
 pub use threshold_coordinator::{
-    FederationTransport, MockFederationTransport, SignRequest, SignResponse,
-    ThresholdError, ThresholdSignCoordinator,
+    FederationTransport, MockFederationTransport, SignRequest, SignResponse, ThresholdError,
+    ThresholdSignCoordinator,
 };
 
 /// Post-quantum cryptographic key pair for FALCON-1024
@@ -498,18 +498,27 @@ mod tests {
     async fn test_falcon_keypair_generation() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
 
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
+        let ca_keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
         assert_eq!(ca_keypair.key_usage, KeyUsage::CertificateAuthority);
         assert_eq!(ca_keypair.ca_id, Some("test-ca".to_string()));
 
-        let asset_keypair = pqc.generate_asset_keypair().await.expect("test: async operation");
+        let asset_keypair = pqc
+            .generate_asset_keypair()
+            .await
+            .expect("test: async operation");
         assert_eq!(asset_keypair.key_usage, KeyUsage::AssetAuthentication);
     }
 
     #[tokio::test]
     async fn test_falcon_sign_verify() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
+        let keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
 
         let test_data = b"Hello, Post-Quantum World!";
         let signature = pqc
@@ -537,7 +546,10 @@ mod tests {
     #[tokio::test]
     async fn test_kyber_encrypt_decrypt() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let keypair = pqc.generate_encryption_keypair().await.expect("test: async operation");
+        let keypair = pqc
+            .generate_encryption_keypair()
+            .await
+            .expect("test: async operation");
 
         let test_data = b"Secret quantum-resistant message";
         let ciphertext = pqc

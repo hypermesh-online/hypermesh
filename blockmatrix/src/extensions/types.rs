@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::assets::core::{AssetType, StateProof, PrivacyMode};
+use crate::assets::core::{AssetType, PrivacyMode, StateProof};
 
 /// Extension system errors
 #[derive(Debug, thiserror::Error)]

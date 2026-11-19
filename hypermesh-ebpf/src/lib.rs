@@ -49,10 +49,10 @@ pub use hooks::{
     ValidationHooks,
 };
 pub use hypermesh_headers::{
-    encode_pos_extension, AssetHashHeader, MatrixCoordinate, MatrixRoutingHeader, PrivacyTierHeader,
-    ProofOfStateHeader, WireExtHeader, WirePosHeader, EXT_ASSET_HASH, EXT_MATRIX_ROUTING,
-    EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE, WIRE_HDR_ASSET, WIRE_HDR_MAGIC, WIRE_HDR_MATRIX,
-    WIRE_HDR_POS, WIRE_HDR_POS_ALG_FALCON, WIRE_HDR_PRIVACY,
+    encode_pos_extension, AssetHashHeader, MatrixCoordinate, MatrixRoutingHeader,
+    PrivacyTierHeader, ProofOfStateHeader, WireExtHeader, WirePosHeader, EXT_ASSET_HASH,
+    EXT_MATRIX_ROUTING, EXT_PRIVACY_TIER, EXT_PROOF_OF_STATE, WIRE_HDR_ASSET, WIRE_HDR_MAGIC,
+    WIRE_HDR_MATRIX, WIRE_HDR_POS, WIRE_HDR_POS_ALG_FALCON, WIRE_HDR_PRIVACY,
 };
 pub use loader::{EbpfLoader, ProgramType};
 pub use metrics::{HyperMeshMetrics, HyperMeshMetricsCollector, TransportMetrics};
@@ -923,7 +923,7 @@ mod tests {
     fn test_set_peer_pos_validated_no_xdp_is_noop() {
         let ebpf = HyperMeshEbpf::default();
         let src_ip = [0x20u8; 16]; // IPv6 global unicast prefix
-        // valid=true, algorithm=FALCON — no XDP attached → graceful Ok.
+                                   // valid=true, algorithm=FALCON — no XDP attached → graceful Ok.
         assert!(ebpf
             .set_peer_pos_validated(src_ip, true, ALG_FALCON_1024)
             .is_ok());
@@ -956,9 +956,18 @@ mod tests {
         };
         let bytes = matrix_position_to_wire_bytes(&pos);
         assert_eq!(bytes.len(), 12);
-        assert_eq!(f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]), 1.5);
-        assert_eq!(f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), -2.0);
-        assert_eq!(f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 3.25);
+        assert_eq!(
+            f32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            1.5
+        );
+        assert_eq!(
+            f32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            -2.0
+        );
+        assert_eq!(
+            f32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            3.25
+        );
     }
 
     #[test]

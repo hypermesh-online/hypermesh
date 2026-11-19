@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
-use blockmatrix::proof_of_state::validation::{DefaultStateAuthenticator, StateAuthenticator};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
+use blockmatrix::proof_of_state::validation::{DefaultStateAuthenticator, StateAuthenticator};
 use blockmatrix::transfer::{
     create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
 };

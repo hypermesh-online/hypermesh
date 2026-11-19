@@ -22,10 +22,7 @@ fn parse_scope(s: &str) -> Result<BlockchainScope, RpcError> {
         "network" => Ok(BlockchainScope::Network),
         other => Err(RpcError {
             code: INVALID_PARAMS,
-            message: format!(
-                "invalid scope '{}': expected 'device' or 'network'",
-                other
-            ),
+            message: format!("invalid scope '{}': expected 'device' or 'network'", other),
             data: None,
         }),
     }
@@ -44,14 +41,15 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             Arc::new(move |params| {
                 let bc = blockchain.clone();
                 Box::pin(async move {
-                    let asset_id_str = params
-                        .get("asset_id")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| RpcError {
-                            code: INVALID_PARAMS,
-                            message: "missing or invalid 'asset_id' parameter".into(),
-                            data: None,
-                        })?;
+                    let asset_id_str =
+                        params
+                            .get("asset_id")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| RpcError {
+                                code: INVALID_PARAMS,
+                                message: "missing or invalid 'asset_id' parameter".into(),
+                                data: None,
+                            })?;
 
                     let source_scope = params
                         .get("source_scope")
@@ -410,9 +408,16 @@ mod tests {
             }),
         );
         let resp = handler.dispatch(req).await;
-        assert!(resp.error.is_none(), "expected success, got: {:?}", resp.error);
+        assert!(
+            resp.error.is_none(),
+            "expected success, got: {:?}",
+            resp.error
+        );
         let result = resp.result.expect("test: result present");
-        assert!(result["transfer_id"].as_str().expect("test: transfer_id").starts_with("gw-tx-"));
+        assert!(result["transfer_id"]
+            .as_str()
+            .expect("test: transfer_id")
+            .starts_with("gw-tx-"));
         assert_eq!(result["status"], "pending");
     }
 
@@ -449,12 +454,11 @@ mod tests {
         );
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error
-                .expect("test: error")
-                .message
-                .contains("asset_id")
-        );
+        assert!(resp
+            .error
+            .expect("test: error")
+            .message
+            .contains("asset_id"));
     }
 
     #[tokio::test]
@@ -473,12 +477,11 @@ mod tests {
         );
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
-        assert!(
-            resp.error
-                .expect("test: error")
-                .message
-                .contains("invalid scope")
-        );
+        assert!(resp
+            .error
+            .expect("test: error")
+            .message
+            .contains("invalid scope"));
     }
 
     #[tokio::test]

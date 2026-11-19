@@ -206,7 +206,10 @@ mod tests {
             assert!(!v.lineage_id.is_empty(), "each version has a content id");
         }
         // Every version's lineage_id is distinct (distinct content).
-        let mut ids = versions.iter().map(|v| v.lineage_id.clone()).collect::<Vec<_>>();
+        let mut ids = versions
+            .iter()
+            .map(|v| v.lineage_id.clone())
+            .collect::<Vec<_>>();
         ids.sort();
         ids.dedup();
         assert_eq!(ids.len(), 3, "lineage ids are distinct per version");
@@ -274,7 +277,9 @@ mod tests {
         let asset_hash = [11u8; 32];
         let (registry, chain) = registry_with_three_versions(asset_hash).await;
         let lineage = chain.asset_lineage(&asset_hash).await;
-        lineage.verify().expect("test: lineage is an unbroken chain");
+        lineage
+            .verify()
+            .expect("test: lineage is an unbroken chain");
         assert_eq!(
             registry.list_versions(&asset_hash).await.len(),
             lineage.len()

@@ -42,11 +42,7 @@ pub struct DomainRegistration {
 impl DomainRegistration {
     /// Create a new domain registration with derived chain_id, network_id,
     /// and parent_network_id computed from domain components.
-    pub fn new(
-        domain_name: &str,
-        privacy_mode: PrivacyMode,
-        owner_node_id: String,
-    ) -> Self {
+    pub fn new(domain_name: &str, privacy_mode: PrivacyMode, owner_node_id: String) -> Self {
         let chain_id = derive_chain_id(domain_name);
         // The on-disk `network_id` field is the wire/serde form — the canonical
         // hex of the derived `NetworkId` (Display), byte-identical to the value
@@ -55,8 +51,8 @@ impl DomainRegistration {
         let network_id = derive_network_id(domain_name).to_string();
 
         // Parent: split on '.', if >1 component, parent is everything after first '.'
-        let parent_network_id = extract_parent_domain(domain_name)
-            .map(|parent| derive_network_id(&parent).to_string());
+        let parent_network_id =
+            extract_parent_domain(domain_name).map(|parent| derive_network_id(&parent).to_string());
 
         Self {
             domain_name: domain_name.to_string(),
@@ -255,8 +251,7 @@ mod tests {
             "node-42".to_string(),
         );
         let json = serde_json::to_string(&reg).expect("test: serialize");
-        let back: DomainRegistration =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let back: DomainRegistration = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(back.domain_name, reg.domain_name);
         assert_eq!(back.chain_id, reg.chain_id);
         assert_eq!(back.network_id, reg.network_id);
@@ -358,9 +353,7 @@ mod tests {
         let network_id = derive_network_id("test.domain").to_string();
         assert!(sm.lock().await.is_member(&network_id));
 
-        mgr.leave_domain("test.domain")
-            .await
-            .expect("test: leave");
+        mgr.leave_domain("test.domain").await.expect("test: leave");
         assert!(!sm.lock().await.is_member(&network_id));
     }
 

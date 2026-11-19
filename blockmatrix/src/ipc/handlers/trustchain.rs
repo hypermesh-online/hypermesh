@@ -201,13 +201,11 @@ fn handle_identity(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     };
 
     // created_at: pull from cert not_before when the cert exists and parses.
-    let created_at = std::fs::read(&cert_path)
-        .ok()
-        .and_then(|der| {
-            x509_parser::parse_x509_certificate(&der)
-                .ok()
-                .map(|(_, cert)| cert.tbs_certificate.validity.not_before.timestamp())
-        });
+    let created_at = std::fs::read(&cert_path).ok().and_then(|der| {
+        x509_parser::parse_x509_certificate(&der)
+            .ok()
+            .map(|(_, cert)| cert.tbs_certificate.validity.not_before.timestamp())
+    });
 
     Ok(serde_json::json!({
         "node_id": state.node_id,
@@ -293,9 +291,7 @@ async fn handle_request_cert(
                             }));
                         }
                         Err(e) => {
-                            return Err(internal_error(format!(
-                                "threshold sign failed: {e}"
-                            )));
+                            return Err(internal_error(format!("threshold sign failed: {e}")));
                         }
                     }
                 }
@@ -308,11 +304,9 @@ async fn handle_request_cert(
     let identity_dir = state.data_dir.join(&state.node_id).join("identity");
     let identity = crate::identity::FalconIdentity::load_or_create(&identity_dir)
         .map_err(|e| internal_error(format!("identity load failed: {e}")))?;
-    let signature = <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::sign(
-        &identity,
-        &csr_bytes,
-    )
-    .map_err(|e| internal_error(format!("local sign failed: {e}")))?;
+    let signature =
+        <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::sign(&identity, &csr_bytes)
+            .map_err(|e| internal_error(format!("local sign failed: {e}")))?;
 
     Ok(serde_json::json!({
         "node_id": state.node_id,
@@ -330,9 +324,7 @@ async fn handle_request_cert(
 /// `network_peers`, `trust_levels{}`. Each peer (when populated by Phase F
 /// federation) carries `{node_id, trust_level, joined_at, fingerprint}`; the
 /// array stays empty until distributed CA is active.
-async fn handle_federation(
-    state: &DaemonState,
-) -> Result<serde_json::Value, RpcError> {
+async fn handle_federation(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     let network_peers = match &state.network {
         Some(net) => net.get_connected_nodes().await.len(),
         None => 0,
@@ -362,11 +354,7 @@ mod tests {
     fn make_test_cert_der(common_name: &str) -> Vec<u8> {
         let cert_key = rcgen::generate_simple_self_signed(vec![common_name.to_string()])
             .expect("test: generate self-signed cert");
-        cert_key
-            .cert
-            .der()
-            .as_ref()
-            .to_vec()
+        cert_key.cert.der().as_ref().to_vec()
     }
 
     #[tokio::test]
@@ -425,8 +413,7 @@ mod tests {
         std::fs::create_dir_all(&identity_dir).expect("test: mkdir");
 
         let der = make_test_cert_der("parse-test.hypermesh");
-        std::fs::write(identity_dir.join("node_cert.der"), &der)
-            .expect("test: write cert");
+        std::fs::write(identity_dir.join("node_cert.der"), &der).expect("test: write cert");
 
         let state = build_test_state_at(dir.path(), "tc-parse-test").await;
         let mut handler = RequestHandler::new();
@@ -453,7 +440,10 @@ mod tests {
         // Validity is RFC3339 — must start with a 4-digit year.
         let vf = cert["valid_from"].as_str().expect("test: valid_from str");
         let vt = cert["valid_to"].as_str().expect("test: valid_to str");
-        assert!(vf.len() >= 20 && &vf[4..5] == "-", "valid_from RFC3339: {vf}");
+        assert!(
+            vf.len() >= 20 && &vf[4..5] == "-",
+            "valid_from RFC3339: {vf}"
+        );
         assert!(vt.len() >= 20 && &vt[4..5] == "-", "valid_to RFC3339: {vt}");
 
         // Active status (cert was just generated)
@@ -482,7 +472,8 @@ mod tests {
             .as_array()
             .expect("test: sans array");
         assert!(
-            sans.iter().any(|s| s.as_str() == Some("DNS:parse-test.hypermesh")),
+            sans.iter()
+                .any(|s| s.as_str() == Some("DNS:parse-test.hypermesh")),
             "expected SAN DNS:parse-test.hypermesh, got {:?}",
             sans
         );
@@ -516,8 +507,14 @@ mod tests {
         let result = resp.result.expect("test: result present");
 
         assert_eq!(result["total"], 0);
-        assert!(result["certificates"].as_array().expect("test: arr").is_empty());
-        assert!(result["error"].is_string(), "error message must be surfaced");
+        assert!(result["certificates"]
+            .as_array()
+            .expect("test: arr")
+            .is_empty());
+        assert!(
+            result["error"].is_string(),
+            "error message must be surfaced"
+        );
     }
 
     #[tokio::test]
@@ -555,8 +552,7 @@ mod tests {
             .expect("test: write kyber");
 
         let der = make_test_cert_der("identity-test.hypermesh");
-        std::fs::write(identity_dir.join("node_cert.der"), &der)
-            .expect("test: write cert");
+        std::fs::write(identity_dir.join("node_cert.der"), &der).expect("test: write cert");
 
         let state = build_test_state_at(dir.path(), "tc-test").await;
         let mut handler = RequestHandler::new();
@@ -633,8 +629,7 @@ mod tests {
         data_dir: &std::path::Path,
         node_id: &str,
     ) -> Arc<crate::ipc::state::DaemonState> {
-        let coord = crate::matrix::coordinate::MatrixCoordinate::new(0, 0, 0)
-            .expect("test: coord");
+        let coord = crate::matrix::coordinate::MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let bc = Arc::new(crate::blockchain::node_chain::NodeBlockchain::new(coord));
         let config = crate::persistence::PersistenceConfig {
             storage_dir: std::path::PathBuf::from("/tmp"),

@@ -130,11 +130,7 @@ impl PrivacyScopedDedup {
     /// Check if content is a duplicate without storing it.
     ///
     /// Privacy mode controls whether tracking info is returned.
-    pub fn check_duplicate(
-        &self,
-        data: &[u8],
-        privacy_mode: PrivacyMode,
-    ) -> DedupResult {
+    pub fn check_duplicate(&self, data: &[u8], privacy_mode: PrivacyMode) -> DedupResult {
         let hash = blake3_hash(data);
 
         match self.entries.get(&hash) {
@@ -156,11 +152,7 @@ impl PrivacyScopedDedup {
     ///
     /// Returns `Ok(())` if hash matches, or a `TamperDetected` result
     /// if the data has been modified.
-    pub fn verify_integrity(
-        &self,
-        stored_hash: &ContentHash,
-        current_data: &[u8],
-    ) -> DedupResult {
+    pub fn verify_integrity(&self, stored_hash: &ContentHash, current_data: &[u8]) -> DedupResult {
         let computed = blake3_hash(current_data);
         if computed == *stored_hash {
             // Hash matches -- check if we know about this content.

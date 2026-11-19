@@ -100,11 +100,7 @@ async fn test_gate2_zero_capacity_is_admitted_by_adapters() {
 
     let registry = AdapterRegistry::new().await;
 
-    for asset_type in [
-        AssetType::Storage,
-        AssetType::Network,
-        AssetType::Container,
-    ] {
+    for asset_type in [AssetType::Storage, AssetType::Network, AssetType::Container] {
         let adapter = registry
             .get_adapter(&asset_type)
             .expect("test: adapter must exist");

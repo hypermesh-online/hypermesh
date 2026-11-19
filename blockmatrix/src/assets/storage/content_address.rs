@@ -420,8 +420,14 @@ mod tests {
         let content_hash = [1u8; 32];
         let shard_hashes = vec![[2u8; 32], [3u8; 32]];
         let shard_map = vec![
-            ([2u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
-            ([3u8; 32], vec![MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate")]),
+            (
+                [2u8; 32],
+                vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")],
+            ),
+            (
+                [3u8; 32],
+                vec![MatrixCoordinate::new(1, 1, 0).expect("test: valid coordinate")],
+            ),
         ];
 
         let addr = ContentAddress::new(content_hash, shard_hashes, shard_map);
@@ -460,8 +466,14 @@ mod tests {
     #[test]
     fn test_retrieval_plan_strategies() {
         let shard_map = vec![
-            ([1u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
-            ([2u8; 32], vec![MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")]),
+            (
+                [1u8; 32],
+                vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")],
+            ),
+            (
+                [2u8; 32],
+                vec![MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")],
+            ),
         ];
 
         // Test nearest-first
@@ -486,8 +498,14 @@ mod tests {
         let content_hash = [1u8; 32];
         let shard_hashes = vec![[2u8; 32], [3u8; 32]];
         let shard_map = vec![
-            ([2u8; 32], vec![MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate")]),
-            ([3u8; 32], vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")]),
+            (
+                [2u8; 32],
+                vec![MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate")],
+            ),
+            (
+                [3u8; 32],
+                vec![MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate")],
+            ),
         ];
 
         let mut addr = ContentAddress::new(content_hash, shard_hashes, shard_map);

@@ -155,17 +155,16 @@ impl<'a> SyncDispatcher<'a> {
         network_id: String,
         genesis_block_json: String,
     ) -> DispatchResponse {
-        let genesis: crate::blockchain::Block =
-            match serde_json::from_str(&genesis_block_json) {
-                Ok(block) => block,
-                Err(e) => {
-                    warn!(
-                        network = %network_id,
-                        "GenesisResponse rejected — not a deserializable Block: {e}",
-                    );
-                    return DispatchResponse::None;
-                }
-            };
+        let genesis: crate::blockchain::Block = match serde_json::from_str(&genesis_block_json) {
+            Ok(block) => block,
+            Err(e) => {
+                warn!(
+                    network = %network_id,
+                    "GenesisResponse rejected — not a deserializable Block: {e}",
+                );
+                return DispatchResponse::None;
+            }
+        };
 
         match self
             .sync_manager

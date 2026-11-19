@@ -13,8 +13,8 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, StateProof, NetworkRequirements, NetworkScope, NetworkUsage,
-    PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage,
+    AssetType, BaseSystemType, NetworkRequirements, NetworkScope, NetworkUsage, PrivacyMode,
+    ProxyAddress, ResourceLimits, ResourceUsage, StateProof,
 };
 
 use super::types::*;
@@ -294,10 +294,7 @@ impl AssetAdapter for NetworkAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        if !self
-            .validate_state_proof(&request.state_proof)
-            .await?
-        {
+        if !self.validate_state_proof(&request.state_proof).await? {
             return Err(AssetError::StateProofValidationFailed {
                 reason: "Network allocation state proof validation failed".to_string(),
             });
@@ -359,7 +356,11 @@ impl AssetAdapter for NetworkAssetAdapter {
             isolation_enabled: request.privacy_level == PrivacyMode::PRIVATE,
             ipv6_addresses,
             vlan_id: if matches!(request.privacy_level, PrivacyMode::PRIVATE) {
-                let h = u128::from_le_bytes(asset_id.content_hash[..16].try_into().expect("16 bytes always fits into [u8; 16]"));
+                let h = u128::from_le_bytes(
+                    asset_id.content_hash[..16]
+                        .try_into()
+                        .expect("16 bytes always fits into [u8; 16]"),
+                );
                 Some(100 + (h % 4000) as u16)
             } else {
                 None
@@ -421,8 +422,7 @@ impl AssetAdapter for NetworkAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                state_requirements:
-                    crate::assets::core::privacy::StateRequirements::default(),
+                state_requirements: crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],

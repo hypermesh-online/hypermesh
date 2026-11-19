@@ -213,8 +213,12 @@ async fn full_stoq_pos_mode_accepts_valid_handshake() {
         .await
         .expect("test: peer connects");
 
-    let handshake =
-        stoq::initiate_handshake(&conn, peer_signer.as_ref(), peer_provider.as_ref(), (9, 9, 9));
+    let handshake = stoq::initiate_handshake(
+        &conn,
+        peer_signer.as_ref(),
+        peer_provider.as_ref(),
+        (9, 9, 9),
+    );
     let result = tokio::time::timeout(Duration::from_secs(10), handshake).await;
     assert!(
         matches!(result, Ok(Ok(_))),

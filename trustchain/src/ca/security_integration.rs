@@ -12,14 +12,14 @@ use std::time::SystemTime;
 use tracing::{debug, error, info, warn};
 
 use super::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
-use crate::proof_of_state::StateProofResult;
 use crate::crypto::{FalconKeyPair, FalconSignature, PQCAlgorithm, PostQuantumCrypto};
 use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::StateProofOps;
+use crate::proof_of_state::StateProofResult;
 use crate::security::monitoring::{
-    StateProofValidationStatus, LiveCertificateOperation, OperationState,
+    LiveCertificateOperation, OperationState, StateProofValidationStatus,
 };
 use crate::security::{SecurityMonitor, SecurityValidationResult};
-use crate::proof_of_state::StateProofOps;
 
 /// Security-integrated Certificate Authority wrapper
 pub struct SecurityIntegratedCA {

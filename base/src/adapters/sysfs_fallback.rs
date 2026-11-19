@@ -52,9 +52,8 @@ impl SubstrateAdapter for SysfsFallbackAdapter {
     async fn enumerate_interfaces(&self) -> SubstrateResult<Vec<InterfaceId>> {
         // Read directory entries under /sys/class/net; each entry is an
         // interface whose kernel index lives in `<iface>/ifindex`.
-        let dir = std::fs::read_dir(SYS_CLASS_NET).map_err(|e| {
-            SubstrateError::Backend(format!("cannot read {SYS_CLASS_NET}: {e}"))
-        })?;
+        let dir = std::fs::read_dir(SYS_CLASS_NET)
+            .map_err(|e| SubstrateError::Backend(format!("cannot read {SYS_CLASS_NET}: {e}")))?;
 
         let mut interfaces = Vec::new();
         for entry in dir {

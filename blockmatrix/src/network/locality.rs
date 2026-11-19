@@ -127,7 +127,10 @@ mod tests {
         let mut samples = Vec::new();
         for i in 0..6 {
             samples.push(PeerProximity::new(format!("lan-{i}"), 500 + i as u64 * 30));
-            samples.push(PeerProximity::new(format!("wan-{i}"), 80_000 + i as u64 * 400));
+            samples.push(PeerProximity::new(
+                format!("wan-{i}"),
+                80_000 + i as u64 * 400,
+            ));
         }
         let provider = LocalityProvider::from_samples(samples);
 

@@ -130,8 +130,7 @@ pub(crate) const TAG_SHARD_LOCATE_RESPONSE: u8 = 0x53;
 
 /// Mirror attestation submission:
 /// `[TAG_MIRROR_ATTEST][len(4 LE)][MirrorAttestation JSON]`.
-pub(crate) const TAG_MIRROR_ATTEST: u8 =
-    crate::network::attestation_wire::MIRROR_ATTEST_TAG;
+pub(crate) const TAG_MIRROR_ATTEST: u8 = crate::network::attestation_wire::MIRROR_ATTEST_TAG;
 
 // ── D3: presented asset-chain submission ─────────────────────────────
 //
@@ -151,5 +150,4 @@ pub(crate) const TAG_MIRROR_ATTEST: u8 =
 
 /// Presented asset-chain submission:
 /// `[TAG_ASSET_CHAIN][len(4 LE)][PresentedAssetChain JSON]`.
-pub(crate) const TAG_ASSET_CHAIN: u8 =
-    crate::network::asset_chain_wire::ASSET_CHAIN_TAG;
+pub(crate) const TAG_ASSET_CHAIN: u8 = crate::network::asset_chain_wire::ASSET_CHAIN_TAG;

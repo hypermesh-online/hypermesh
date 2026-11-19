@@ -208,8 +208,7 @@ impl HypermeshConfig {
         }
         let contents =
             toml::to_string_pretty(self).map_err(|e| format!("failed to serialize config: {e}"))?;
-        std::fs::write(path, contents)
-            .map_err(|e| format!("failed to write config file: {e}"))?;
+        std::fs::write(path, contents).map_err(|e| format!("failed to write config file: {e}"))?;
         Ok(())
     }
 }
@@ -277,7 +276,8 @@ mod tests {
 
     #[test]
     fn test_load_missing_file_returns_defaults() {
-        let config = HypermeshConfig::load_from(Path::new("/tmp/nonexistent_hypermesh_config.toml"));
+        let config =
+            HypermeshConfig::load_from(Path::new("/tmp/nonexistent_hypermesh_config.toml"));
         assert_eq!(config.network.stoq_port, 9292);
         assert_eq!(config.node.data_dir, "~/.blockmatrix");
     }
@@ -313,8 +313,7 @@ coord_x = 10
 [network]
 reflector = true
 "#;
-        let config: HypermeshConfig =
-            toml::from_str(toml_str).expect("test: parse partial toml");
+        let config: HypermeshConfig = toml::from_str(toml_str).expect("test: parse partial toml");
         assert_eq!(config.node.coord_x, 10);
         assert_eq!(config.node.coord_y, 0); // default
         assert_eq!(config.node.data_dir, "~/.blockmatrix"); // default
@@ -341,8 +340,7 @@ reflector = true
     #[test]
     fn test_set_dotpath() {
         let mut value = serde_json::json!({"node": {"coord_x": 0}});
-        set_dotpath(&mut value, "node.coord_x", serde_json::json!(99))
-            .expect("test: set dotpath");
+        set_dotpath(&mut value, "node.coord_x", serde_json::json!(99)).expect("test: set dotpath");
         assert_eq!(value["node"]["coord_x"], 99);
     }
 
@@ -383,8 +381,7 @@ reflector = true
 mode = "stoq"
 gateway_url = "stoq://my-gateway.local"
 "#;
-        let config: HypermeshConfig =
-            toml::from_str(toml_str).expect("test: parse services toml");
+        let config: HypermeshConfig = toml::from_str(toml_str).expect("test: parse services toml");
         assert_eq!(config.services.mode, "stoq");
         assert_eq!(config.services.gateway_url, "stoq://my-gateway.local");
         assert_eq!(config.services.connection_mode(), ConnectionMode::Stoq);
@@ -410,12 +407,8 @@ gateway_url = "stoq://my-gateway.local"
         let config = HypermeshConfig::default();
         let mut value = serde_json::to_value(&config).expect("test: serialize");
 
-        set_dotpath(
-            &mut value,
-            "services.mode",
-            serde_json::json!("ipc"),
-        )
-        .expect("test: set services.mode");
+        set_dotpath(&mut value, "services.mode", serde_json::json!("ipc"))
+            .expect("test: set services.mode");
         assert_eq!(value["services"]["mode"], "ipc");
 
         set_dotpath(

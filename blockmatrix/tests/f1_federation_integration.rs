@@ -110,8 +110,7 @@ async fn end_to_end_2_of_3_federation_signs_csr() {
     fed.set_threshold_mode(true).await;
     assert!(fed.threshold_mode_enabled().await);
 
-    let coordinator =
-        ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
+    let coordinator = ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
 
     // C requests a certificate signed over a CSR blob.  We sign
     // directly here; in production the IPC handler `trustchain.request_cert`
@@ -126,8 +125,7 @@ async fn end_to_end_2_of_3_federation_signs_csr() {
     let mut hasher = Sha256::new();
     hasher.update(csr_bytes);
     let digest: [u8; 32] = hasher.finalize().into();
-    let sig = falcon1024::DetachedSignature::from_bytes(&signature)
-        .expect("test: parse sig");
+    let sig = falcon1024::DetachedSignature::from_bytes(&signature).expect("test: parse sig");
     let verify = falcon1024::verify_detached_signature(&sig, &digest, &pk);
     assert!(
         verify.is_ok(),

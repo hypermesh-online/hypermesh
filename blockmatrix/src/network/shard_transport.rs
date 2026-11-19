@@ -435,10 +435,11 @@ pub async fn handle_shard_message(
             shard_id_bytes.copy_from_slice(&data[1..33]);
             let shard_id = ContentHash(shard_id_bytes);
 
-            let data_len =
-                u64::from_le_bytes(data[33..41].try_into().map_err(|_| {
-                    TransportError::Protocol("SHARD_SEND invalid data_len".into())
-                })?) as usize;
+            let data_len = u64::from_le_bytes(
+                data[33..41]
+                    .try_into()
+                    .map_err(|_| TransportError::Protocol("SHARD_SEND invalid data_len".into()))?,
+            ) as usize;
             if data.len() < 41 + data_len {
                 return Err(TransportError::Protocol("SHARD_SEND data truncated".into()));
             }
@@ -520,10 +521,11 @@ pub async fn handle_incoming_shard_stream(
             shard_id_bytes.copy_from_slice(&data[1..33]);
             let shard_id = ContentHash(shard_id_bytes);
 
-            let data_len =
-                u64::from_le_bytes(data[33..41].try_into().map_err(|_| {
-                    TransportError::Protocol("SHARD_SEND invalid data_len".into())
-                })?) as usize;
+            let data_len = u64::from_le_bytes(
+                data[33..41]
+                    .try_into()
+                    .map_err(|_| TransportError::Protocol("SHARD_SEND invalid data_len".into()))?,
+            ) as usize;
             if data.len() < 41 + data_len {
                 return Err(TransportError::Protocol("SHARD_SEND data truncated".into()));
             }
@@ -785,12 +787,18 @@ mod tests {
         let served = build_enveloped_response(&shard_id, &shard_data, Some(&chain)).await;
         let (got_shard, got_reg) = parse_shard_response(&served, &shard_id);
         assert_eq!(got_shard, shard_data);
-        assert!(got_reg.is_some(), "serve-with-chain must attach a registration");
+        assert!(
+            got_reg.is_some(),
+            "serve-with-chain must attach a registration"
+        );
 
         // Serve WITHOUT chain → registration-less envelope.
         let served_none = build_enveloped_response(&shard_id, &shard_data, None).await;
         let (got_shard2, got_reg2) = parse_shard_response(&served_none, &shard_id);
         assert_eq!(got_shard2, shard_data);
-        assert!(got_reg2.is_none(), "serve-without-chain carries no registration");
+        assert!(
+            got_reg2.is_none(),
+            "serve-without-chain carries no registration"
+        );
     }
 }

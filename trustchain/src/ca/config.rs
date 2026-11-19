@@ -116,9 +116,7 @@ impl Clone for CAMetrics {
             state_validations: std::sync::atomic::AtomicU64::new(
                 self.state_validations.load(Relaxed),
             ),
-            ct_log_entries: std::sync::atomic::AtomicU64::new(
-                self.ct_log_entries.load(Relaxed),
-            ),
+            ct_log_entries: std::sync::atomic::AtomicU64::new(self.ct_log_entries.load(Relaxed)),
             average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
                 self.average_issuance_time_ms.load(Relaxed),
             ),
@@ -136,13 +134,28 @@ impl std::fmt::Debug for CAMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use std::sync::atomic::Ordering::Relaxed;
         f.debug_struct("CAMetrics")
-            .field("certificates_issued", &self.certificates_issued.load(Relaxed))
-            .field("certificates_revoked", &self.certificates_revoked.load(Relaxed))
+            .field(
+                "certificates_issued",
+                &self.certificates_issued.load(Relaxed),
+            )
+            .field(
+                "certificates_revoked",
+                &self.certificates_revoked.load(Relaxed),
+            )
             .field("state_validations", &self.state_validations.load(Relaxed))
             .field("ct_log_entries", &self.ct_log_entries.load(Relaxed))
-            .field("average_issuance_time_ms", &self.average_issuance_time_ms.load(Relaxed))
-            .field("validation_latency_ms", &self.validation_latency_ms.load(Relaxed))
-            .field("performance_violations", &self.performance_violations.load(Relaxed))
+            .field(
+                "average_issuance_time_ms",
+                &self.average_issuance_time_ms.load(Relaxed),
+            )
+            .field(
+                "validation_latency_ms",
+                &self.validation_latency_ms.load(Relaxed),
+            )
+            .field(
+                "performance_violations",
+                &self.performance_violations.load(Relaxed),
+            )
             .finish()
     }
 }
@@ -155,13 +168,28 @@ impl serde::Serialize for CAMetrics {
         use serde::ser::SerializeStruct;
         use std::sync::atomic::Ordering::Relaxed;
         let mut state = serializer.serialize_struct("CAMetrics", 7)?;
-        state.serialize_field("certificates_issued", &self.certificates_issued.load(Relaxed))?;
-        state.serialize_field("certificates_revoked", &self.certificates_revoked.load(Relaxed))?;
+        state.serialize_field(
+            "certificates_issued",
+            &self.certificates_issued.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "certificates_revoked",
+            &self.certificates_revoked.load(Relaxed),
+        )?;
         state.serialize_field("state_validations", &self.state_validations.load(Relaxed))?;
         state.serialize_field("ct_log_entries", &self.ct_log_entries.load(Relaxed))?;
-        state.serialize_field("average_issuance_time_ms", &self.average_issuance_time_ms.load(Relaxed))?;
-        state.serialize_field("validation_latency_ms", &self.validation_latency_ms.load(Relaxed))?;
-        state.serialize_field("performance_violations", &self.performance_violations.load(Relaxed))?;
+        state.serialize_field(
+            "average_issuance_time_ms",
+            &self.average_issuance_time_ms.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "validation_latency_ms",
+            &self.validation_latency_ms.load(Relaxed),
+        )?;
+        state.serialize_field(
+            "performance_violations",
+            &self.performance_violations.load(Relaxed),
+        )?;
         state.end()
     }
 }
@@ -190,7 +218,9 @@ impl<'de> serde::Deserialize<'de> for CAMetrics {
             certificates_revoked: std::sync::atomic::AtomicU64::new(data.certificates_revoked),
             state_validations: std::sync::atomic::AtomicU64::new(data.state_validations),
             ct_log_entries: std::sync::atomic::AtomicU64::new(data.ct_log_entries),
-            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(data.average_issuance_time_ms),
+            average_issuance_time_ms: std::sync::atomic::AtomicU64::new(
+                data.average_issuance_time_ms,
+            ),
             validation_latency_ms: std::sync::atomic::AtomicU64::new(data.validation_latency_ms),
             performance_violations: std::sync::atomic::AtomicU64::new(data.performance_violations),
         })

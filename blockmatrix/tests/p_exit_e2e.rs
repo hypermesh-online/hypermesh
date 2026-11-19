@@ -61,8 +61,12 @@ fn proximity_cell(provider: &LocalityProvider, peer_id: &str) -> MatrixCoordinat
     let pos = provider
         .coordinate_for(peer_id)
         .expect("test: peer has a measured proximity sample");
-    MatrixCoordinate::new(pos.x.round() as i64, pos.y.round() as i64, pos.z.round() as i64)
-        .expect("test: proximity cell is in bounds")
+    MatrixCoordinate::new(
+        pos.x.round() as i64,
+        pos.y.round() as i64,
+        pos.z.round() as i64,
+    )
+    .expect("test: proximity cell is in bounds")
 }
 
 /// A real `NetworkNode` announced at `coord`. No live connection, so the
@@ -71,7 +75,9 @@ fn proximity_cell(provider: &LocalityProvider, peer_id: &str) -> MatrixCoordinat
 fn peer(node_id: &str, coord: MatrixCoordinate) -> NetworkNode {
     NetworkNode {
         coordinate: coord,
-        address: "[::1]:9292".parse::<SocketAddr>().expect("test: valid addr"),
+        address: "[::1]:9292"
+            .parse::<SocketAddr>()
+            .expect("test: valid addr"),
         node_id: node_id.to_string(),
         privacy_mode: PrivacyMode::PRIVATE,
         connection: None,
@@ -97,7 +103,11 @@ async fn p_exit_capstone_proximity_placement_end_to_end() {
 
     let near_coords: Vec<MatrixPosition> = near_ids
         .iter()
-        .map(|id| provider.coordinate_for(id).expect("test: near sample present"))
+        .map(|id| {
+            provider
+                .coordinate_for(id)
+                .expect("test: near sample present")
+        })
         .collect();
     let outlier_coord = provider
         .coordinate_for(outlier_id)
@@ -126,8 +136,11 @@ async fn p_exit_capstone_proximity_placement_end_to_end() {
         }
     }
     intra /= n;
-    let inter: f64 =
-        near_coords.iter().map(|c| dist(c, &outlier_coord)).sum::<f64>() / near_coords.len() as f64;
+    let inter: f64 = near_coords
+        .iter()
+        .map(|c| dist(c, &outlier_coord))
+        .sum::<f64>()
+        / near_coords.len() as f64;
     assert!(
         inter > intra * 5.0,
         "P3: distance to the outlier ({inter:.1}) must dominate intra-band spread ({intra:.1})"
@@ -144,7 +157,11 @@ async fn p_exit_capstone_proximity_placement_end_to_end() {
         .iter()
         .map(|p| (p.coordinate.x, p.coordinate.y, p.coordinate.z))
         .collect();
-    let all_ids: HashSet<&str> = near_ids.iter().copied().chain(std::iter::once(outlier_id)).collect();
+    let all_ids: HashSet<&str> = near_ids
+        .iter()
+        .copied()
+        .chain(std::iter::once(outlier_id))
+        .collect();
 
     // Enough data to force real Reed-Solomon sharding into many shards.
     let original: Vec<u8> = b"HYPERMESH-P-EXIT-E2E-PLACEMENT-".repeat(4096);
@@ -173,11 +190,13 @@ async fn p_exit_capstone_proximity_placement_end_to_end() {
         "P4: the pipeline must NOT fabricate placements"
     );
 
-    let placements =
-        place_shards(&peers, &processed.shards, &asset_id, PrivacyMode::PRIVATE).await;
+    let placements = place_shards(&peers, &processed.shards, &asset_id, PrivacyMode::PRIVATE).await;
 
     // A5: with eligible peers present, real placement occurs.
-    assert!(!placements.is_empty(), "P4: eligible peers present ⇒ placement must occur");
+    assert!(
+        !placements.is_empty(),
+        "P4: eligible peers present ⇒ placement must occur"
+    );
     // A6: every placement lands on a REAL proximity-derived peer coordinate and
     // names a real eligible peer — never synthetic golden-ratio geometry.
     for pl in &placements {
@@ -202,7 +221,10 @@ async fn p_exit_capstone_proximity_placement_end_to_end() {
     );
 
     // A8: store → reconstruct is byte-identical (content-addressing intact).
-    let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: reconstruct");
+    let reconstructed = pipeline
+        .reconstruct_asset(&processed)
+        .await
+        .expect("test: reconstruct");
     assert_eq!(
         reconstructed, original,
         "P4: store → reconstruct round trip must reproduce the original bytes exactly"

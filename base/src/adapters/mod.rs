@@ -14,15 +14,15 @@
 //! `rtnetlink-backend`), [`sysfs_fallback`] (read-only degraded), [`radio_mesh`]
 //! (Substrate.c, roadmap stub), [`windows`] (future, roadmap stub).
 
+pub mod radio_mesh;
 #[cfg(feature = "rtnetlink-backend")]
 pub mod rtnetlink_linux;
-pub mod radio_mesh;
 pub mod sysfs_fallback;
 pub mod windows;
 
+pub use radio_mesh::RadioMeshAdapter;
 #[cfg(feature = "rtnetlink-backend")]
 pub use rtnetlink_linux::RtnetlinkLinuxAdapter;
-pub use radio_mesh::RadioMeshAdapter;
 pub use sysfs_fallback::SysfsFallbackAdapter;
 pub use windows::WindowsAdapter;
 

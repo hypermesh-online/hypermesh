@@ -49,11 +49,26 @@ pub struct ServiceEntry {
 /// Default local service DNS entries. Every node registers these
 /// in bootstrap DNS so that `dns.resolve("catalog")` returns `::1`.
 pub const LOCAL_SERVICES: &[ServiceEntry] = &[
-    ServiceEntry { name: "blockmatrix", port: 9292 },
-    ServiceEntry { name: "caesar", port: 9294 },
-    ServiceEntry { name: "catalog", port: 9295 },
-    ServiceEntry { name: "trust", port: 8444 },
-    ServiceEntry { name: "ngauge", port: 9296 },
+    ServiceEntry {
+        name: "blockmatrix",
+        port: 9292,
+    },
+    ServiceEntry {
+        name: "caesar",
+        port: 9294,
+    },
+    ServiceEntry {
+        name: "catalog",
+        port: 9295,
+    },
+    ServiceEntry {
+        name: "trust",
+        port: 8444,
+    },
+    ServiceEntry {
+        name: "ngauge",
+        port: 9296,
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -155,7 +170,10 @@ impl DnsResolver {
     /// Uses well-known port table for local services.
     pub async fn resolve_service(&self, name: &str) -> Option<std::net::SocketAddr> {
         let ip = self.resolve(name).await?;
-        let port = LOCAL_SERVICES.iter().find(|s| s.name == name).map(|s| s.port)?;
+        let port = LOCAL_SERVICES
+            .iter()
+            .find(|s| s.name == name)
+            .map(|s| s.port)?;
         Some(std::net::SocketAddr::new(ip, port))
     }
 
@@ -241,9 +259,8 @@ pub fn adopt_legacy_identity(
     let legacy_identity = data_dir.join(legacy_key).join("identity");
     if legacy_identity.exists() {
         if let Some(parent) = new_identity.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                anyhow!("failed to create data dir {}: {e}", parent.display())
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| anyhow!("failed to create data dir {}: {e}", parent.display()))?;
         }
         std::fs::rename(&legacy_identity, &new_identity).map_err(|e| {
             anyhow!(
@@ -466,7 +483,10 @@ impl NodeBootstrap {
             )
             .await;
         }
-        info!("Registered {} local service DNS entries", LOCAL_SERVICES.len());
+        info!(
+            "Registered {} local service DNS entries",
+            LOCAL_SERVICES.len()
+        );
 
         // 5. Default to Private mode (localhost only)
         let privacy_mode = Arc::new(RwLock::new(PrivacyMode::PRIVATE));
@@ -643,7 +663,9 @@ mod tests {
     #[tokio::test]
     async fn test_node_bootstrap_initialization() {
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
-        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
+        let bootstrap = NodeBootstrap::initialize(coord)
+            .await
+            .expect("test: async operation");
 
         // Verify genesis block
         assert_eq!(bootstrap.genesis_block().index, 0);
@@ -693,7 +715,9 @@ mod tests {
     #[tokio::test]
     async fn test_privacy_mode_transitions() {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
-        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
+        let bootstrap = NodeBootstrap::initialize(coord)
+            .await
+            .expect("test: async operation");
 
         // Start in Private mode
         assert_eq!(bootstrap.privacy_mode().await, PrivacyMode::PRIVATE);
@@ -723,10 +747,15 @@ mod tests {
     #[tokio::test]
     async fn test_node_self_sufficiency() {
         let coord = MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate");
-        let bootstrap = NodeBootstrap::initialize(coord).await.expect("test: async operation");
+        let bootstrap = NodeBootstrap::initialize(coord)
+            .await
+            .expect("test: async operation");
 
         // Verify self-sufficiency
-        bootstrap.verify_self_sufficient().await.expect("test: async operation");
+        bootstrap
+            .verify_self_sufficient()
+            .await
+            .expect("test: async operation");
     }
 
     #[test]
@@ -770,8 +799,12 @@ mod tests {
         let coord1 = MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate");
         let coord2 = MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate");
 
-        let bootstrap1 = NodeBootstrap::initialize(coord1).await.expect("test: async operation");
-        let bootstrap2 = NodeBootstrap::initialize(coord2).await.expect("test: async operation");
+        let bootstrap1 = NodeBootstrap::initialize(coord1)
+            .await
+            .expect("test: async operation");
+        let bootstrap2 = NodeBootstrap::initialize(coord2)
+            .await
+            .expect("test: async operation");
 
         // Each node has unique genesis block
         assert_ne!(

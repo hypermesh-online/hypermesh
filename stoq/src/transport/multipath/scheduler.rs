@@ -210,7 +210,9 @@ impl PathSelector {
 
         tracing::info!(
             "PathSelector ngauge recommendation: {:?} -> {:?} (input={:?})",
-            self.strategy, new_strategy, strategy_name,
+            self.strategy,
+            new_strategy,
+            strategy_name,
         );
         self.strategy = new_strategy;
         true
@@ -246,11 +248,7 @@ impl PathSelector {
     /// redundant mode regardless of the recommended strategy when `true`.
     ///
     /// Returns `true` if the strategy actually changed.
-    pub fn apply_recommendation(
-        &mut self,
-        enable_redundant: bool,
-        recommended: &str,
-    ) -> bool {
+    pub fn apply_recommendation(&mut self, enable_redundant: bool, recommended: &str) -> bool {
         let new_strategy = if enable_redundant {
             PathScheduler::Redundant
         } else {
@@ -268,7 +266,9 @@ impl PathSelector {
 
         tracing::info!(
             "PathSelector strategy changed: {:?} -> {:?} (redundant={})",
-            self.strategy, new_strategy, enable_redundant,
+            self.strategy,
+            new_strategy,
+            enable_redundant,
         );
         self.strategy = new_strategy;
         true

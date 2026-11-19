@@ -45,7 +45,7 @@ use std::sync::Arc;
 // Re-export key types from HyperMesh
 pub use blockmatrix::assets::core::{AssetRegistration, AssetType};
 pub use blockmatrix::proof_of_state::proof_of_state_integration::{
-    StateProof, SpaceProof, StakeProof, TimeProof, WorkProof,
+    SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
 };
 
 // Canonical asset types from lib -- directly usable now that catalog's
@@ -82,8 +82,8 @@ pub struct StateProofContext {
 }
 pub use api::{CatalogAppState, CatalogStoqApi, CatalogStoqConfig};
 pub use assets::{
-    AssetContent, AssetDependency, AssetExecution, PackageSpecMetadata, AssetPackage, AssetResources,
-    AssetSecurity, AssetSpec,
+    AssetContent, AssetDependency, AssetExecution, AssetPackage, AssetResources, AssetSecurity,
+    AssetSpec, PackageSpecMetadata,
 };
 pub use distribution::DistributionConfig;
 pub use documentation::DocumentationGenerator;

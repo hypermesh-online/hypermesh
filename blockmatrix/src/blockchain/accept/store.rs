@@ -224,7 +224,10 @@ impl ReceivedAssetStore {
 
     /// The entries held for `asset_hash`, in chain order.
     pub fn entries(&self, asset_hash: &[u8; 32]) -> &[BlockAssetEntry] {
-        self.chains.get(asset_hash).map(Vec::as_slice).unwrap_or(&[])
+        self.chains
+            .get(asset_hash)
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 
     /// Whether a chain is held for `asset_hash`.

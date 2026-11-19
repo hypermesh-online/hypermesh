@@ -350,9 +350,14 @@ impl DashboardServer {
 
             match std::fs::read(&path) {
                 Ok(content) => {
-                    let content_type =
-                        detect_content_type(&key).to_string();
-                    out.insert(key, CachedFile { content, content_type });
+                    let content_type = detect_content_type(&key).to_string();
+                    out.insert(
+                        key,
+                        CachedFile {
+                            content,
+                            content_type,
+                        },
+                    );
                 }
                 Err(e) => {
                     warn!(
@@ -433,16 +438,13 @@ mod tests {
         let mut scopes: HashMap<String, HashMap<String, CachedFile>> = HashMap::new();
         for &(scope_dir, path, content) in entries {
             let ct = detect_content_type(path).to_string();
-            scopes
-                .entry(scope_dir.to_string())
-                .or_default()
-                .insert(
-                    path.to_string(),
-                    CachedFile {
-                        content: content.to_vec(),
-                        content_type: ct,
-                    },
-                );
+            scopes.entry(scope_dir.to_string()).or_default().insert(
+                path.to_string(),
+                CachedFile {
+                    content: content.to_vec(),
+                    content_type: ct,
+                },
+            );
         }
         DashboardCache {
             scopes,
@@ -475,7 +477,10 @@ mod tests {
 
     #[test]
     fn content_type_html() {
-        assert_eq!(detect_content_type("index.html"), "text/html; charset=utf-8");
+        assert_eq!(
+            detect_content_type("index.html"),
+            "text/html; charset=utf-8"
+        );
     }
 
     #[test]
@@ -511,8 +516,14 @@ mod tests {
 
     #[test]
     fn content_type_unknown() {
-        assert_eq!(detect_content_type("archive.tar"), "application/octet-stream");
-        assert_eq!(detect_content_type("no-extension"), "application/octet-stream");
+        assert_eq!(
+            detect_content_type("archive.tar"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            detect_content_type("no-extension"),
+            "application/octet-stream"
+        );
     }
 
     // ===== Serve behaviour (7 tests) ======================================
@@ -520,10 +531,13 @@ mod tests {
     #[tokio::test]
     async fn serve_returns_file_from_correct_scope() {
         let server = DashboardServer::new(Duration::from_secs(300));
-        let cache = make_cache("owner", &[
-            ("public", "index.html", b"<h1>public</h1>"),
-            ("private", "index.html", b"<h1>private</h1>"),
-        ]);
+        let cache = make_cache(
+            "owner",
+            &[
+                ("public", "index.html", b"<h1>public</h1>"),
+                ("private", "index.html", b"<h1>private</h1>"),
+            ],
+        );
         server.register_dashboard("example.com", cache).await;
 
         let result = server
@@ -617,7 +631,9 @@ mod tests {
         let cache = make_cache("owner", &[("public", "index.html", b"hi")]);
         server.register_dashboard("d.com", cache).await;
 
-        let _ = server.serve("d.com", "/index.html", DashboardScope::Public).await;
+        let _ = server
+            .serve("d.com", "/index.html", DashboardScope::Public)
+            .await;
         let snap = server.stats();
         assert_eq!(snap.cache_hits, 1);
         assert_eq!(snap.scope_public, 1);
@@ -638,7 +654,13 @@ mod tests {
     async fn load_defaults_populates_all_scopes() {
         let server = DashboardServer::new(Duration::from_secs(300));
         server
-            .load_defaults("d.com", "owner", "<h1>pub</h1>", "<h1>priv</h1>", "<h1>own</h1>")
+            .load_defaults(
+                "d.com",
+                "owner",
+                "<h1>pub</h1>",
+                "<h1>priv</h1>",
+                "<h1>own</h1>",
+            )
             .await;
 
         let pub_file = server
@@ -663,7 +685,9 @@ mod tests {
     #[tokio::test]
     async fn load_defaults_skips_empty_scopes() {
         let server = DashboardServer::new(Duration::from_secs(300));
-        server.load_defaults("d.com", "owner", "<h1>pub</h1>", "", "").await;
+        server
+            .load_defaults("d.com", "owner", "<h1>pub</h1>", "", "")
+            .await;
 
         // Private scope has no index.html, so it falls back to public.
         let result = server
@@ -676,7 +700,9 @@ mod tests {
     #[tokio::test]
     async fn load_defaults_content_type_is_html() {
         let server = DashboardServer::new(Duration::from_secs(300));
-        server.load_defaults("d.com", "owner", "<h1>hi</h1>", "", "").await;
+        server
+            .load_defaults("d.com", "owner", "<h1>hi</h1>", "", "")
+            .await;
 
         let file = server
             .serve("d.com", "/index.html", DashboardScope::Public)

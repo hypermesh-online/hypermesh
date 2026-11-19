@@ -600,7 +600,10 @@ mod tests {
         let entry = delivered_registration(state.coordinate, vec![shard_id]);
         let registered = revalidate_and_register(&state, &content_hash, entry).await;
 
-        assert!(registered, "a covering, content-bound registration must register");
+        assert!(
+            registered,
+            "a covering, content-bound registration must register"
+        );
         assert!(
             state.blockchain.authorizes_shard(&shard_id).await,
             "after re-anchoring the delivered registration, the shard must be authorized on OUR chain",
@@ -665,10 +668,16 @@ mod tests {
             },
             registration: reg,
         };
-        assert!(!unbound.content_binding_ok(), "test setup: entry must be unbound");
+        assert!(
+            !unbound.content_binding_ok(),
+            "test setup: entry must be unbound"
+        );
 
         let registered = revalidate_and_register(&state, &content_hash, unbound).await;
-        assert!(!registered, "an unbound-proof registration must be rejected");
+        assert!(
+            !registered,
+            "an unbound-proof registration must be rejected"
+        );
         assert!(
             !state.blockchain.authorizes_shard(&shard_id).await,
             "no block should have been appended for an unbound registration",

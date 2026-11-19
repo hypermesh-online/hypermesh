@@ -135,7 +135,10 @@ async fn s3_3_third_party_attestation_is_accepted() {
     );
 
     // The attestation verifier accepts it: binding is to the NAMED THIRD PARTY.
-    assert!(verify_attestation(&attestation), "third-party signature must verify");
+    assert!(
+        verify_attestation(&attestation),
+        "third-party signature must verify"
+    );
     chain
         .record_mirror_attestation(attestation.clone())
         .await
@@ -205,7 +208,10 @@ async fn s3_3_forged_attestations_are_rejected() {
     let stranger = FalconIdentity::generate();
     let mut wrong_key = honest.clone();
     wrong_key.signature.signer_pubkey = stranger.public_key_bytes().to_vec();
-    assert!(!verify_attestation(&wrong_key), "wrong key must be rejected");
+    assert!(
+        !verify_attestation(&wrong_key),
+        "wrong key must be rejected"
+    );
     chain
         .record_mirror_attestation(wrong_key)
         .await
@@ -214,7 +220,10 @@ async fn s3_3_forged_attestations_are_rejected() {
     // (b) TAMPERED MATRIX INDEX — the ordering key itself.
     let mut moved = honest.clone();
     moved.matrix_index = MatrixIndex::new(4, 4, 5);
-    assert!(!verify_attestation(&moved), "tampered matrix cell must be rejected");
+    assert!(
+        !verify_attestation(&moved),
+        "tampered matrix cell must be rejected"
+    );
     chain
         .record_mirror_attestation(moved)
         .await
@@ -223,23 +232,31 @@ async fn s3_3_forged_attestations_are_rejected() {
     // (c) TAMPERED ASSET.
     let mut other_asset = honest.clone();
     other_asset.asset_hash = [0xFFu8; 32];
-    assert!(!verify_attestation(&other_asset), "tampered asset must be rejected");
+    assert!(
+        !verify_attestation(&other_asset),
+        "tampered asset must be rejected"
+    );
 
     // (d) TAMPERED SPINE POINT — attesting to a point the mirror never signed.
     let mut moved_spine = honest.clone();
     moved_spine.spine_point = "0".repeat(64);
-    assert!(!verify_attestation(&moved_spine), "tampered spine point must be rejected");
+    assert!(
+        !verify_attestation(&moved_spine),
+        "tampered spine point must be rejected"
+    );
     let mut moved_seq = honest.clone();
     moved_seq.spine_seq = seq + 99;
-    assert!(!verify_attestation(&moved_seq), "tampered spine seq must be rejected");
+    assert!(
+        !verify_attestation(&moved_seq),
+        "tampered spine seq must be rejected"
+    );
 
     // (e) IDENTITY-BINDING MISMATCH — a fully valid FALCON signature over
     //     canonical bytes that claim SOMEONE ELSE is the mirror.
     let impersonator = FalconIdentity::generate();
     let victim = FalconIdentity::generate().node_id().to_string();
     let cell = MatrixIndex::new(7, 7, 7);
-    let proof_bytes =
-        MirrorAttestation::canonical_bytes(&asset, cell, &victim, &spine, seq);
+    let proof_bytes = MirrorAttestation::canonical_bytes(&asset, cell, &victim, &spine, seq);
     let nonce = [5u8; 32];
     let digest = MirrorAttestation::signing_digest(&proof_bytes, &nonce);
     let impersonation = MirrorAttestation {
@@ -312,7 +329,10 @@ async fn s3_3_seal_root_is_matrix_ordered_not_arrival_ordered() {
 
     let a = forward.mirror_attestations(&asset).await;
     let b = backward.mirror_attestations(&asset).await;
-    assert_eq!(a, b, "the pool must present the set in MATRIX order, not arrival order");
+    assert_eq!(
+        a, b,
+        "the pool must present the set in MATRIX order, not arrival order"
+    );
 
     // The presented order IS matrix-lexicographic.
     let presented: Vec<MatrixIndex> = a.iter().map(|x| x.matrix_index).collect();
@@ -328,7 +348,11 @@ async fn s3_3_seal_root_is_matrix_ordered_not_arrival_ordered() {
     shuffled.swap(0, 6);
     shuffled.swap(2, 4);
     shuffled.reverse();
-    assert_eq!(root, seal_root(&shuffled), "the root is a function of the SET only");
+    assert_eq!(
+        root,
+        seal_root(&shuffled),
+        "the root is a function of the SET only"
+    );
 }
 
 // ── SPINE + SEAL ───────────────────────────────────────────────────────────
@@ -364,7 +388,11 @@ async fn s3_3_accumulation_leaves_the_spine_untouched_and_seal_extends_it_by_one
         .await
         .expect("test: lineage still verifies");
     assert_eq!(before, after, "accumulation must not touch the asset spine");
-    assert_eq!(chain.get_height().await, height_before, "no block was written");
+    assert_eq!(
+        chain.get_height().await,
+        height_before,
+        "no block was written"
+    );
 
     // The OWNER seals: exactly one checkpoint entry is appended.
     let receipt = chain
@@ -386,7 +414,13 @@ async fn s3_3_accumulation_leaves_the_spine_untouched_and_seal_extends_it_by_one
     let head = sealed.head().expect("test: head");
     assert_eq!(
         head.prev_asset_entry(),
-        Some(after.head().expect("test: prior head").lineage_id().as_str()),
+        Some(
+            after
+                .head()
+                .expect("test: prior head")
+                .lineage_id()
+                .as_str()
+        ),
         "the checkpoint names the prior head — single-parent continuity preserved"
     );
     assert!(head.succeeds(after.head().expect("test: prior head")));
@@ -408,7 +442,13 @@ async fn s3_3_seal_is_hash_committed_through_proof_hash() {
     let (chain, owner, spine, seq) = owned_asset(asset).await;
     let mirror = FalconIdentity::generate();
     chain
-        .record_mirror_attestation(attest(&mirror, asset, MatrixIndex::new(2, 2, 2), &spine, seq))
+        .record_mirror_attestation(attest(
+            &mirror,
+            asset,
+            MatrixIndex::new(2, 2, 2),
+            &spine,
+            seq,
+        ))
         .await
         .expect("test: accepted");
 
@@ -484,7 +524,13 @@ async fn s3_3_stripped_or_added_attestation_is_detectable_post_seal() {
     // ADD.
     let intruder = FalconIdentity::generate();
     let mut added = set.clone();
-    added.push(attest(&intruder, asset, MatrixIndex::new(50, 50, 50), &spine, seq));
+    added.push(attest(
+        &intruder,
+        asset,
+        MatrixIndex::new(50, 50, 50),
+        &spine,
+        seq,
+    ));
     assert!(matches!(
         verify_sealed_set(&asset, &added, &seal),
         Err(SealBreak::CountMismatch { .. })
@@ -501,7 +547,10 @@ async fn s3_3_stripped_or_added_attestation_is_detectable_post_seal() {
     // MEMBERSHIP against the intact set.
     assert_eq!(sealed_set_contains(&asset, &set, &seal, &set[4]), Ok(true));
     let outsider = attest(&intruder, asset, MatrixIndex::new(-1, -1, -1), &spine, seq);
-    assert_eq!(sealed_set_contains(&asset, &set, &seal, &outsider), Ok(false));
+    assert_eq!(
+        sealed_set_contains(&asset, &set, &seal, &outsider),
+        Ok(false)
+    );
 
     // A second seal after one more mirror joins produces a DIFFERENT root, and
     // the older seal still verifies against the set it committed to.
@@ -544,7 +593,10 @@ async fn s3_3_ownerless_asset_fails_closed_with_the_s3_5_label() {
         .seal_mirror_attestations(&asset, "anyone-at-all")
         .await
         .expect_err("test: an ownerless asset must not be sealable by anyone");
-    assert!(err.contains("NO owner"), "error must name the real cause: {err}");
+    assert!(
+        err.contains("NO owner"),
+        "error must name the real cause: {err}"
+    );
     assert!(err.contains("S3.5"), "error must label the S3.5 gap: {err}");
 }
 
@@ -554,7 +606,13 @@ async fn s3_3_non_owner_cannot_seal() {
     let (chain, owner, spine, seq) = owned_asset(asset).await;
     let mirror = FalconIdentity::generate();
     chain
-        .record_mirror_attestation(attest(&mirror, asset, MatrixIndex::new(1, 1, 1), &spine, seq))
+        .record_mirror_attestation(attest(
+            &mirror,
+            asset,
+            MatrixIndex::new(1, 1, 1),
+            &spine,
+            seq,
+        ))
         .await
         .expect("test: accepted");
 
@@ -563,7 +621,10 @@ async fn s3_3_non_owner_cannot_seal() {
         .seal_mirror_attestations(&asset, mirror.node_id())
         .await
         .expect_err("test: a mirror must not be able to seal");
-    assert!(err.contains("does not hold the distribution right"), "{err}");
+    assert!(
+        err.contains("does not hold the distribution right"),
+        "{err}"
+    );
 
     // The owner can.
     chain
@@ -623,7 +684,13 @@ async fn s3_3_seal_binds_to_its_asset() {
     let (chain, owner, spine, seq) = owned_asset(asset_a).await;
     let mirror = FalconIdentity::generate();
     chain
-        .record_mirror_attestation(attest(&mirror, asset_a, MatrixIndex::new(1, 2, 3), &spine, seq))
+        .record_mirror_attestation(attest(
+            &mirror,
+            asset_a,
+            MatrixIndex::new(1, 2, 3),
+            &spine,
+            seq,
+        ))
         .await
         .expect("test: accepted");
     let receipt = chain
@@ -670,8 +737,14 @@ async fn s3_3_empty_spine_point_cannot_poison_a_seal() {
 
     // Minted honestly in every respect EXCEPT the empty spine point.
     let poison = attest(&mirror, asset, MatrixIndex::new(1, 1, 1), "", 0);
-    assert!(poison.proof_bytes_match(), "envelope really does cover these fields");
-    assert!(poison.binds_to_signer(), "identity binding really does hold");
+    assert!(
+        poison.proof_bytes_match(),
+        "envelope really does cover these fields"
+    );
+    assert!(
+        poison.binds_to_signer(),
+        "identity binding really does hold"
+    );
     assert!(
         !poison.is_structurally_valid(),
         "the AUDIT gate rejects it — a non-empty spine_point is required"
@@ -791,11 +864,18 @@ async fn s3_3_accept_gate_is_a_superset_of_the_audit_gate() {
                 .expect("accepted by the gate must be recordable");
         }
     }
-    assert!(accepted >= 5, "corpus must exercise the ACCEPTING branch too");
+    assert!(
+        accepted >= 5,
+        "corpus must exercise the ACCEPTING branch too"
+    );
 
     let owner_seal = build_seal("auditor", &chain.mirror_attestations(&asset).await);
-    verify_sealed_set(&asset, &chain.mirror_attestations(&asset).await, &owner_seal)
-        .expect("everything the accept gate admitted is auditable");
+    verify_sealed_set(
+        &asset,
+        &chain.mirror_attestations(&asset).await,
+        &owner_seal,
+    )
+    .expect("everything the accept gate admitted is auditable");
 }
 
 // ── F1: the sealed root is OPENABLE without the set ────────────────────────

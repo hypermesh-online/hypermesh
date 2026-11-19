@@ -204,9 +204,7 @@ pub unsafe extern "C" fn hypermesh_asset_address_coords(
 ///
 /// `bytes16` must point to 16 readable bytes.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_asset_address_shard_index(
-    bytes16: *const u8,
-) -> c_int {
+pub unsafe extern "C" fn hypermesh_asset_address_shard_index(bytes16: *const u8) -> c_int {
     catch_ffi(HM_ERR_INTERNAL, || {
         let addr = match addr_from_ptr(bytes16) {
             Some(a) => a,
@@ -223,15 +221,17 @@ pub unsafe extern "C" fn hypermesh_asset_address_shard_index(
 ///
 /// `bytes16` must point to 16 readable bytes.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_asset_address_is_hypermesh(
-    bytes16: *const u8,
-) -> c_int {
+pub unsafe extern "C" fn hypermesh_asset_address_is_hypermesh(bytes16: *const u8) -> c_int {
     catch_ffi(HM_ERR_INTERNAL, || {
         let addr = match addr_from_ptr(bytes16) {
             Some(a) => a,
             None => return HM_ERR_NULL,
         };
-        if addr.is_hypermesh() { HM_VERIFY_OK } else { HM_VERIFY_FAIL }
+        if addr.is_hypermesh() {
+            HM_VERIFY_OK
+        } else {
+            HM_VERIFY_FAIL
+        }
     })
 }
 
@@ -355,9 +355,7 @@ mod tests {
 
         // coords
         let (mut x, mut y, mut z) = (0i64, 0i64, 0i64);
-        let rc = unsafe {
-            hypermesh_asset_address_coords(addr.as_ptr(), &mut x, &mut y, &mut z)
-        };
+        let rc = unsafe { hypermesh_asset_address_coords(addr.as_ptr(), &mut x, &mut y, &mut z) };
         assert_eq!(rc, HM_OK);
         assert_eq!((x, y, z), (10, -20, 30));
 
@@ -367,9 +365,7 @@ mod tests {
 
         // fingerprint = 5 hash bytes + (hash[5] high nibble | shard)
         let mut fp = [0u8; 6];
-        let rc = unsafe {
-            hypermesh_asset_address_fingerprint(addr.as_ptr(), fp.as_mut_ptr())
-        };
+        let rc = unsafe { hypermesh_asset_address_fingerprint(addr.as_ptr(), fp.as_mut_ptr()) };
         assert_eq!(rc, HM_OK);
         assert_eq!(&fp[..5], &hash[..5]);
         assert_eq!(fp[5], (hash[5] & 0xF0) | 3);
@@ -384,9 +380,8 @@ mod tests {
         }
 
         let mut buf = [0i8; 64];
-        let rc = unsafe {
-            hypermesh_asset_address_to_ipv6(addr.as_ptr(), buf.as_mut_ptr(), buf.len())
-        };
+        let rc =
+            unsafe { hypermesh_asset_address_to_ipv6(addr.as_ptr(), buf.as_mut_ptr(), buf.len()) };
         assert_eq!(rc, HM_OK);
         let s = unsafe { std::ffi::CStr::from_ptr(buf.as_ptr()) }
             .to_str()
@@ -395,9 +390,7 @@ mod tests {
 
         let cstr = CString::new(s).expect("test: cstring");
         let mut back = [0u8; 16];
-        let rc = unsafe {
-            hypermesh_asset_address_from_ipv6(cstr.as_ptr(), back.as_mut_ptr())
-        };
+        let rc = unsafe { hypermesh_asset_address_from_ipv6(cstr.as_ptr(), back.as_mut_ptr()) };
         assert_eq!(rc, HM_OK);
         assert_eq!(addr, back);
     }
@@ -406,9 +399,7 @@ mod tests {
     fn from_ipv6_rejects_non_hypermesh() {
         let cstr = CString::new("2001:db8::1").expect("test: cstring");
         let mut back = [0u8; 16];
-        let rc = unsafe {
-            hypermesh_asset_address_from_ipv6(cstr.as_ptr(), back.as_mut_ptr())
-        };
+        let rc = unsafe { hypermesh_asset_address_from_ipv6(cstr.as_ptr(), back.as_mut_ptr()) };
         assert_eq!(rc, HM_ERR_INVALID);
     }
 
@@ -416,22 +407,17 @@ mod tests {
     fn content_hash_compute_and_verify() {
         let data = b"the payload bytes";
         let mut hash = [0u8; 32];
-        let rc = unsafe {
-            hypermesh_compute_content_hash(data.as_ptr(), data.len(), hash.as_mut_ptr())
-        };
+        let rc =
+            unsafe { hypermesh_compute_content_hash(data.as_ptr(), data.len(), hash.as_mut_ptr()) };
         assert_eq!(rc, HM_OK);
 
         // Matches -> OK
-        let rc = unsafe {
-            hypermesh_verify_content_hash(hash.as_ptr(), data.as_ptr(), data.len())
-        };
+        let rc = unsafe { hypermesh_verify_content_hash(hash.as_ptr(), data.as_ptr(), data.len()) };
         assert_eq!(rc, HM_VERIFY_OK);
 
         // Tampered data -> FAIL (mirror invariant)
         let bad = b"the payload byteX";
-        let rc = unsafe {
-            hypermesh_verify_content_hash(hash.as_ptr(), bad.as_ptr(), bad.len())
-        };
+        let rc = unsafe { hypermesh_verify_content_hash(hash.as_ptr(), bad.as_ptr(), bad.len()) };
         assert_eq!(rc, HM_VERIFY_FAIL);
     }
 
@@ -440,9 +426,7 @@ mod tests {
         let hash = sample_hash();
         let mut addr = [0u8; 16];
         let rc = unsafe {
-            hypermesh_asset_address_new(
-                100_000, 0, 0, hash.as_ptr(), 0, addr.as_mut_ptr(),
-            )
+            hypermesh_asset_address_new(100_000, 0, 0, hash.as_ptr(), 0, addr.as_mut_ptr())
         };
         assert_eq!(rc, HM_ERR_INVALID);
     }
@@ -450,17 +434,14 @@ mod tests {
     #[test]
     fn null_pointers_safe() {
         let mut out = [0u8; 16];
-        let rc = unsafe {
-            hypermesh_asset_address_new(0, 0, 0, std::ptr::null(), 0, out.as_mut_ptr())
-        };
+        let rc =
+            unsafe { hypermesh_asset_address_new(0, 0, 0, std::ptr::null(), 0, out.as_mut_ptr()) };
         assert_eq!(rc, HM_ERR_NULL);
 
         let s = unsafe { hypermesh_asset_address_shard_index(std::ptr::null()) };
         assert_eq!(s, HM_ERR_NULL);
 
-        let rc = unsafe {
-            hypermesh_verify_content_hash(std::ptr::null(), std::ptr::null(), 0)
-        };
+        let rc = unsafe { hypermesh_verify_content_hash(std::ptr::null(), std::ptr::null(), 0) };
         assert_eq!(rc, HM_ERR_NULL);
     }
 }

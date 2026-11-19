@@ -24,9 +24,7 @@ use tokio::sync::broadcast;
 
 use crate::capacity::CapacityMetrics;
 
-use super::protocol::{
-    CongestionSnapshot, EconomicSnapshot, MetricsFrame, RoutingSnapshot,
-};
+use super::protocol::{CongestionSnapshot, EconomicSnapshot, MetricsFrame, RoutingSnapshot};
 use super::publisher::MetricsPublisher;
 
 /// Default broadcast channel capacity. Slow subscribers that lag beyond this
@@ -72,7 +70,8 @@ impl SseFrameBridge {
         publish_interval_secs: u64,
         channel_capacity: usize,
     ) -> Self {
-        let publisher = MetricsPublisher::new(node_id, privacy_mode, epsilon, publish_interval_secs);
+        let publisher =
+            MetricsPublisher::new(node_id, privacy_mode, epsilon, publish_interval_secs);
         let (tx, _) = broadcast::channel(channel_capacity.max(1));
         Self {
             publisher: Arc::new(Mutex::new(publisher)),

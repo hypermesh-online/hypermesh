@@ -25,10 +25,9 @@ use super::wal::{WalEntry, WalOperation, WalWriter};
 #[tokio::test]
 async fn test_blockchain_storage_creation() {
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let metadata = storage.get_metadata().await;
     assert_eq!(metadata.total_blocks, 0);
@@ -38,19 +37,24 @@ async fn test_blockchain_storage_creation() {
 #[tokio::test]
 async fn test_write_and_read_block() {
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
 
     // Write block
-    storage.write_block(&block).await.expect("test: async operation");
+    storage
+        .write_block(&block)
+        .await
+        .expect("test: async operation");
 
     // Read by index
-    let read_block = storage.read_block(BlockQuery::ByIndex(0)).await.expect("test: async operation");
+    let read_block = storage
+        .read_block(BlockQuery::ByIndex(0))
+        .await
+        .expect("test: async operation");
     assert!(read_block.is_some());
     assert_eq!(read_block.expect("test: assertion value").hash, block.hash);
 
@@ -68,14 +72,16 @@ async fn test_multiple_blocks() {
     use crate::assets::core::AssetRegistration;
 
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let mut prev_block = Block::genesis(coord);
-    storage.write_block(&prev_block).await.expect("test: async operation");
+    storage
+        .write_block(&prev_block)
+        .await
+        .expect("test: async operation");
 
     // Write additional blocks (each must contain at least one entry)
     for i in 1..10 {
@@ -97,7 +103,10 @@ async fn test_multiple_blocks() {
         };
         let mut block = Block::new(i, vec![entry], prev_block.hash.clone());
         block.hash = format!("hash_{i}"); // Simplified for testing
-        storage.write_block(&block).await.expect("test: async operation");
+        storage
+            .write_block(&block)
+            .await
+            .expect("test: async operation");
         prev_block = block;
     }
 
@@ -107,7 +116,10 @@ async fn test_multiple_blocks() {
     assert_eq!(metadata.chain_height, 9);
 
     // Read range
-    let blocks = storage.read_range(0, 5).await.expect("test: async operation");
+    let blocks = storage
+        .read_range(0, 5)
+        .await
+        .expect("test: async operation");
     assert_eq!(blocks.len(), 6);
 }
 
@@ -120,12 +132,8 @@ async fn test_wal_replay_crash_recovery() {
 
     // Set up storage directory and write a WAL entry directly (simulating
     // a crash between WAL write and storage commit).
-    let blockchain_dir = temp_dir
-        .path()
-        .join("test_node")
-        .join("blockchain");
-    std::fs::create_dir_all(blockchain_dir.join("blocks"))
-        .expect("test: create dirs");
+    let blockchain_dir = temp_dir.path().join("test_node").join("blockchain");
+    std::fs::create_dir_all(blockchain_dir.join("blocks")).expect("test: create dirs");
 
     let wal_path = blockchain_dir.join("wal.log");
     {
@@ -140,10 +148,9 @@ async fn test_wal_replay_crash_recovery() {
     }
 
     // Open storage (block NOT in index) and replay WAL
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let replayed = storage.replay_wal().await.expect("test: async operation");
     assert_eq!(replayed, 1, "should replay the one missing block");
@@ -172,10 +179,9 @@ async fn test_wal_replay_skips_already_persisted() {
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
 
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     // Write block normally (commits to storage + truncates WAL)
     storage
@@ -204,10 +210,9 @@ async fn test_wal_replay_skips_already_persisted() {
 #[tokio::test]
 async fn test_wal_truncated_after_write() {
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
@@ -245,15 +250,17 @@ async fn test_metadata_persistence() {
             let mut block = Block::genesis(coord);
             block.index = i;
             block.hash = format!("hash_{i}");
-            storage.write_block(&block).await.expect("test: async operation");
+            storage
+                .write_block(&block)
+                .await
+                .expect("test: async operation");
         }
     }
 
     // Load storage again and verify metadata
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let metadata = storage.get_metadata().await;
     assert_eq!(metadata.total_blocks, 5);
@@ -263,10 +270,9 @@ async fn test_metadata_persistence() {
 #[tokio::test]
 async fn test_last_n_blocks_query() {
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
 
@@ -275,11 +281,17 @@ async fn test_last_n_blocks_query() {
         let mut block = Block::genesis(coord);
         block.index = i;
         block.hash = format!("hash_{i}");
-        storage.write_block(&block).await.expect("test: async operation");
+        storage
+            .write_block(&block)
+            .await
+            .expect("test: async operation");
     }
 
     // Query last 3 blocks
-    let block = storage.read_block(BlockQuery::Last(3)).await.expect("test: async operation");
+    let block = storage
+        .read_block(BlockQuery::Last(3))
+        .await
+        .expect("test: async operation");
     assert!(block.is_some());
     assert_eq!(block.expect("test: assertion value").index, 7);
 }
@@ -287,15 +299,17 @@ async fn test_last_n_blocks_query() {
 #[tokio::test]
 async fn test_flush_wal() {
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
 
-    storage.write_block(&block).await.expect("test: async operation");
+    storage
+        .write_block(&block)
+        .await
+        .expect("test: async operation");
     storage.flush_wal().await.expect("test: async operation");
 
     // Verify WAL file exists
@@ -313,10 +327,9 @@ async fn test_flush_wal() {
 async fn test_v1_write_and_read_integrity() {
     // Write a block with v1 format, read it back, verify integrity passes
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(5, 10, 15).expect("test: valid coordinate");
     let block = Block::genesis(coord);
@@ -324,7 +337,10 @@ async fn test_v1_write_and_read_integrity() {
     // Verify the genesis block has a valid hash
     assert!(block.verify_hash(), "genesis block hash should be valid");
 
-    storage.write_block(&block).await.expect("test: write block");
+    storage
+        .write_block(&block)
+        .await
+        .expect("test: write block");
 
     // Read back and verify integrity check passed (no IntegrityViolation)
     let read = storage
@@ -342,16 +358,18 @@ async fn test_tampered_block_detected() {
     // Write a block, then tamper with the on-disk payload. Read should
     // return IntegrityViolation.
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
     assert!(block.verify_hash(), "genesis block hash should be valid");
 
-    storage.write_block(&block).await.expect("test: write block");
+    storage
+        .write_block(&block)
+        .await
+        .expect("test: write block");
 
     // Get the location of the block on disk
     let (file_id, offset, _size) = {
@@ -411,10 +429,9 @@ async fn test_legacy_format_read() {
     // it through the storage layer. Should succeed for a valid block
     // (legacy compat) because the hash matches.
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let block = Block::genesis(coord);
@@ -436,10 +453,7 @@ async fn test_legacy_format_read() {
     {
         let mut block_index = storage.block_index.write().await;
         let mut index_map = storage.index_map.write().await;
-        block_index.insert(
-            block.hash.clone(),
-            (file_id, 0, serialized.len() as u32),
-        );
+        block_index.insert(block.hash.clone(), (file_id, 0, serialized.len() as u32));
         index_map.insert(block.index, block.hash.clone());
     }
 
@@ -457,10 +471,9 @@ async fn test_legacy_tampered_block_detected() {
     // Write raw bincode (legacy) with a tampered hash field inside the
     // Block struct. The hash won't match calculate_hash() -> IntegrityViolation.
     let temp_dir = TempDir::new().expect("test: temp dir creation");
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
     let mut block = Block::genesis(coord);
@@ -484,10 +497,7 @@ async fn test_legacy_tampered_block_detected() {
     {
         let mut block_index = storage.block_index.write().await;
         let mut index_map = storage.index_map.write().await;
-        block_index.insert(
-            block.hash.clone(),
-            (file_id, 0, serialized.len() as u32),
-        );
+        block_index.insert(block.hash.clone(), (file_id, 0, serialized.len() as u32));
         index_map.insert(block.index, block.hash.clone());
     }
 
@@ -520,12 +530,8 @@ async fn test_wal_replay_integrity_check() {
     // Tamper: set hash to something that won't match calculate_hash()
     block.hash = "wal_tampered_hash".to_string();
 
-    let blockchain_dir = temp_dir
-        .path()
-        .join("test_node")
-        .join("blockchain");
-    std::fs::create_dir_all(blockchain_dir.join("blocks"))
-        .expect("test: create dirs");
+    let blockchain_dir = temp_dir.path().join("test_node").join("blockchain");
+    std::fs::create_dir_all(blockchain_dir.join("blocks")).expect("test: create dirs");
 
     let wal_path = blockchain_dir.join("wal.log");
     {
@@ -539,17 +545,22 @@ async fn test_wal_replay_integrity_check() {
             .expect("test: wal write");
     }
 
-    let storage =
-        BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
-            .await
-            .expect("test: expected success");
+    let storage = BlockchainStorage::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+        .await
+        .expect("test: expected success");
 
     // Replay should skip the tampered entry (0 replayed)
-    let replayed = storage.replay_wal().await.expect("test: replay should succeed");
+    let replayed = storage
+        .replay_wal()
+        .await
+        .expect("test: replay should succeed");
     assert_eq!(replayed, 0, "tampered WAL entry should be skipped");
 
     // Verify the block was NOT written to storage
-    let read = storage.read_block(BlockQuery::ByIndex(0)).await.expect("test: read");
+    let read = storage
+        .read_block(BlockQuery::ByIndex(0))
+        .await
+        .expect("test: read");
     assert!(read.is_none(), "tampered block should not be in storage");
 }
 
@@ -566,14 +577,11 @@ fn test_v1_header_structure() {
 
     // Check payload size
     let payload_size =
-        u32::from_le_bytes([serialized[4], serialized[5], serialized[6], serialized[7]])
-            as usize;
+        u32::from_le_bytes([serialized[4], serialized[5], serialized[6], serialized[7]]) as usize;
     assert_eq!(serialized.len(), BLOCK_HEADER_SIZE + payload_size);
 
     // Check canonical hash matches block's hash
-    let stored_hash: [u8; 32] = serialized[8..40]
-        .try_into()
-        .expect("test: hash slice");
+    let stored_hash: [u8; 32] = serialized[8..40].try_into().expect("test: hash slice");
     let expected = canonical_hash_bytes(&block);
     assert_eq!(stored_hash, expected);
 }
@@ -584,8 +592,7 @@ fn test_deserialize_v1_round_trip() {
     let block = Block::genesis(coord);
 
     let serialized = serialize_block_v1(&block).expect("test: serialize");
-    let deserialized =
-        deserialize_block_verified(&serialized).expect("test: deserialize");
+    let deserialized = deserialize_block_verified(&serialized).expect("test: deserialize");
 
     assert_eq!(deserialized.hash, block.hash);
     assert_eq!(deserialized.index, block.index);
@@ -599,8 +606,7 @@ fn test_deserialize_legacy_round_trip() {
 
     // Raw bincode (legacy format)
     let serialized = bincode::serialize(&block).expect("test: serialize");
-    let deserialized =
-        deserialize_block_verified(&serialized).expect("test: deserialize legacy");
+    let deserialized = deserialize_block_verified(&serialized).expect("test: deserialize legacy");
 
     assert_eq!(deserialized.hash, block.hash);
     assert_eq!(deserialized.index, block.index);

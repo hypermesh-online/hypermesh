@@ -76,8 +76,7 @@ async fn live_store_path_places_on_real_peers_and_round_trips() {
         .map(|p| (p.coordinate.x, p.coordinate.y, p.coordinate.z))
         .collect();
 
-    let placements =
-        place_shards(&peers, &processed.shards, &asset_id, PrivacyMode::PRIVATE).await;
+    let placements = place_shards(&peers, &processed.shards, &asset_id, PrivacyMode::PRIVATE).await;
 
     assert!(
         !placements.is_empty(),
@@ -98,7 +97,10 @@ async fn live_store_path_places_on_real_peers_and_round_trips() {
 
     // FETCH side: reconstruct through the reverse pipeline — content-addressing
     // and the store→fetch round trip must be byte-identical.
-    let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("reconstruct");
+    let reconstructed = pipeline
+        .reconstruct_asset(&processed)
+        .await
+        .expect("reconstruct");
     assert_eq!(
         reconstructed, original,
         "store → fetch round trip must reproduce the original bytes exactly",

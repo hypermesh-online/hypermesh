@@ -228,7 +228,7 @@ pub mod auth;
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,
-    AssetStatus, AssetType, StateProof, StateRequirements, PrivacyMode,
+    AssetStatus, AssetType, PrivacyMode, StateProof, StateRequirements,
 };
 
 pub use assets::adapters::{
@@ -401,7 +401,14 @@ mod tests {
             1024 * 1024, // 1MB
         );
 
-        let work_proof = WorkProof::new("owner-1".to_string(), "workload-1".to_string(), *blake3::hash(format!("{}:{}", "owner-1".to_string(), "workload-1".to_string()).as_bytes()).as_bytes());
+        let work_proof = WorkProof::new(
+            "owner-1".to_string(),
+            "workload-1".to_string(),
+            *blake3::hash(
+                format!("{}:{}", "owner-1".to_string(), "workload-1".to_string()).as_bytes(),
+            )
+            .as_bytes(),
+        );
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 

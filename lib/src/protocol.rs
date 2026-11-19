@@ -49,7 +49,10 @@ impl ErasureCodingParams {
 
     /// Create with validation.
     pub fn new(data_shards: u16, parity_shards: u16) -> Result<Self, ErasureCodingError> {
-        let params = Self { data_shards, parity_shards };
+        let params = Self {
+            data_shards,
+            parity_shards,
+        };
         params.validate()?;
         Ok(params)
     }
@@ -116,12 +119,7 @@ impl Default for ErasureCodingParams {
 
 impl fmt::Display for ErasureCodingParams {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "RS({}-of-{})",
-            self.data_shards,
-            self.total_shards()
-        )
+        write!(f, "RS({}-of-{})", self.data_shards, self.total_shards())
     }
 }
 
@@ -153,11 +151,11 @@ pub struct HardwareCapabilities {
 
 impl HardwareCapabilities {
     /// R13 minimum device specifications.
-    pub const MIN_NETWORK_BPS: u64 = 1_000_000;       // 1 Mb/s
+    pub const MIN_NETWORK_BPS: u64 = 1_000_000; // 1 Mb/s
     pub const MIN_STORAGE_BYTES: u64 = 50_000_000_000; // 50 GB
-    pub const MIN_RAM_BYTES: u64 = 4_000_000_000;      // 4 GB
+    pub const MIN_RAM_BYTES: u64 = 4_000_000_000; // 4 GB
     pub const MIN_CPU_CORES: u16 = 2;
-    pub const MIN_CPU_CLOCK_MHZ: u32 = 1_000;          // 1 GHz
+    pub const MIN_CPU_CLOCK_MHZ: u32 = 1_000; // 1 GHz
 
     /// Check whether this hardware meets the R13 minimum spec.
     ///
@@ -381,8 +379,7 @@ mod tests {
 
     #[test]
     fn erasure_coding_new_valid() {
-        let params = ErasureCodingParams::new(20, 8)
-            .expect("test: valid params");
+        let params = ErasureCodingParams::new(20, 8).expect("test: valid params");
         assert_eq!(params.data_shards, 20);
         assert_eq!(params.parity_shards, 8);
         assert_eq!(params.total_shards(), 28);
@@ -414,8 +411,7 @@ mod tests {
 
     #[test]
     fn erasure_coding_at_rs_limit() {
-        let params = ErasureCodingParams::new(200, 56)
-            .expect("test: at limit");
+        let params = ErasureCodingParams::new(200, 56).expect("test: at limit");
         assert_eq!(params.total_shards(), 256);
     }
 
@@ -450,12 +446,9 @@ mod tests {
 
     #[test]
     fn erasure_coding_serde_roundtrip() {
-        let params = ErasureCodingParams::new(20, 8)
-            .expect("test: valid params");
-        let json = serde_json::to_string(&params)
-            .expect("test: serialize");
-        let back: ErasureCodingParams = serde_json::from_str(&json)
-            .expect("test: deserialize");
+        let params = ErasureCodingParams::new(20, 8).expect("test: valid params");
+        let json = serde_json::to_string(&params).expect("test: serialize");
+        let back: ErasureCodingParams = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(params, back);
     }
 
@@ -572,10 +565,8 @@ mod tests {
     #[test]
     fn hardware_serde_roundtrip() {
         let hw = sample_hardware();
-        let json = serde_json::to_string(&hw)
-            .expect("test: serialize");
-        let back: HardwareCapabilities = serde_json::from_str(&json)
-            .expect("test: deserialize");
+        let json = serde_json::to_string(&hw).expect("test: serialize");
+        let back: HardwareCapabilities = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(hw, back);
     }
 

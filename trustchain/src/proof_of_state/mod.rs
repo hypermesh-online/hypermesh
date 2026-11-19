@@ -27,19 +27,19 @@ pub use validation::*;
 // Re-export validator types explicitly to avoid ambiguous glob with
 // hypermesh_client::ValidationMetrics (different struct, same name).
 pub use validator::{
-    FourProofValidator, MisbehaviorDetector, MisbehaviorThresholds, MaliciousNodeInfo,
-    ProofOfSpaceValidator, ProofOfStakeValidator, ProofOfWorkValidator, ProofOfTimeValidator,
-    SecurityConfig, SecurityViolationType, StateAuthenticator, StorageNodeInfo,
-    SuspiciousActivity, ValidationMetrics,
+    FourProofValidator, MaliciousNodeInfo, MisbehaviorDetector, MisbehaviorThresholds,
+    ProofOfSpaceValidator, ProofOfStakeValidator, ProofOfTimeValidator, ProofOfWorkValidator,
+    SecurityConfig, SecurityViolationType, StateAuthenticator, StorageNodeInfo, SuspiciousActivity,
+    ValidationMetrics,
 };
 // Re-export hypermesh_client types explicitly, excluding ValidationMetrics
 // (which collides with validator::ValidationMetrics — different struct).
 pub use hypermesh_client::{
     ByzantineFaultToleranceStatus, CertificateType, FourProofValidationRequest,
     HyperMeshClientConfig, HyperMeshStateProofClient, PerformanceStatistics,
-    ProofValidationResults, StateProofClientMetrics,
-    StateProofValidationRequest, StateProofValidationResult, StateProofValidationService,
-    StateProofValidationStatus, ValidationContext, ValidationDetails,
+    ProofValidationResults, StateProofClientMetrics, StateProofValidationRequest,
+    StateProofValidationResult, StateProofValidationService, StateProofValidationStatus,
+    ValidationContext, ValidationDetails,
 };
 
 // The canonical four-proof composite and its validation bounds live in
@@ -239,7 +239,9 @@ impl hypermesh_lib::StateProofProvider for TrustChainProofProvider {
         hasher.update(&nonce);
         let digest = hasher.finalize();
 
-        let signature = self.signer.sign(digest.as_bytes())
+        let signature = self
+            .signer
+            .sign(digest.as_bytes())
             .map_err(|e| anyhow!("FALCON signing failed: {e}"))?;
 
         let wire = WireSignedProof {
@@ -249,8 +251,7 @@ impl hypermesh_lib::StateProofProvider for TrustChainProofProvider {
             nonce,
         };
 
-        serde_json::to_vec(&wire)
-            .map_err(|e| anyhow!("Failed to serialize WireSignedProof: {e}"))
+        serde_json::to_vec(&wire).map_err(|e| anyhow!("Failed to serialize WireSignedProof: {e}"))
     }
 
     async fn validate_proof(&self, incoming: &[u8]) -> anyhow::Result<bool> {
@@ -386,11 +387,10 @@ impl TryFrom<WireSignedProof> for SignedStateProof {
 
     /// Convert a wire-format proof to the in-memory deserialized form.
     fn try_from(wire: WireSignedProof) -> Result<Self> {
-        let proof = StateProof::from_bytes(&wire.proof_bytes)
-            .or_else(|_| {
-                serde_json::from_slice::<StateProof>(&wire.proof_bytes)
-                    .map_err(|e| anyhow!("Failed to deserialize proof_bytes: {e}"))
-            })?;
+        let proof = StateProof::from_bytes(&wire.proof_bytes).or_else(|_| {
+            serde_json::from_slice::<StateProof>(&wire.proof_bytes)
+                .map_err(|e| anyhow!("Failed to deserialize proof_bytes: {e}"))
+        })?;
         Ok(Self {
             proof,
             signature: wire.signature,
@@ -482,12 +482,8 @@ mod tests {
         let proof = StateProof::new_for_testing();
         let (pk, sk) = falcon1024::keypair();
 
-        let signed = SignedStateProof::sign(
-            proof,
-            sk.as_bytes(),
-            pk.as_bytes(),
-        )
-        .expect("test: signing should succeed");
+        let signed = SignedStateProof::sign(proof, sk.as_bytes(), pk.as_bytes())
+            .expect("test: signing should succeed");
 
         // Verify signature
         assert!(
@@ -503,8 +499,7 @@ mod tests {
 
         // Serialize and deserialize
         let bytes = signed.to_bytes().expect("test: serialization");
-        let deserialized =
-            SignedStateProof::from_bytes(&bytes).expect("test: deserialization");
+        let deserialized = SignedStateProof::from_bytes(&bytes).expect("test: deserialization");
         assert!(
             deserialized.verify().expect("test: verify after deser"),
             "Signature should verify after deserialization"
@@ -518,12 +513,8 @@ mod tests {
         let (pk2, _sk2) = falcon1024::keypair();
 
         // Sign with sk1 but claim pk2
-        let mut signed = SignedStateProof::sign(
-            proof,
-            sk1.as_bytes(),
-            pk2.as_bytes(),
-        )
-        .expect("test: signing should succeed");
+        let mut signed = SignedStateProof::sign(proof, sk1.as_bytes(), pk2.as_bytes())
+            .expect("test: signing should succeed");
 
         // Verification should fail (wrong key)
         assert!(
@@ -606,15 +597,16 @@ mod proof_provider_tests {
     #[tokio::test]
     async fn test_proof_provider_sign_verify_roundtrip() {
         let signer = Arc::new(TestNodeSigner::new());
-        let provider = TrustChainProofProvider::new(
-            signer.node_id().to_string(),
-            signer.clone(),
-        );
+        let provider = TrustChainProofProvider::new(signer.node_id().to_string(), signer.clone());
 
-        let proof_bytes = provider.generate_proof().await
+        let proof_bytes = provider
+            .generate_proof()
+            .await
             .expect("test: proof generation should succeed");
 
-        let valid = provider.validate_proof(&proof_bytes).await
+        let valid = provider
+            .validate_proof(&proof_bytes)
+            .await
             .expect("test: validation should not error");
         assert!(valid, "Signed proof should validate successfully");
     }
@@ -622,24 +614,24 @@ mod proof_provider_tests {
     #[tokio::test]
     async fn test_proof_provider_tampered_signature_fails() {
         let signer = Arc::new(TestNodeSigner::new());
-        let provider = TrustChainProofProvider::new(
-            signer.node_id().to_string(),
-            signer.clone(),
-        );
+        let provider = TrustChainProofProvider::new(signer.node_id().to_string(), signer.clone());
 
-        let proof_bytes = provider.generate_proof().await
+        let proof_bytes = provider
+            .generate_proof()
+            .await
             .expect("test: proof generation should succeed");
 
         // Tamper with the signature field inside the JSON
-        let mut wire: WireSignedProof = serde_json::from_slice(&proof_bytes)
-            .expect("test: should deserialize");
+        let mut wire: WireSignedProof =
+            serde_json::from_slice(&proof_bytes).expect("test: should deserialize");
         if let Some(byte) = wire.signature.get_mut(0) {
             *byte ^= 0xFF;
         }
-        let tampered = serde_json::to_vec(&wire)
-            .expect("test: should serialize");
+        let tampered = serde_json::to_vec(&wire).expect("test: should serialize");
 
-        let valid = provider.validate_proof(&tampered).await
+        let valid = provider
+            .validate_proof(&tampered)
+            .await
             .expect("test: validation should not error");
         assert!(!valid, "Tampered signature should fail verification");
     }
@@ -650,14 +642,12 @@ mod proof_provider_tests {
         // StateProof (no signature) must be REJECTED, not accepted after a
         // structural-only check.
         let signer = Arc::new(TestNodeSigner::new());
-        let provider = TrustChainProofProvider::new(
-            signer.node_id().to_string(),
-            signer.clone(),
-        );
+        let provider = TrustChainProofProvider::new(signer.node_id().to_string(), signer.clone());
 
         // Create a raw StateProof in bincode (legacy format)
         let proof = StateProof::new_for_testing();
-        let raw_bytes = proof.to_bytes()
+        let raw_bytes = proof
+            .to_bytes()
             .expect("test: serialization should succeed");
 
         // validate_proof must now ERROR (reject) — no silent structural pass.
@@ -673,15 +663,14 @@ mod proof_provider_tests {
         // F2: the WireSignedProof exposes its signer key so the handshake can
         // enforce that the proof signer == the authenticated peer identity.
         let signer = Arc::new(TestNodeSigner::new());
-        let provider = TrustChainProofProvider::new(
-            signer.node_id().to_string(),
-            signer.clone(),
-        );
+        let provider = TrustChainProofProvider::new(signer.node_id().to_string(), signer.clone());
 
-        let proof_bytes = provider.generate_proof().await
+        let proof_bytes = provider
+            .generate_proof()
+            .await
             .expect("test: proof generation should succeed");
-        let wire: WireSignedProof = serde_json::from_slice(&proof_bytes)
-            .expect("test: should deserialize WireSignedProof");
+        let wire: WireSignedProof =
+            serde_json::from_slice(&proof_bytes).expect("test: should deserialize WireSignedProof");
 
         // The signer key equals the node's own FALCON pubkey.
         assert_eq!(

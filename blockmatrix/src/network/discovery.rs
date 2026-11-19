@@ -336,8 +336,7 @@ mod tests {
                     timestamp: 0,
                 },
                 source_addr: Ipv6Addr::LOCALHOST,
-                last_seen: std::time::Instant::now()
-                    - std::time::Duration::from_secs(100),
+                last_seen: std::time::Instant::now() - std::time::Duration::from_secs(100),
             };
             discovery
                 .peers

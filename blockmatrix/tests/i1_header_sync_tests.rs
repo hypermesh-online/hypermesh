@@ -13,9 +13,7 @@
 //! STOQ) is part of the 20-node multi-host harness — these in-process
 //! tests are the deterministic floor.
 
-use blockmatrix::blockchain::sync_manager::{
-    SyncConfig, SyncManager, SyncMessage, SyncState,
-};
+use blockmatrix::blockchain::sync_manager::{SyncConfig, SyncManager, SyncMessage, SyncState};
 use blockmatrix::bootstrap::PrivacyMode;
 
 fn fresh_manager() -> SyncManager {
@@ -106,9 +104,9 @@ fn i1_two_nodes_exchange_header_messages() {
     // Drives two SyncManagers in-process: A in headers mode talks to B
     // (which acts as a passive responder via process_sync_message).
     // Verifies the round-trip surface is byte-compatible end-to-end.
+    use blockmatrix::blockchain::block::Block;
     use blockmatrix::blockchain::sync_manager::NodeBlockchainBlockProvider;
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
-    use blockmatrix::blockchain::block::Block;
 
     let mut node_a = SyncManager::new("device-a".to_string(), SyncConfig::default());
     node_a

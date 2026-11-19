@@ -31,7 +31,11 @@ impl super::MirrorManager {
         }
 
         // Sort by priority
-        candidates.sort_by(|a, b| b.priority.partial_cmp(&a.priority).expect("priority values should be valid for comparison"));
+        candidates.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .expect("priority values should be valid for comparison")
+        });
 
         // Mirror top packages
         let mut mirrored = 0;
@@ -241,7 +245,10 @@ impl super::MirrorManager {
         }
 
         // Sort by score
-        node_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).expect("node scores should be valid for comparison"));
+        node_scores.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .expect("node scores should be valid for comparison")
+        });
 
         // Select top nodes
         let selected: Vec<String> = node_scores

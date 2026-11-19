@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 
 use super::super::ConflictResolution;
 use super::types::*;
-use crate::{PackageSpecMetadata, AssetPackage};
+use crate::{AssetPackage, PackageSpecMetadata};
 
 impl super::SyncManager {
     pub(super) async fn update_sync_state(&self, peer_id: &str, state: SyncState) -> Result<()> {
@@ -257,7 +257,10 @@ impl super::SyncManager {
         Ok(diff_hashes)
     }
 
-    pub(super) async fn get_state_proof_result(&self, metadata: &PackageSpecMetadata) -> Result<f64> {
+    pub(super) async fn get_state_proof_result(
+        &self,
+        metadata: &PackageSpecMetadata,
+    ) -> Result<f64> {
         // Score based on metadata completeness and trust signals.
         let mut score = 0.0;
         let mut factors = 0;

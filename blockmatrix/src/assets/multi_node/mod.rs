@@ -26,12 +26,8 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 #[cfg(feature = "multi-node")]
-use crate::assets::core::{
-    AssetRegistration, AssetResult, AssetState, AssetType, StateProof,
-};
+use crate::assets::core::{AssetRegistration, AssetResult, AssetState, AssetType, StateProof};
 
-#[cfg(feature = "multi-node")]
-pub mod state_verification;
 #[cfg(feature = "multi-node")]
 pub mod coordinator;
 #[cfg(feature = "multi-node")]
@@ -46,6 +42,8 @@ pub mod multi_network_coordinator;
 pub mod network_membership;
 #[cfg(feature = "multi-node")]
 pub mod resource_sharing;
+#[cfg(feature = "multi-node")]
+pub mod state_verification;
 
 #[cfg(feature = "multi-node")]
 pub use coordinator::{MultiNodeCoordinator, NodeCapabilities, NodeInfo};
@@ -68,8 +66,8 @@ pub use multi_network_coordinator::{
 };
 pub use network_membership::{
     ApprovalProcess, JoinRequirements, MembershipStatus, MultiNetworkMembership,
-    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkRole, ParticipationMembership, PrivacyMode,
-    TrustChainClient,
+    NetworkCredentials, NetworkDiscovery, NetworkId, NetworkRole, ParticipationMembership,
+    PrivacyMode, TrustChainClient,
 };
 
 // Use canonical PeerIdentity from transport layer

@@ -63,9 +63,7 @@ fn test_extension_provided_assets() {
 
     let metadata = extension.metadata();
     // provided_assets has: VirtualMachine, Library, Library(overwritten by Dataset), Container
-    assert!(metadata
-        .provided_assets
-        .contains(&AssetType::Blockchain));
+    assert!(metadata.provided_assets.contains(&AssetType::Blockchain));
     assert!(metadata.provided_assets.contains(&AssetType::Dns));
     assert!(metadata.provided_assets.contains(&AssetType::Container));
 }
@@ -377,9 +375,7 @@ mod future_extension_tests {
             hypermesh::extensions::ExtensionCategory::AssetLibrary
         );
 
-        assert!(metadata
-            .provided_assets
-            .contains(&AssetType::Blockchain));
+        assert!(metadata.provided_assets.contains(&AssetType::Blockchain));
         assert!(metadata.provided_assets.contains(&AssetType::Dns));
         assert!(metadata.provided_assets.contains(&AssetType::Dataset));
         assert!(metadata.provided_assets.contains(&AssetType::Template));

@@ -20,9 +20,9 @@ use crate::assets::core::asset_id::{
     AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
 };
 use crate::blockchain::node_chain::NodeBlockchain;
+use crate::matrix::coordinate::MatrixCoordinate;
 use crate::proof_of_state::validation::StateAuthenticator;
 use crate::proof_of_state::StateProof;
-use crate::matrix::coordinate::MatrixCoordinate;
 use hypermesh_lib::{AddressError, AssetAddress, ContentHash};
 
 /// Opaque Proof of State bytes.
@@ -214,8 +214,9 @@ impl TransferEngine {
         let new_address = self.readdress_asset(&old_address, &intent.target_coord)?;
 
         // 5. Record "transfer-out" block on source chain
-        let source_proof = StateProof::from_bytes(intent.source_proof.as_bytes())
-            .map_err(|e| TransferError::AuthenticationFailed(format!("source proof decode: {e}")))?;
+        let source_proof = StateProof::from_bytes(intent.source_proof.as_bytes()).map_err(|e| {
+            TransferError::AuthenticationFailed(format!("source proof decode: {e}"))
+        })?;
         let transfer_out_asset = build_transfer_record(
             "transfer-out",
             &old_address,
@@ -235,8 +236,9 @@ impl TransferEngine {
             .map_err(|e| TransferError::Blockchain(format!("source chain: {e}")))?;
 
         // 6. Record "transfer-in" block on target chain
-        let target_proof_typed = StateProof::from_bytes(target_proof.as_bytes())
-            .map_err(|e| TransferError::AuthenticationFailed(format!("target proof decode: {e}")))?;
+        let target_proof_typed = StateProof::from_bytes(target_proof.as_bytes()).map_err(|e| {
+            TransferError::AuthenticationFailed(format!("target proof decode: {e}"))
+        })?;
         let transfer_in_asset = build_transfer_record(
             "transfer-in",
             &new_address,

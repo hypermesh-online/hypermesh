@@ -447,7 +447,8 @@ mod tests {
         // Register some positions
         for x in -2..=2 {
             for y in -2..=2 {
-                let coord = MatrixCoordinate::new(x * 10, y * 10, 0).expect("test: valid coordinate");
+                let coord =
+                    MatrixCoordinate::new(x * 10, y * 10, 0).expect("test: valid coordinate");
                 let proof = StateProof::new_for_testing();
                 let _ = validator
                     .validate_node_position(coord, format!("node_{x}_{y}"), proof)
@@ -497,22 +498,28 @@ mod tests {
 
     #[test]
     fn test_verify_peer_rotation_no_rotations() {
-        use trustchain::identity::FalconIdentity;
         use hypermesh_lib::NodeSigner;
+        use trustchain::identity::FalconIdentity;
 
         let id = FalconIdentity::generate();
         let pubkey = id.public_key_bytes().to_vec();
 
         // No rotation chain, genesis == current => valid
-        let result = verify_peer_rotation(&pubkey, &[], &pubkey)
-            .expect("test: verify_peer_rotation");
-        assert!(result, "Same genesis and current key with no rotations should be valid");
+        let result =
+            verify_peer_rotation(&pubkey, &[], &pubkey).expect("test: verify_peer_rotation");
+        assert!(
+            result,
+            "Same genesis and current key with no rotations should be valid"
+        );
 
         // No rotation chain, genesis != current => invalid
         let other = FalconIdentity::generate();
         let result = verify_peer_rotation(&pubkey, &[], other.public_key_bytes())
             .expect("test: verify_peer_rotation");
-        assert!(!result, "Different keys with no rotation chain should be invalid");
+        assert!(
+            !result,
+            "Different keys with no rotation chain should be invalid"
+        );
     }
 
     #[test]

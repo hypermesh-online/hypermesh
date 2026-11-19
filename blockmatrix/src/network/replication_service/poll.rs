@@ -40,8 +40,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
     );
 
     tokio::spawn(async move {
-        let mut interval =
-            tokio::time::interval(tokio::time::Duration::from_secs(30));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
         // Skip the immediate tick so the first fetch happens after
         // the network has had time to come up.
         interval.tick().await;
@@ -53,9 +52,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
             // handing out peers that have gone offline.
             let reclaimed = rp_index.cleanup_expired().await;
             if reclaimed > 0 {
-                debug!(
-                    "replication-poll: reclaimed {reclaimed} expired provider hint(s)"
-                );
+                debug!("replication-poll: reclaimed {reclaimed} expired provider hint(s)");
             }
 
             // The networks this node has joined — replication is per-network.
@@ -75,34 +72,31 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
             // ranking degrades deterministically rather than reverting to
             // meaningless hash distance (VISION §5.5).
             let connected = rp_network.get_connected_nodes().await;
-            let locality =
-                crate::network::locality::provider_from_nodes(&connected);
-            let peer_coords: std::collections::HashMap<
-                String,
-                hypermesh_lib::MatrixPosition,
-            > = connected
-                .into_iter()
-                .map(|n| {
-                    let pos = locality.coordinate_for(&n.node_id).unwrap_or(
-                        hypermesh_lib::MatrixPosition {
-                            x: n.coordinate.x as f64,
-                            y: n.coordinate.y as f64,
-                            z: n.coordinate.z as f64,
-                        },
-                    );
-                    (n.node_id, pos)
-                })
-                .collect();
+            let locality = crate::network::locality::provider_from_nodes(&connected);
+            let peer_coords: std::collections::HashMap<String, hypermesh_lib::MatrixPosition> =
+                connected
+                    .into_iter()
+                    .map(|n| {
+                        let pos = locality.coordinate_for(&n.node_id).unwrap_or(
+                            hypermesh_lib::MatrixPosition {
+                                x: n.coordinate.x as f64,
+                                y: n.coordinate.y as f64,
+                                z: n.coordinate.z as f64,
+                            },
+                        );
+                        (n.node_id, pos)
+                    })
+                    .collect();
 
             for network in &networks {
                 // (1) NGauge decides WHICH shards need copies + urgency. The
                 // SwarmAnalytics guard is held only for this call and dropped
                 // at the end of the match expression (it is `!Send`).
                 let signals = match rp_analytics.lock() {
-                    Ok(guard) => ngauge::ReplicationTrigger::new(
-                        ngauge::ReplicationConfig::default(),
-                    )
-                    .check_in_network(&guard, *network),
+                    Ok(guard) => {
+                        ngauge::ReplicationTrigger::new(ngauge::ReplicationConfig::default())
+                            .check_in_network(&guard, *network)
+                    }
                     Err(e) => {
                         debug!("replication-poll: analytics lock poisoned: {e}");
                         continue;
@@ -138,9 +132,9 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                     let positioned: Vec<ngauge::ReplicaCandidate> = all_ids
                         .iter()
                         .filter_map(|id| {
-                            peer_coords.get(id).map(|p| {
-                                ngauge::ReplicaCandidate::new(id.clone(), *p, 1.0)
-                            })
+                            peer_coords
+                                .get(id)
+                                .map(|p| ngauge::ReplicaCandidate::new(id.clone(), *p, 1.0))
                         })
                         .collect();
                     bundles.push(ngauge::ShardCandidates {
@@ -158,9 +152,7 @@ pub(super) async fn spawn(svc: &ReplicationService) -> anyhow::Result<()> {
                 // the guard is DROPPED before any await.
                 let plan = match rp_analytics.lock() {
                     Ok(guard) => {
-                        let plan = ngauge::DmsDriver::plan(
-                            &guard, *network, &bundles, 0.5,
-                        );
+                        let plan = ngauge::DmsDriver::plan(&guard, *network, &bundles, 0.5);
                         drop(guard);
                         plan
                     }

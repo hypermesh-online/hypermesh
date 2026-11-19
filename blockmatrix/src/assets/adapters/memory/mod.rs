@@ -17,10 +17,10 @@
 
 mod types;
 
+use types::{_MemoryAccessType, MemoryOperation};
 pub use types::{
     MemoryAllocation, MemoryPermissions, MemoryPool, MemoryProxyMapping, MemoryUsageStats,
 };
-use types::{MemoryOperation, _MemoryAccessType};
 
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -31,8 +31,8 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, StateProof, MemoryUsage, NetworkScope, PrivacyMode,
-    ProxyAddress, ResourceLimits, ResourceUsage,
+    AssetType, BaseSystemType, MemoryUsage, NetworkScope, PrivacyMode, ProxyAddress,
+    ResourceLimits, ResourceUsage, StateProof,
 };
 use crate::os_integration::create_os_abstraction;
 
@@ -265,10 +265,7 @@ impl AssetAdapter for MemoryAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        if !self
-            .validate_state_proof(&request.state_proof)
-            .await?
-        {
+        if !self.validate_state_proof(&request.state_proof).await? {
             return Err(AssetError::StateProofValidationFailed {
                 reason: "Memory allocation state proof validation failed".to_string(),
             });
@@ -408,8 +405,7 @@ impl AssetAdapter for MemoryAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                state_requirements:
-                    crate::assets::core::privacy::StateRequirements::default(),
+                state_requirements: crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -682,9 +678,7 @@ impl AssetAdapter for MemoryAssetAdapter {
 mod tests {
     use super::*;
     #[allow(unused_imports)]
-    use crate::assets::core::{
-        SpaceProof, StakeProof, TimeProof, WorkProof,
-    };
+    use crate::assets::core::{SpaceProof, StakeProof, TimeProof, WorkProof};
     use std::collections::HashMap;
     use std::time::Duration;
 
@@ -720,7 +714,10 @@ mod tests {
         let adapter = MemoryAssetAdapter::new().await;
         let request = create_test_memory_request();
 
-        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
+        let allocation = adapter
+            .allocate_asset(&request)
+            .await
+            .expect("test: async operation");
         assert!(matches!(
             allocation.asset_id.category,
             AssetCategory::BaseSystem(BaseSystemType::Memory)
@@ -738,10 +735,19 @@ mod tests {
         let adapter = MemoryAssetAdapter::new().await;
         let request = create_test_memory_request();
 
-        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
-        let proxy_addr = allocation.status.proxy_address.expect("test: expected success");
+        let allocation = adapter
+            .allocate_asset(&request)
+            .await
+            .expect("test: async operation");
+        let proxy_addr = allocation
+            .status
+            .proxy_address
+            .expect("test: expected success");
 
-        let resolved_asset_id = adapter.resolve_proxy_address(&proxy_addr).await.expect("test: async operation");
+        let resolved_asset_id = adapter
+            .resolve_proxy_address(&proxy_addr)
+            .await
+            .expect("test: async operation");
         assert_eq!(resolved_asset_id, allocation.asset_id);
 
         adapter

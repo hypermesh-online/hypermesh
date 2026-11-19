@@ -85,7 +85,9 @@ impl<T: ShardTransport> SwarmProtocol<T> {
     /// Register a node in the swarm (does not announce any shards yet).
     pub async fn register_node(&self, node_id: NodeId) {
         let mut nodes = self.nodes.write().await;
-        nodes.entry(node_id).or_insert_with(|| SwarmNode::new(node_id));
+        nodes
+            .entry(node_id)
+            .or_insert_with(|| SwarmNode::new(node_id));
     }
 
     /// Announce that `node_id` can serve `shard_id`.
@@ -142,9 +144,7 @@ impl<T: ShardTransport> SwarmProtocol<T> {
     ) -> Result<Vec<u8>, SwarmError> {
         let providers = self.discover_shard(shard_id).await;
         if providers.is_empty() {
-            return Err(SwarmError::NoProviders {
-                shard: *shard_id,
-            });
+            return Err(SwarmError::NoProviders { shard: *shard_id });
         }
 
         // Try providers in order until one succeeds.
@@ -164,7 +164,10 @@ impl<T: ShardTransport> SwarmProtocol<T> {
 
         Err(SwarmError::AllProvidersFailed {
             shard: *shard_id,
-            last_error: format!("{}", last_err.map_or_else(|| "unknown".to_string(), |e| e.to_string())),
+            last_error: format!(
+                "{}",
+                last_err.map_or_else(|| "unknown".to_string(), |e| e.to_string())
+            ),
         })
     }
 
@@ -194,7 +197,10 @@ pub enum SwarmError {
     #[error("no providers found for shard {shard}")]
     NoProviders { shard: ContentHash },
     #[error("all providers failed for shard {shard}: {last_error}")]
-    AllProvidersFailed { shard: ContentHash, last_error: String },
+    AllProvidersFailed {
+        shard: ContentHash,
+        last_error: String,
+    },
 }
 
 #[cfg(test)]
@@ -267,7 +273,10 @@ mod tests {
         assert_eq!(swarm.provider_count(&s1).await, 1);
 
         // n2 fetches the shard.
-        let fetched = swarm.serve_shard(&s1, n2).await.expect("test: serve should succeed");
+        let fetched = swarm
+            .serve_shard(&s1, n2)
+            .await
+            .expect("test: serve should succeed");
         assert_eq!(fetched, data);
 
         // After serve: n2 was auto-announced as provider (cascade).

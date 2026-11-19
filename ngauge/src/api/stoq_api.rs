@@ -590,19 +590,22 @@ impl NGaugeStoqApi {
         });
         handlers.insert(routing_advisory.path().to_string(), routing_advisory);
 
-        let marketplace_pools: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplacePoolsHandler {
-            state: app_state.clone(),
-        });
+        let marketplace_pools: Arc<dyn ApiHandler> =
+            Arc::new(ui_handlers::MarketplacePoolsHandler {
+                state: app_state.clone(),
+            });
         handlers.insert(marketplace_pools.path().to_string(), marketplace_pools);
 
-        let marketplace_leases: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplaceLeasesHandler {
-            state: app_state.clone(),
-        });
+        let marketplace_leases: Arc<dyn ApiHandler> =
+            Arc::new(ui_handlers::MarketplaceLeasesHandler {
+                state: app_state.clone(),
+            });
         handlers.insert(marketplace_leases.path().to_string(), marketplace_leases);
 
-        let marketplace_pricing: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MarketplacePricingHandler {
-            state: app_state.clone(),
-        });
+        let marketplace_pricing: Arc<dyn ApiHandler> =
+            Arc::new(ui_handlers::MarketplacePricingHandler {
+                state: app_state.clone(),
+            });
         handlers.insert(marketplace_pricing.path().to_string(), marketplace_pricing);
 
         let metrics_stream: Arc<dyn ApiHandler> = Arc::new(ui_handlers::MetricsStreamHandler {
@@ -610,12 +613,14 @@ impl NGaugeStoqApi {
         });
         handlers.insert(metrics_stream.path().to_string(), metrics_stream);
 
-        let create_lease: Arc<dyn ApiHandler> = Arc::new(ui_handlers::CreateLeaseHandler {
-            state: app_state,
-        });
+        let create_lease: Arc<dyn ApiHandler> =
+            Arc::new(ui_handlers::CreateLeaseHandler { state: app_state });
         handlers.insert(create_lease.path().to_string(), create_lease);
 
-        info!("NGauge STOQ API handlers registered ({} endpoints)", handlers.len());
+        info!(
+            "NGauge STOQ API handlers registered ({} endpoints)",
+            handlers.len()
+        );
 
         Self { handlers, config }
     }
@@ -669,10 +674,9 @@ impl NGaugeStoqApi {
                 .map_err(|e| anyhow!("Invalid port '{}': {}", port_str, e))?;
             SocketAddr::V6(std::net::SocketAddrV6::new(addr, port, 0, 0))
         } else {
-            self.config
-                .bind_address
-                .parse()
-                .map_err(|e| anyhow!("Invalid bind address '{}': {}", self.config.bind_address, e))?
+            self.config.bind_address.parse().map_err(|e| {
+                anyhow!("Invalid bind address '{}': {}", self.config.bind_address, e)
+            })?
         };
 
         // Generate self-signed cert for QUIC
@@ -870,9 +874,7 @@ mod tests {
             id: "test-traffic-1".to_string(),
             service: "ngauge".to_string(),
             method: "traffic".to_string(),
-            payload: Bytes::from(
-                serde_json::to_vec(&req_body).expect("test: serialize request"),
-            ),
+            payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize request")),
             metadata: HashMap::new(),
         };
 
@@ -933,7 +935,6 @@ mod tests {
             state: state.clone(),
         };
         assert_eq!(swarm.path(), "ngauge/swarm");
-
     }
 
     #[test]

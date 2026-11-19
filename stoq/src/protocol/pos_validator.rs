@@ -432,7 +432,6 @@ pub struct ValidationStats {
     pub cache_size: usize,
 }
 
-
 /// Test-only helpers shared by the PoS test modules across this crate.
 #[cfg(test)]
 pub(crate) mod test_support {
@@ -493,8 +492,8 @@ pub(crate) mod test_support {
         let data = validator.serialize_token_for_signing(&token);
         // The verifier signs over SHA-256(data) — match that convention.
         let digest: [u8; 32] = Sha256::digest(&data).into();
-        let sk = falcon1024::SecretKey::from_bytes(sk.as_bytes())
-            .expect("test: reconstruct secret key");
+        let sk =
+            falcon1024::SecretKey::from_bytes(sk.as_bytes()).expect("test: reconstruct secret key");
         token.signature = falcon1024::detached_sign(&digest, &sk).as_bytes().to_vec();
         token
     }
@@ -563,8 +562,8 @@ mod tests {
         );
         let data = validator.serialize_token_for_signing(&token);
         let digest: [u8; 32] = Sha256::digest(&data).into();
-        let sk = falcon1024::SecretKey::from_bytes(sk.as_bytes())
-            .expect("test: reconstruct secret key");
+        let sk =
+            falcon1024::SecretKey::from_bytes(sk.as_bytes()).expect("test: reconstruct secret key");
         token.signature = falcon1024::detached_sign(&digest, &sk).as_bytes().to_vec();
 
         let result = validator.validate_token(&token).expect("test: validation");

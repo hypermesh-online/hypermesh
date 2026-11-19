@@ -189,7 +189,10 @@ impl Domain {
             });
         }
 
-        let root = parts.last().expect("parts is non-empty after length check").to_string();
+        let root = parts
+            .last()
+            .expect("parts is non-empty after length check")
+            .to_string();
         let subdomains: Vec<String> = parts[..parts.len() - 1]
             .iter()
             .map(|s| s.to_string())

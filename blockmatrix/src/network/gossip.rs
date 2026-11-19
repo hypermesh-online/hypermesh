@@ -92,11 +92,7 @@ impl GossipState {
     }
 
     /// Update the local node's entry (increments version).
-    pub fn update_local(
-        &mut self,
-        coordinate: MatrixCoordinate,
-        available_assets: Vec<String>,
-    ) {
+    pub fn update_local(&mut self, coordinate: MatrixCoordinate, available_assets: Vec<String>) {
         self.local_version += 1;
 
         if let Some(entry) = self.entries.get_mut(&self.local_node_id) {
@@ -227,11 +223,7 @@ impl GossipProtocol {
     }
 
     /// Update local state (coordinate and assets).
-    pub async fn update_local(
-        &self,
-        coordinate: MatrixCoordinate,
-        available_assets: Vec<String>,
-    ) {
+    pub async fn update_local(&self, coordinate: MatrixCoordinate, available_assets: Vec<String>) {
         self.state
             .write()
             .await
@@ -316,7 +308,10 @@ mod tests {
         assert_eq!(state.entries.len(), 1);
         assert_eq!(state.local_version, 1);
 
-        let entry = state.entries.get("node1").expect("test: entry should exist");
+        let entry = state
+            .entries
+            .get("node1")
+            .expect("test: entry should exist");
         assert_eq!(entry.stoq_port, 9292);
     }
 

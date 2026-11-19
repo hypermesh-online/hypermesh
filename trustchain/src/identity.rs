@@ -21,7 +21,9 @@ use hkdf::Hkdf;
 use hypermesh_lib::{NodeEncryptor, NodeSigner};
 use pqcrypto_falcon::falcon1024;
 use pqcrypto_kyber::kyber1024;
-use pqcrypto_traits::kem::{Ciphertext as KemCiphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret};
+use pqcrypto_traits::kem::{
+    Ciphertext as KemCiphertext, PublicKey as KemPublicKey, SecretKey as KemSecretKey, SharedSecret,
+};
 use pqcrypto_traits::sign::{DetachedSignature, PublicKey, SecretKey};
 use serde::{Deserialize, Serialize};
 use sha2::Sha512;
@@ -105,7 +107,9 @@ impl FalconIdentity {
             }
 
             // Load or generate Kyber keys (upgrade path for existing nodes)
-            let (kyber_pk_bytes, kyber_sk_bytes) = if kyber_pk_path.exists() && kyber_sk_path.exists() {
+            let (kyber_pk_bytes, kyber_sk_bytes) = if kyber_pk_path.exists()
+                && kyber_sk_path.exists()
+            {
                 let kpk = std::fs::read(&kyber_pk_path)
                     .map_err(|e| anyhow!("Failed to read Kyber public key: {e}"))?;
                 let ksk = std::fs::read(&kyber_sk_path)
@@ -159,10 +163,7 @@ impl FalconIdentity {
                 .map_err(|e| anyhow!("Failed to write Kyber public key: {e}"))?;
             std::fs::write(&kyber_sk_path, &identity.kyber_secret_key)
                 .map_err(|e| anyhow!("Failed to write Kyber secret key: {e}"))?;
-            info!(
-                "Generated new dual-key identity at {}",
-                data_dir.display()
-            );
+            info!("Generated new dual-key identity at {}", data_dir.display());
             Ok(identity)
         }
     }
@@ -229,19 +230,15 @@ impl FalconIdentity {
             // Verify old_pubkey_hash matches BLAKE3 of current key
             let expected_hash = *blake3::hash(&current_key).as_bytes();
             if entry.old_pubkey_hash != expected_hash {
-                info!(
-                    "Rotation chain entry {i}: old_pubkey_hash mismatch"
-                );
+                info!("Rotation chain entry {i}: old_pubkey_hash mismatch");
                 return Ok(false);
             }
 
             let message = entry.rotation_message();
             let pk = falcon1024::PublicKey::from_bytes(&current_key)
                 .map_err(|e| anyhow!("Invalid FALCON public key at rotation {i}: {e}"))?;
-            let sig = falcon1024::DetachedSignature::from_bytes(
-                &entry.rotation_signature,
-            )
-            .map_err(|e| anyhow!("Invalid FALCON signature at rotation {i}: {e}"))?;
+            let sig = falcon1024::DetachedSignature::from_bytes(&entry.rotation_signature)
+                .map_err(|e| anyhow!("Invalid FALCON signature at rotation {i}: {e}"))?;
 
             if falcon1024::verify_detached_signature(&sig, &message, &pk).is_err() {
                 info!("Rotation chain entry {i}: signature verification failed");
@@ -280,9 +277,8 @@ impl KeyRotationEntry {
     ///
     /// Format: `old_pubkey_hash || new_pubkey || new_kyber_pubkey || block_index_le`
     pub fn rotation_message(&self) -> Vec<u8> {
-        let mut msg = Vec::with_capacity(
-            32 + self.new_pubkey.len() + self.new_kyber_pubkey.len() + 8,
-        );
+        let mut msg =
+            Vec::with_capacity(32 + self.new_pubkey.len() + self.new_kyber_pubkey.len() + 8);
         msg.extend_from_slice(&self.old_pubkey_hash);
         msg.extend_from_slice(&self.new_pubkey);
         msg.extend_from_slice(&self.new_kyber_pubkey);
@@ -440,7 +436,10 @@ mod tests {
             .expect("test: decapsulation");
 
         // Both sides must derive the same shared secret
-        assert_eq!(shared_secret_sender.as_bytes(), shared_secret_receiver.as_slice());
+        assert_eq!(
+            shared_secret_sender.as_bytes(),
+            shared_secret_receiver.as_slice()
+        );
     }
 
     #[test]
@@ -459,7 +458,10 @@ mod tests {
             .rotate_keys(42, KeyRotationReason::Scheduled)
             .expect("test: rotate_keys");
 
-        assert_eq!(entry.old_pubkey_hash, *blake3::hash(&id.public_key).as_bytes());
+        assert_eq!(
+            entry.old_pubkey_hash,
+            *blake3::hash(&id.public_key).as_bytes()
+        );
         assert_eq!(entry.new_pubkey, new_id.public_key);
         assert_eq!(entry.new_kyber_pubkey, new_id.kyber_public_key);
         assert_eq!(entry.block_index, 42);
@@ -484,8 +486,9 @@ mod tests {
         message.extend_from_slice(&entry.new_kyber_pubkey);
         message.extend_from_slice(&100u64.to_le_bytes());
 
-        let valid = FalconIdentity::verify_signature(&id.public_key, &message, &entry.rotation_signature)
-            .expect("test: verify_signature");
+        let valid =
+            FalconIdentity::verify_signature(&id.public_key, &message, &entry.rotation_signature)
+                .expect("test: verify_signature");
         assert!(valid, "Rotation signature should verify with old pubkey");
     }
 
@@ -514,11 +517,9 @@ mod tests {
             .rotate_keys(10, KeyRotationReason::Scheduled)
             .expect("test: rotate 3");
 
-        let valid = FalconIdentity::verify_rotation_chain(
-            &id0.public_key,
-            &[entry1, entry2, entry3],
-        )
-        .expect("test: verify_rotation_chain");
+        let valid =
+            FalconIdentity::verify_rotation_chain(&id0.public_key, &[entry1, entry2, entry3])
+                .expect("test: verify_rotation_chain");
         assert!(valid, "Three-rotation chain should verify");
     }
 
@@ -537,11 +538,8 @@ mod tests {
             *byte ^= 0xFF;
         }
 
-        let valid = FalconIdentity::verify_rotation_chain(
-            &id0.public_key,
-            &[entry1, entry2],
-        )
-        .expect("test: verify_rotation_chain");
+        let valid = FalconIdentity::verify_rotation_chain(&id0.public_key, &[entry1, entry2])
+            .expect("test: verify_rotation_chain");
         assert!(!valid, "Tampered chain should fail verification");
     }
 
@@ -556,11 +554,17 @@ mod tests {
     fn test_recovery_commitment_different_passphrase() {
         let c1 = compute_recovery_commitment("phrase-one", "node-abc123");
         let c2 = compute_recovery_commitment("phrase-two", "node-abc123");
-        assert_ne!(c1, c2, "Different passphrases should produce different commitments");
+        assert_ne!(
+            c1, c2,
+            "Different passphrases should produce different commitments"
+        );
 
         let c3 = compute_recovery_commitment("my-secret-phrase", "node-111");
         let c4 = compute_recovery_commitment("my-secret-phrase", "node-222");
-        assert_ne!(c3, c4, "Different node_ids should produce different commitments");
+        assert_ne!(
+            c3, c4,
+            "Different node_ids should produce different commitments"
+        );
     }
 
     #[test]

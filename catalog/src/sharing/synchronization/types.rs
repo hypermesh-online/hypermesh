@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use super::super::ConflictResolution;
-use crate::{PackageSpecMetadata, AssetRegistration};
+use crate::{AssetRegistration, PackageSpecMetadata};
 
 /// Synchronization strategy
 #[derive(Debug, Clone, Serialize, Deserialize)]

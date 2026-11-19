@@ -612,7 +612,9 @@ impl SignatureVerifier {
                 match pk_result {
                     Ok(pk) => match falcon1024::open(&signed_msg, &pk) {
                         Ok(_) => {
-                            info!("FALCON-1024 signature verified successfully via X.509 public key");
+                            info!(
+                                "FALCON-1024 signature verified successfully via X.509 public key"
+                            );
                             Ok(true)
                         }
                         Err(_) => {

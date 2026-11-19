@@ -105,10 +105,7 @@ impl CascadingRevocation {
             let revoked = self.revoked.read().await;
             if revoked.contains(serial_number) {
                 return Err(TrustChainError::InvalidRequest {
-                    reason: format!(
-                        "Certificate '{}' is already revoked",
-                        serial_number
-                    ),
+                    reason: format!("Certificate '{}' is already revoked", serial_number),
                 });
             }
         }
@@ -138,11 +135,7 @@ impl CascadingRevocation {
             let children = self.children.read().await;
             if let Some(child_set) = children.get(&current) {
                 for child in child_set {
-                    queue.push((
-                        child.clone(),
-                        current.clone(),
-                        depth + 1,
-                    ));
+                    queue.push((child.clone(), current.clone(), depth + 1));
                 }
             }
         }
@@ -223,11 +216,7 @@ mod tests {
             .expect("test: root in affected");
         assert_eq!(root_entry.depth, 0);
 
-        let child_entries: Vec<_> = result
-            .affected
-            .iter()
-            .filter(|e| e.depth == 1)
-            .collect();
+        let child_entries: Vec<_> = result.affected.iter().filter(|e| e.depth == 1).collect();
         assert_eq!(child_entries.len(), 2);
     }
 
@@ -307,10 +296,7 @@ mod tests {
             .await
             .expect("test: register");
 
-        assert_eq!(
-            cr.get_parent("child-a").await,
-            Some("parent".to_string())
-        );
+        assert_eq!(cr.get_parent("child-a").await, Some("parent".to_string()));
 
         let children = cr.get_children("parent").await;
         assert_eq!(children.len(), 2);

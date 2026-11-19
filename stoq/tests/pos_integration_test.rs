@@ -54,7 +54,6 @@ fn canonical_test_proof() -> StateProof {
     )
 }
 
-
 #[tokio::test]
 async fn test_anonymous_network_validation() -> Result<()> {
     let integration = StoqPosIntegration::new(Duration::from_secs(300));

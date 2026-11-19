@@ -21,8 +21,8 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, StateProof, NetworkScope, PrivacyMode, ProxyAddress,
-    ResourceLimits, ResourceUsage, StorageUsage,
+    AssetType, BaseSystemType, NetworkScope, PrivacyMode, ProxyAddress, ResourceLimits,
+    ResourceUsage, StateProof, StorageUsage,
 };
 
 use super::allocation::{
@@ -127,10 +127,7 @@ impl AssetAdapter for StorageAssetAdapter {
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         // Validate state proof first
-        if !self
-            .validate_state_proof(&request.state_proof)
-            .await?
-        {
+        if !self.validate_state_proof(&request.state_proof).await? {
             return Err(AssetError::StateProofValidationFailed {
                 reason: "Storage allocation state proof validation failed".to_string(),
             });
@@ -272,8 +269,7 @@ impl AssetAdapter for StorageAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                state_requirements:
-                    crate::assets::core::privacy::StateRequirements::default(),
+                state_requirements: crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],
@@ -411,13 +407,12 @@ impl AssetAdapter for StorageAssetAdapter {
 
         // Update encryption based on privacy level
         if privacy == PrivacyMode::PRIVATE && allocation.encryption_key_id.is_none() {
-            allocation.encryption_key_id = Some(
-                create_kyber_encryption_key()
-                    .await
-                    .map_err(|e| AssetError::AdapterError {
+            allocation.encryption_key_id =
+                Some(create_kyber_encryption_key().await.map_err(|e| {
+                    AssetError::AdapterError {
                         message: format!("Kyber key generation failed: {e}"),
-                    })?,
-            );
+                    }
+                })?);
             allocation.encryption_enabled = true;
         }
 

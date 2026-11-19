@@ -502,14 +502,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_sct_manager_creation() {
-        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+        let manager = SCTManager::new("test-log".to_string())
+            .await
+            .expect("test: async operation");
         assert_eq!(manager._log_id, "test-log");
         assert_ne!(manager.log_id_hash, [0u8; 32]);
     }
 
     #[tokio::test]
     async fn test_sct_generation() {
-        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+        let manager = SCTManager::new("test-log".to_string())
+            .await
+            .expect("test: async operation");
 
         let request = SCTRequest {
             certificate_der: b"test certificate".to_vec(),
@@ -518,7 +522,10 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+        let sct = manager
+            .generate_sct_from_request(&request)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(sct.version, 1);
         assert_eq!(sct.log_id, manager.log_id_hash);
@@ -527,7 +534,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_sct_verification() {
-        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+        let manager = SCTManager::new("test-log".to_string())
+            .await
+            .expect("test: async operation");
 
         let cert_data = b"test certificate for verification";
         let request = SCTRequest {
@@ -537,15 +546,23 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
-        let is_valid = manager.verify_sct(&sct, cert_data).await.expect("test: async operation");
+        let sct = manager
+            .generate_sct_from_request(&request)
+            .await
+            .expect("test: async operation");
+        let is_valid = manager
+            .verify_sct(&sct, cert_data)
+            .await
+            .expect("test: async operation");
 
         assert!(is_valid);
     }
 
     #[tokio::test]
     async fn test_sct_verification_invalid() {
-        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+        let manager = SCTManager::new("test-log".to_string())
+            .await
+            .expect("test: async operation");
 
         let cert_data = b"test certificate for verification";
         let request = SCTRequest {
@@ -555,18 +572,26 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+        let sct = manager
+            .generate_sct_from_request(&request)
+            .await
+            .expect("test: async operation");
 
         // Try to verify with different certificate data
         let wrong_cert_data = b"wrong certificate data";
-        let is_valid = manager.verify_sct(&sct, wrong_cert_data).await.expect("test: async operation");
+        let is_valid = manager
+            .verify_sct(&sct, wrong_cert_data)
+            .await
+            .expect("test: async operation");
 
         assert!(!is_valid);
     }
 
     #[tokio::test]
     async fn test_sct_serialization() {
-        let manager = SCTManager::new("test-log".to_string()).await.expect("test: async operation");
+        let manager = SCTManager::new("test-log".to_string())
+            .await
+            .expect("test: async operation");
 
         let request = SCTRequest {
             certificate_der: b"test certificate".to_vec(),
@@ -575,11 +600,16 @@ mod tests {
             extensions: vec![],
         };
 
-        let sct = manager.generate_sct_from_request(&request).await.expect("test: async operation");
+        let sct = manager
+            .generate_sct_from_request(&request)
+            .await
+            .expect("test: async operation");
 
         // Test extension serialization/parsing
-        let extension_data = SCTUtils::serialize_sct_extension(&[sct.clone()]).expect("test: expected success");
-        let parsed_scts = SCTUtils::parse_sct_extension(&extension_data).expect("test: expected success");
+        let extension_data =
+            SCTUtils::serialize_sct_extension(&[sct.clone()]).expect("test: expected success");
+        let parsed_scts =
+            SCTUtils::parse_sct_extension(&extension_data).expect("test: expected success");
 
         assert_eq!(parsed_scts.len(), 1);
         assert_eq!(parsed_scts[0].version, sct.version);

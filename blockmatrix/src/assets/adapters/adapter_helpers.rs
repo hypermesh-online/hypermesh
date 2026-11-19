@@ -12,7 +12,7 @@ use std::time::SystemTime;
 
 use crate::assets::core::privacy::{
     AccessConfig, AccessPermissions, AllocationConfig, AuthRequirements, ConcurrencyLimits,
-    StateRequirements, DurationConfig, RateLimits, ResourceAllocationConfig,
+    DurationConfig, RateLimits, ResourceAllocationConfig, StateRequirements,
 };
 use crate::assets::core::status::{AssetHealthStatus, AssetPerformanceMetrics};
 use crate::assets::core::{

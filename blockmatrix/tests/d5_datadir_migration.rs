@@ -25,8 +25,7 @@ use std::path::Path;
 const DEVICE_ID: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
 fn write(path: &Path, contents: &str) {
-    fs::create_dir_all(path.parent().expect("test: has parent"))
-        .expect("test: mkdir -p");
+    fs::create_dir_all(path.parent().expect("test: has parent")).expect("test: mkdir -p");
     fs::write(path, contents).expect("test: write file");
 }
 
@@ -37,9 +36,18 @@ fn read(path: &Path) -> String {
 /// Seed a pre-migration install: identity + chain + cert under the legacy key.
 fn seed_legacy(data_dir: &Path, legacy_key: &str) {
     let legacy = data_dir.join(legacy_key);
-    write(&legacy.join("identity").join("falcon_public.der"), "IDENTITY-BYTES");
-    write(&legacy.join("blockchain").join("metadata.json"), "{\"height\":7}");
-    write(&legacy.join("blockchain").join("blocks.dat"), "GENESIS..HEAD");
+    write(
+        &legacy.join("identity").join("falcon_public.der"),
+        "IDENTITY-BYTES",
+    );
+    write(
+        &legacy.join("blockchain").join("metadata.json"),
+        "{\"height\":7}",
+    );
+    write(
+        &legacy.join("blockchain").join("blocks.dat"),
+        "GENESIS..HEAD",
+    );
     write(&legacy.join("certificate.json"), "CERT-BYTES");
     write(&legacy.join("shards").join("shard0"), "SHARD-BYTES");
 }
@@ -66,8 +74,14 @@ fn d5_boot_with_legacy_datadir_adopts_and_preserves_state() {
 
     let new_dir = data_dir.join(&nid);
     // Chain state survives byte-for-byte under the new key.
-    assert_eq!(read(&new_dir.join("blockchain").join("blocks.dat")), "GENESIS..HEAD");
-    assert_eq!(read(&new_dir.join("blockchain").join("metadata.json")), "{\"height\":7}");
+    assert_eq!(
+        read(&new_dir.join("blockchain").join("blocks.dat")),
+        "GENESIS..HEAD"
+    );
+    assert_eq!(
+        read(&new_dir.join("blockchain").join("metadata.json")),
+        "{\"height\":7}"
+    );
     assert_eq!(read(&new_dir.join("certificate.json")), "CERT-BYTES");
     assert_eq!(read(&new_dir.join("shards").join("shard0")), "SHARD-BYTES");
     // The legacy coordinate dir is fully consumed.
@@ -96,7 +110,11 @@ fn d5_fresh_boot_uses_identity_layout_without_fabricating_legacy() {
     assert!(!data_dir.join(&nid).exists());
     assert!(!data_dir.join(&legacy_key).exists());
     // metadata gate is absent => main.rs takes the fresh_boot branch.
-    assert!(!data_dir.join(&nid).join("blockchain").join("metadata.json").exists());
+    assert!(!data_dir
+        .join(&nid)
+        .join("blockchain")
+        .join("metadata.json")
+        .exists());
 }
 
 #[test]
@@ -118,8 +136,15 @@ fn d5_adopt_is_idempotent_and_never_clobbers() {
     adopt_legacy_identity(data_dir, &legacy_key).expect("test: adopt identity 2");
     adopt_legacy_state_dir(data_dir, &legacy_key, &nid).expect("test: adopt state 2");
 
-    assert_eq!(read(&head), "ADVANCED-HEAD", "migrated state must not be clobbered");
-    assert_eq!(read(&identity_dir(data_dir).join("falcon_public.der")), "IDENTITY-BYTES");
+    assert_eq!(
+        read(&head),
+        "ADVANCED-HEAD",
+        "migrated state must not be clobbered"
+    );
+    assert_eq!(
+        read(&identity_dir(data_dir).join("falcon_public.der")),
+        "IDENTITY-BYTES"
+    );
 }
 
 #[test]
@@ -130,8 +155,17 @@ fn d5_partial_migration_does_not_overwrite_new_identity() {
     let data_dir = tmp.path();
     let legacy_key = node_id(&MatrixCoordinate::new(0, 0, 0).expect("test: coord"));
 
-    write(&identity_dir(data_dir).join("falcon_public.der"), "NEW-IDENTITY");
-    write(&data_dir.join(&legacy_key).join("identity").join("falcon_public.der"), "STALE");
+    write(
+        &identity_dir(data_dir).join("falcon_public.der"),
+        "NEW-IDENTITY",
+    );
+    write(
+        &data_dir
+            .join(&legacy_key)
+            .join("identity")
+            .join("falcon_public.der"),
+        "STALE",
+    );
 
     let id_dir = adopt_legacy_identity(data_dir, &legacy_key).expect("test: adopt identity");
     assert_eq!(read(&id_dir.join("falcon_public.der")), "NEW-IDENTITY");

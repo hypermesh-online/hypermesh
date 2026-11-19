@@ -42,14 +42,14 @@ pub use connection::{Connection, Endpoint, FrameBatch, MemoryPool, Stream};
 pub use falcon::{FalconTransport, FalconVariant};
 pub use manager::StoqTransport;
 pub use metrics::{IntervalMetrics, ProtocolMetrics, TransportMetrics, TransportSnapshot};
+pub use min_spec::{
+    max_concurrent_connections, validate_bandwidth_budget, validate_connection_budget,
+    ConnectionBudget, TransportMinSpec,
+};
 pub use multipath::{MultiPathConnection, MultiPathMetrics, PathInfo, PathPolicy, PathScheduler};
 pub use pos_extension_validator::StoqPosExtensionValidator;
 pub use reflector::{
     ReflectorBridge, ReflectorMessage, StoqBlockTransport, SyncProtocol, SyncProtocolConfig,
-};
-pub use min_spec::{
-    max_concurrent_connections, validate_bandwidth_budget, validate_connection_budget,
-    ConnectionBudget, TransportMinSpec,
 };
 pub use stats::{ConnectionPoolStats, PerformanceStats};
 
@@ -157,7 +157,9 @@ mod tests {
             ..Default::default()
         };
 
-        let transport = StoqTransport::new(config).await.expect("test: async operation");
+        let transport = StoqTransport::new(config)
+            .await
+            .expect("test: async operation");
 
         // Call cleanup - should not panic even with empty pools
         transport.cleanup_unhealthy_connections();

@@ -575,7 +575,10 @@ mod tests {
             auth_required: false,
         };
 
-        forwarder.install_rule(&proxy_addr, &rule).await.expect("test: async operation");
+        forwarder
+            .install_rule(&proxy_addr, &rule)
+            .await
+            .expect("test: async operation");
 
         let rules = forwarder.forwarding_rules.read().await;
         assert!(rules.contains_key(&proxy_addr));
@@ -602,7 +605,10 @@ mod tests {
             connections.insert("test-conn".to_string(), connection_info);
         }
 
-        let removed = forwarder.cleanup_idle_connections().await.expect("test: async operation");
+        let removed = forwarder
+            .cleanup_idle_connections()
+            .await
+            .expect("test: async operation");
         assert_eq!(removed, 1);
         assert_eq!(forwarder.get_active_connection_count().await, 0);
     }

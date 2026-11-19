@@ -51,7 +51,9 @@ mod tests {
             state_proof: match StateProof::generate_from_network("test-node").await {
                 Ok(p) => p,
                 Err(_) => {
-                    use crate::proof_of_state::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
+                    use crate::proof_of_state::proof::{
+                        SpaceProof, StakeProof, TimeProof, WorkProof,
+                    };
                     StateProof::new(
                         StakeProof::default(),
                         TimeProof::default(),

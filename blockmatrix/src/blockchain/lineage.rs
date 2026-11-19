@@ -116,11 +116,18 @@ impl std::fmt::Display for LineageBreak {
             Self::NotContentBound { position } => {
                 write!(f, "entry {position} proof is not bound to its asset_hash")
             }
-            Self::RootIsNotAssetGenesis { claimed_prev, claimed_seq } => write!(
+            Self::RootIsNotAssetGenesis {
+                claimed_prev,
+                claimed_seq,
+            } => write!(
                 f,
                 "lineage root is not an asset genesis (prev={claimed_prev:?}, seq={claimed_seq})"
             ),
-            Self::PrevPointerMismatch { position, claimed, expected } => write!(
+            Self::PrevPointerMismatch {
+                position,
+                claimed,
+                expected,
+            } => write!(
                 f,
                 "entry {position} names predecessor {claimed:?}, expected {expected}"
             ),
@@ -128,7 +135,11 @@ impl std::fmt::Display for LineageBreak {
                 f,
                 "entry {position} would need asset_seq u64::MAX + 1 — sequence overflow"
             ),
-            Self::SequenceGap { position, claimed, expected } => write!(
+            Self::SequenceGap {
+                position,
+                claimed,
+                expected,
+            } => write!(
                 f,
                 "entry {position} has asset_seq {claimed}, expected {expected}"
             ),

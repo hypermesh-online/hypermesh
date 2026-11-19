@@ -14,9 +14,7 @@ use hypermesh_lib::{MatrixPosition, NodeId, PrivacyMode};
 use serde::{Deserialize, Serialize};
 
 use crate::streaming::aggregator::RegionalAggregator;
-use crate::streaming::protocol::{
-    EconomicSnapshot, MetricsFrame, MetricsPayload,
-};
+use crate::streaming::protocol::{EconomicSnapshot, MetricsFrame, MetricsPayload};
 
 // ---------------------------------------------------------------------------
 // NetworkInsight
@@ -145,8 +143,7 @@ impl CollectiveIntelligence {
 
         // Track economic data separately.
         if let MetricsPayload::Economic(ref econ) = frame.payload {
-            self.economic_data
-                .insert(frame.source_node, econ.clone());
+            self.economic_data.insert(frame.source_node, econ.clone());
         }
 
         self.aggregator.ingest(frame);
@@ -292,9 +289,7 @@ impl CollectiveIntelligence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::streaming::protocol::{
-        CapacitySnapshot, CongestionSnapshot, MetricsPayload,
-    };
+    use crate::streaming::protocol::{CapacitySnapshot, CongestionSnapshot, MetricsPayload};
 
     fn test_node(name: &str) -> NodeId {
         NodeId::from_public_key(name.as_bytes())

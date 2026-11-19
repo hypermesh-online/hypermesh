@@ -12,9 +12,7 @@ use std::os::raw::c_char;
 ///
 /// `client` must be a valid pointer returned by `hypermesh_connect`.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_domain_list(
-    client: *mut HypermeshClientHandle,
-) -> *mut c_char {
+pub unsafe extern "C" fn hypermesh_domain_list(client: *mut HypermeshClientHandle) -> *mut c_char {
     let h = match borrow_handle(client) {
         Some(h) => h,
         None => return std::ptr::null_mut(),

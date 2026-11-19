@@ -377,11 +377,11 @@ pub struct StorageStats {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::block::{BlockAssetEntry, StoragePointer};
+    use super::*;
     use crate::assets::core::AssetRegistration;
-    use trustchain::proof_of_state::StateProof;
     use tempfile::TempDir;
+    use trustchain::proof_of_state::StateProof;
 
     fn test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
         let reg = AssetRegistration::genesis(coord);
@@ -424,7 +424,10 @@ mod tests {
         let block = Block::genesis(coord);
 
         // Store block
-        manager.store_block(&block).await.expect("test: block storage");
+        manager
+            .store_block(&block)
+            .await
+            .expect("test: block storage");
 
         // Retrieve block
         let loaded = manager.load_block(0).await.expect("test: async operation");
@@ -441,7 +444,10 @@ mod tests {
         // Add blocks beyond cache size
         for i in 0..5 {
             let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
-            manager.store_block(&block).await.expect("test: block storage");
+            manager
+                .store_block(&block)
+                .await
+                .expect("test: block storage");
         }
 
         // Check cache size
@@ -458,7 +464,10 @@ mod tests {
         // Add some blocks
         for i in 0..10 {
             let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
-            manager.store_block(&block).await.expect("test: block storage");
+            manager
+                .store_block(&block)
+                .await
+                .expect("test: block storage");
         }
 
         // Query range
@@ -468,7 +477,10 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.expect("test: async operation");
+        let results = manager
+            .query_blocks(query)
+            .await
+            .expect("test: async operation");
         assert_eq!(results.len(), 5);
         assert_eq!(results[0].index, 3);
         assert_eq!(results[4].index, 7);
@@ -483,7 +495,10 @@ mod tests {
         // Add blocks
         for i in 0..10 {
             let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
-            manager.store_block(&block).await.expect("test: block storage");
+            manager
+                .store_block(&block)
+                .await
+                .expect("test: block storage");
         }
 
         // Query with limit
@@ -492,7 +507,10 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.expect("test: async operation");
+        let results = manager
+            .query_blocks(query)
+            .await
+            .expect("test: async operation");
         assert_eq!(results.len(), 3);
     }
 
@@ -511,7 +529,10 @@ mod tests {
         assert_eq!(snapshot.head_hash, "head_hash_123");
 
         // Get latest snapshot
-        let latest = manager.get_latest_snapshot().await.expect("test: async operation");
+        let latest = manager
+            .get_latest_snapshot()
+            .await
+            .expect("test: async operation");
         assert_eq!(latest.height, snapshot.height);
     }
 
@@ -552,11 +573,17 @@ mod tests {
         // Add some blocks
         for i in 0..5 {
             let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
-            manager.store_block(&block).await.expect("test: block storage");
+            manager
+                .store_block(&block)
+                .await
+                .expect("test: block storage");
         }
 
         // Get stats
-        let stats = manager.get_storage_stats().await.expect("test: async operation");
+        let stats = manager
+            .get_storage_stats()
+            .await
+            .expect("test: async operation");
         assert_eq!(stats.total_blocks, 5);
         assert!(stats.total_size_bytes > 0);
         assert!(stats.cached_blocks <= 5);
@@ -571,7 +598,10 @@ mod tests {
         // Add blocks
         for i in 0..5 {
             let block = Block::new(i, vec![test_entry(coord)], format!("prev_{i}"));
-            manager.store_block(&block).await.expect("test: block storage");
+            manager
+                .store_block(&block)
+                .await
+                .expect("test: block storage");
         }
 
         // Query with descending sort
@@ -580,7 +610,10 @@ mod tests {
             ..Default::default()
         };
 
-        let results = manager.query_blocks(query).await.expect("test: async operation");
+        let results = manager
+            .query_blocks(query)
+            .await
+            .expect("test: async operation");
         assert!(results.len() >= 5);
         assert!(results[0].index > results[1].index);
     }

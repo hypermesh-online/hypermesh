@@ -455,13 +455,21 @@ mod tests {
 
     #[test]
     fn validate_matrix_position_accepts_finite() {
-        let pos = MatrixPosition { x: 1.0, y: -2.0, z: 0.0 };
+        let pos = MatrixPosition {
+            x: 1.0,
+            y: -2.0,
+            z: 0.0,
+        };
         assert!(super::validate_matrix_position(&pos).is_ok());
     }
 
     #[test]
     fn validate_matrix_position_rejects_nan() {
-        let pos = MatrixPosition { x: f64::NAN, y: 0.0, z: 0.0 };
+        let pos = MatrixPosition {
+            x: f64::NAN,
+            y: 0.0,
+            z: 0.0,
+        };
         let err = super::validate_matrix_position(&pos).unwrap_err();
         match err {
             super::ValidationError::NonFiniteCoordinate { axis, .. } => {
@@ -473,7 +481,11 @@ mod tests {
 
     #[test]
     fn validate_matrix_position_rejects_infinity_on_z() {
-        let pos = MatrixPosition { x: 0.0, y: 0.0, z: f64::INFINITY };
+        let pos = MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: f64::INFINITY,
+        };
         let err = super::validate_matrix_position(&pos).unwrap_err();
         match err {
             super::ValidationError::NonFiniteCoordinate { axis, .. } => {

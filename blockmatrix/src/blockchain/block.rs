@@ -261,7 +261,9 @@ impl BlockAssetEntry {
         &mut self,
         signer: &(dyn hypermesh_lib::NodeSigner + Send + Sync),
     ) -> Result<(), String> {
-        let proof_bytes = self.state_proof.to_bytes()
+        let proof_bytes = self
+            .state_proof
+            .to_bytes()
             .map_err(|e| format!("failed to serialize state_proof for signing: {e}"))?;
 
         let storage_bytes = bincode::serialize(&self.storage_pointer)
@@ -312,12 +314,12 @@ impl BlockAssetEntry {
             .ok_or_else(|| "entry has no signed_proof envelope".to_string())?;
 
         // (1) The envelope must wrap the proof this entry actually carries.
-        let expected = self.state_proof.to_bytes()
+        let expected = self
+            .state_proof
+            .to_bytes()
             .map_err(|e| format!("failed to serialize state_proof: {e}"))?;
         if wire.proof_bytes != expected {
-            return Err(
-                "signed_proof envelope does not wrap this entry's state_proof".to_string(),
-            );
+            return Err("signed_proof envelope does not wrap this entry's state_proof".to_string());
         }
 
         let storage_bytes = bincode::serialize(&self.storage_pointer)
@@ -396,11 +398,7 @@ pub struct Block {
 
 impl Block {
     /// Create a new block from asset entries.
-    pub fn new(
-        index: u64,
-        entries: Vec<BlockAssetEntry>,
-        previous_hash: String,
-    ) -> Self {
+    pub fn new(index: u64, entries: Vec<BlockAssetEntry>, previous_hash: String) -> Self {
         assert!(!entries.is_empty(), "Block must contain at least one entry");
 
         let mut block = Block {
@@ -439,10 +437,7 @@ impl Block {
     /// historical node IDs into one. The device fingerprint (from the OS) is
     /// folded into all four proofs; the genesis label is
     /// `genesis_<device_node_id>`.
-    pub fn genesis_with_identity(
-        node_coordinate: MatrixCoordinate,
-        device_node_id: &str,
-    ) -> Self {
+    pub fn genesis_with_identity(node_coordinate: MatrixCoordinate, device_node_id: &str) -> Self {
         Self::genesis_with_identity_at(node_coordinate, device_node_id, GenesisEpoch::now())
     }
 
@@ -492,8 +487,7 @@ impl Block {
         // B2: the registration is stamped with the genesis epoch, not the live
         // clock — its metadata feeds `content_hash` and its `creation_timestamp`
         // feeds `to_string()`, so both reach the block hash.
-        let genesis_reg =
-            AssetRegistration::genesis_at(node_coordinate, epoch.as_system_time());
+        let genesis_reg = AssetRegistration::genesis_at(node_coordinate, epoch.as_system_time());
         let content_hash = {
             let serialized = genesis_reg.to_string();
             *blake3::hash(serialized.as_bytes()).as_bytes()
@@ -762,8 +756,7 @@ mod tests {
                         .expect("test: serialize storage pointer"),
                 );
                 h.update(
-                    &bincode::serialize(&entry.registration)
-                        .expect("test: serialize registration"),
+                    &bincode::serialize(&entry.registration).expect("test: serialize registration"),
                 );
                 *h.finalize().as_bytes()
             };
@@ -805,9 +798,8 @@ mod tests {
         // (2b) C1: registration IS now bound into the block hash — tampering
         //      with registration metadata MUST change the block hash.
         let mut block_tampered_reg = block.clone();
-        block_tampered_reg.entries[0].registration = AssetRegistration::genesis(
-            MatrixCoordinate::new(9, 9, 9).expect("test: valid coord"),
-        );
+        block_tampered_reg.entries[0].registration =
+            AssetRegistration::genesis(MatrixCoordinate::new(9, 9, 9).expect("test: valid coord"));
         assert_ne!(
             block.calculate_hash(),
             block_tampered_reg.calculate_hash(),
@@ -896,11 +888,7 @@ mod tests {
     #[test]
     fn test_block_size() {
         let entries: Vec<BlockAssetEntry> = (0..10)
-            .map(|i| {
-                test_genesis_entry(
-                    MatrixCoordinate::new(i, i, i).expect("test: valid coord"),
-                )
-            })
+            .map(|i| test_genesis_entry(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
             .collect();
 
         let block = Block::new(100, entries, "x".repeat(64));
@@ -958,11 +946,7 @@ mod tests {
     #[test]
     fn test_multiple_entries() {
         let entries: Vec<BlockAssetEntry> = (0..5)
-            .map(|i| {
-                test_genesis_entry(
-                    MatrixCoordinate::new(i, i, i).expect("test: valid coord"),
-                )
-            })
+            .map(|i| test_genesis_entry(MatrixCoordinate::new(i, i, i).expect("test: valid coord")))
             .collect();
 
         let block = Block::new(1, entries, "prev".to_string());

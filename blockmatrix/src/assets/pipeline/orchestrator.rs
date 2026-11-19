@@ -9,8 +9,8 @@
 use crate::assets::pipeline::{
     AesKey, Asset, CompressionConfig, CompressionStats, Compressor, DistributedAsset,
     DistributionConfig, DistributionStats, EncryptedData, EncryptionConfig, EncryptionStats,
-    Encryptor, KyberEncryptionResult, PipelineResult, Shard, Sharder,
-    ShardingConfig, ShardingStats,
+    Encryptor, KyberEncryptionResult, PipelineResult, Shard, Sharder, ShardingConfig,
+    ShardingStats,
 };
 use serde::{Deserialize, Serialize};
 
@@ -258,10 +258,7 @@ impl AssetPipeline {
         // Stage 2: Hash — H = BLAKE3(Brotli(A))
         // Content address of the compressed asset. This is the blockchain identifier.
         let content_hash: [u8; 32] = *blake3::hash(&compressed_data).as_bytes();
-        tracing::info!(
-            "Content hash: {}",
-            hex::encode(&content_hash[..8])
-        );
+        tracing::info!("Content hash: {}", hex::encode(&content_hash[..8]));
 
         // Stage 3: Proof — P = PoS(A)
         // Generate a state proof for this asset. The proof attests WHO/WHEN/WHERE/WHAT.
@@ -278,10 +275,7 @@ impl AssetPipeline {
         // Stage 4: Proof hash — PH = BLAKE3(P(A))
         // Content address of the proof itself.
         let proof_hash: [u8; 32] = *blake3::hash(&proof_data).as_bytes();
-        tracing::info!(
-            "Proof hash: {}",
-            hex::encode(&proof_hash[..8])
-        );
+        tracing::info!("Proof hash: {}", hex::encode(&proof_hash[..8]));
 
         // Stage 5: Encrypt (whole blob)
         // Encrypt the entire compressed blob, NOT per-shard.
@@ -328,12 +322,10 @@ impl AssetPipeline {
         // size warrants different parameters, we use adaptive RS (R14).
         let (shards, sharding_stats) = if self.config.stages_enabled.sharding {
             tracing::debug!("Stage 6: Shard");
-            let adaptive_config =
-                ShardingConfig::adaptive_for_size(original_size as u64);
+            let adaptive_config = ShardingConfig::adaptive_for_size(original_size as u64);
             let use_adaptive = self.config.sharding.data_shards
                 == ShardingConfig::default().data_shards
-                && self.config.sharding.parity_shards
-                    == ShardingConfig::default().parity_shards;
+                && self.config.sharding.parity_shards == ShardingConfig::default().parity_shards;
 
             if use_adaptive
                 && (adaptive_config.data_shards != self.config.sharding.data_shards
@@ -445,7 +437,11 @@ impl AssetPipeline {
             // config -- partial shard sets (missing parity) should use
             // the existing sharder which handles reconstruction with fewer shards.
             let total = processed.shards.len();
-            let data_count = processed.shards.iter().filter(|s| !s.metadata.is_parity).count();
+            let data_count = processed
+                .shards
+                .iter()
+                .filter(|s| !s.metadata.is_parity)
+                .count();
             let parity_count = total - data_count;
             let sharder = if parity_count > 0
                 && (data_count != self.config.sharding.data_shards
@@ -501,7 +497,8 @@ impl AssetPipeline {
                 }
                 DecryptionKey::KyberSegmented { .. } => {
                     return Err(crate::assets::pipeline::PipelineError::InvalidData(
-                        "KyberSegmented assets must use StreamingAssetPipeline for reconstruction".into(),
+                        "KyberSegmented assets must use StreamingAssetPipeline for reconstruction"
+                            .into(),
                     ));
                 }
             }
@@ -549,7 +546,10 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: async operation");
 
         // Verify processing
         assert_eq!(processed.asset_id, "test-asset-1");
@@ -562,7 +562,10 @@ mod tests {
         assert!(processed.stats.total_throughput_mbps > 0.0);
 
         // Reconstruct and verify
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
+        let reconstructed = pipeline
+            .reconstruct_asset(&processed)
+            .await
+            .expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 
@@ -584,7 +587,10 @@ mod tests {
             },
         };
 
-        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: async operation");
 
         // Verify throughput target (should be > 100 MB/s)
         assert!(
@@ -594,7 +600,10 @@ mod tests {
         );
 
         // Reconstruct and verify
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
+        let reconstructed = pipeline
+            .reconstruct_asset(&processed)
+            .await
+            .expect("test: async operation");
         assert_eq!(reconstructed, data);
     }
 
@@ -625,10 +634,16 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: async operation");
 
         // Should still work but with minimal processing
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
+        let reconstructed = pipeline
+            .reconstruct_asset(&processed)
+            .await
+            .expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 
@@ -649,7 +664,10 @@ mod tests {
             },
         };
 
-        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: async operation");
 
         // Verify all stats are populated
         assert_eq!(processed.stats.original_size, 100000);
@@ -695,13 +713,19 @@ mod tests {
         };
 
         let original_data = asset.data.clone();
-        let processed = pipeline.process_asset(asset).await.expect("test: async operation");
+        let processed = pipeline
+            .process_asset(asset)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(processed.stats.sharding.data_shards, 6);
         assert_eq!(processed.stats.sharding.parity_shards, 2);
         assert_eq!(processed.shards.len(), 8);
 
-        let reconstructed = pipeline.reconstruct_asset(&processed).await.expect("test: async operation");
+        let reconstructed = pipeline
+            .reconstruct_asset(&processed)
+            .await
+            .expect("test: async operation");
         assert_eq!(reconstructed, original_data);
     }
 
@@ -776,7 +800,10 @@ mod tests {
             "cleartext (Public) and encrypted (Private) shards must differ"
         );
         // Private produced a real Kyber key to custody; Public did not encrypt.
-        assert!(matches!(private.decryption_key, DecryptionKey::Kyber { .. }));
+        assert!(matches!(
+            private.decryption_key,
+            DecryptionKey::Kyber { .. }
+        ));
 
         // The cleartext fetch path reconstructs with encryption disabled and
         // NO key material — the defining property of a Public asset.
@@ -806,7 +833,10 @@ mod tests {
             .await
             .expect("test: private pipeline");
 
-        assert!(matches!(processed.decryption_key, DecryptionKey::Kyber { .. }));
+        assert!(matches!(
+            processed.decryption_key,
+            DecryptionKey::Kyber { .. }
+        ));
 
         let reconstructed = pipeline
             .reconstruct_asset(&processed)

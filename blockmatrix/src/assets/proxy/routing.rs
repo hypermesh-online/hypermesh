@@ -643,7 +643,10 @@ mod tests {
         let router = create_test_router().await;
         let node_info = create_test_node_info("test-node-1", true);
 
-        router.add_proxy_node(&node_info).await.expect("test: async operation");
+        router
+            .add_proxy_node(&node_info)
+            .await
+            .expect("test: async operation");
 
         let registry = router.node_registry.read().await;
         // add_proxy_node stores with hex-encoded node_id bytes

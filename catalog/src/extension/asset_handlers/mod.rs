@@ -19,8 +19,8 @@ pub use virtual_machine::VirtualMachineHandler;
 
 pub(crate) use async_trait::async_trait;
 pub(crate) use blockmatrix::extensions::{
-    AssetCreationSpec, AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery,
-    AssetUpdate, DeploymentResult, ExecutionResult, ExtensionError, ExtensionResult,
+    AssetCreationSpec, AssetExtensionHandler, AssetOperation, AssetQuery, AssetUpdate,
+    DeploymentResult, ExecutionResult, ExtensionAssetRecord, ExtensionError, ExtensionResult,
     OperationResult, ResourceUsageReport,
 };
 pub(crate) use std::collections::HashMap;

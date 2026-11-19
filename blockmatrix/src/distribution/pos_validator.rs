@@ -353,10 +353,15 @@ mod tests {
         let state_proof = MockStateAuthenticator::new(true);
 
         // Test PrivateNetwork asset
-        let eligible =
-            get_eligible_nodes("test-asset", "PrivateNetwork", &shards, &nodes, &state_proof)
-                .await
-                .expect("test: expected success");
+        let eligible = get_eligible_nodes(
+            "test-asset",
+            "PrivateNetwork",
+            &shards,
+            &nodes,
+            &state_proof,
+        )
+        .await
+        .expect("test: expected success");
 
         // Only node1 should be eligible (PrivateNetwork)
         assert_eq!(eligible.len(), 1);

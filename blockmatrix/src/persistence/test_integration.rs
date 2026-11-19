@@ -18,15 +18,22 @@ mod tests {
         // 1. Test Matrix State Persistence
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let mut state = matrix_state::MatrixState::new(coord);
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"));
+        state.add_neighbor(
+            "node1".to_string(),
+            MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"),
+        );
 
         let serializer = matrix_state::MatrixStateSerializer::new(
             matrix_state::SerializationFormat::Bincode,
             true,
         );
 
-        let serialized = serializer.serialize(&state).expect("test: expected success");
-        let deserialized = serializer.deserialize(&serialized).expect("test: expected success");
+        let serialized = serializer
+            .serialize(&state)
+            .expect("test: expected success");
+        let deserialized = serializer
+            .deserialize(&serialized)
+            .expect("test: expected success");
         assert_eq!(deserialized.coordinate, state.coordinate);
         assert_eq!(deserialized.neighbors.len(), 1);
         println!("✅ Matrix state persistence: PASSED");
@@ -40,7 +47,10 @@ mod tests {
         .expect("test: expected success");
 
         let genesis = Block::genesis(coord);
-        storage.write_block(&genesis).await.expect("test: async operation");
+        storage
+            .write_block(&genesis)
+            .await
+            .expect("test: async operation");
 
         let loaded = storage
             .read_block(blockchain_storage::BlockQuery::ByIndex(0))
@@ -62,7 +72,10 @@ mod tests {
             crate::matrix::geospatial::topology::TopologyNode::new("node1".to_string(), coord);
         topology.add_node(node);
 
-        let backup_path = backup_handler.create_full_backup(&topology).await.expect("test: async operation");
+        let backup_path = backup_handler
+            .create_full_backup(&topology)
+            .await
+            .expect("test: async operation");
         assert!(backup_path.exists());
         println!("✅ Topology backup: PASSED");
 
@@ -96,7 +109,10 @@ mod tests {
         let mut recovery_mgr =
             recovery::RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        let report = recovery_mgr.recover_all().await.expect("test: async operation");
+        let report = recovery_mgr
+            .recover_all()
+            .await
+            .expect("test: async operation");
         assert!(
             report.status == recovery::RecoveryStatus::Completed
                 || report.status == recovery::RecoveryStatus::Partial
@@ -115,14 +131,23 @@ mod tests {
             .expect("test: expected success");
 
         // Save matrix state
-        persistence_mgr.save_matrix_state(&state).await.expect("test: async operation");
+        persistence_mgr
+            .save_matrix_state(&state)
+            .await
+            .expect("test: async operation");
 
         // Save block
         let block = Block::genesis(coord);
-        persistence_mgr.save_block(&block).await.expect("test: async operation");
+        persistence_mgr
+            .save_block(&block)
+            .await
+            .expect("test: async operation");
 
         // Create snapshot
-        let snapshot = persistence_mgr.create_snapshot().await.expect("test: async operation");
+        let snapshot = persistence_mgr
+            .create_snapshot()
+            .await
+            .expect("test: async operation");
         assert!(!snapshot.is_empty());
 
         // Get stats
@@ -132,7 +157,10 @@ mod tests {
         println!("✅ Persistence manager: PASSED");
 
         // Shutdown
-        persistence_mgr.shutdown().await.expect("test: async operation");
+        persistence_mgr
+            .shutdown()
+            .await
+            .expect("test: async operation");
 
         println!("\n🎉 ALL PERSISTENCE TESTS PASSED!");
     }

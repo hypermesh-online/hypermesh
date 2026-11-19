@@ -97,11 +97,7 @@ impl HyperMeshExtension for CatalogPlugin {
                 ExtensionCapability::TransportAccess,
                 ExtensionCapability::FileSystemAccess,
             ]),
-            provided_assets: vec![
-                AssetType::Blockchain,
-                AssetType::Container,
-                AssetType::Dns,
-            ],
+            provided_assets: vec![AssetType::Blockchain, AssetType::Container, AssetType::Dns],
             certificate_fingerprint: Some("SHA256:catalog_cert_fingerprint".to_string()),
             config_schema: Some(serde_json::json!({
                 "type": "object",
@@ -281,11 +277,7 @@ pub extern "C" fn hypermesh_extension_metadata() -> *const u8 {
             ExtensionCapability::VMExecution,
             ExtensionCapability::NetworkAccess,
         ]),
-        provided_assets: vec![
-            AssetType::Blockchain,
-            AssetType::Container,
-            AssetType::Dns,
-        ],
+        provided_assets: vec![AssetType::Blockchain, AssetType::Container, AssetType::Dns],
         certificate_fingerprint: Some("SHA256:catalog_cert_fingerprint".to_string()),
         config_schema: None,
     };

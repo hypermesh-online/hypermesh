@@ -319,10 +319,8 @@ mod tests {
 
     #[test]
     fn generate_domain_cert_different_domains_produce_different_keys() {
-        let (_, key1) =
-            generate_domain_cert("a.hypermesh.online").expect("test: generate cert a");
-        let (_, key2) =
-            generate_domain_cert("b.hypermesh.online").expect("test: generate cert b");
+        let (_, key1) = generate_domain_cert("a.hypermesh.online").expect("test: generate cert a");
+        let (_, key2) = generate_domain_cert("b.hypermesh.online").expect("test: generate cert b");
         // Different key pairs should produce different DER encodings.
         assert_ne!(key1, key2);
     }
@@ -336,6 +334,9 @@ mod tests {
         let cert = CertificateDer::from(cert_der);
         let key = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(key_der));
         let config = TlsProvider::build_server_config(vec![cert], key);
-        assert!(config.is_ok(), "domain cert should build a valid server config");
+        assert!(
+            config.is_ok(),
+            "domain cert should build a valid server config"
+        );
     }
 }

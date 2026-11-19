@@ -61,10 +61,7 @@ fn privacy_tier(mode: PrivacyMode) -> &'static str {
 /// (cold start) fall back to the peer's announced matrix coordinate. Rounding
 /// the continuous proximity position to an integer cell cannot fail for these
 /// magnitudes, so the announced-coordinate path is the only real fallback.
-fn peer_coordinate(
-    locality: &ngauge::LocalityProvider,
-    peer: &NetworkNode,
-) -> MatrixCoordinate {
+fn peer_coordinate(locality: &ngauge::LocalityProvider, peer: &NetworkNode) -> MatrixCoordinate {
     match locality.coordinate_for(&peer.node_id) {
         Some(pos) => MatrixCoordinate::new(
             pos.x.round() as i64,
@@ -147,7 +144,9 @@ mod tests {
     fn peer(node_id: &str, x: i64, y: i64, z: i64) -> NetworkNode {
         NetworkNode {
             coordinate: MatrixCoordinate::new(x, y, z).expect("test: valid coord"),
-            address: "[::1]:9292".parse::<SocketAddr>().expect("test: valid addr"),
+            address: "[::1]:9292"
+                .parse::<SocketAddr>()
+                .expect("test: valid addr"),
             node_id: node_id.to_string(),
             privacy_mode: PrivacyMode::PUBLIC,
             // No live connection → proximity is unmeasured → announced
@@ -174,8 +173,10 @@ mod tests {
 
         assert_eq!(placements.len(), 2, "one placement per shard");
 
-        let real: std::collections::HashSet<(i64, i64, i64)> =
-            peers.iter().map(|p| (p.coordinate.x, p.coordinate.y, p.coordinate.z)).collect();
+        let real: std::collections::HashSet<(i64, i64, i64)> = peers
+            .iter()
+            .map(|p| (p.coordinate.x, p.coordinate.y, p.coordinate.z))
+            .collect();
         for pl in &placements {
             let pos = (pl.position.x, pl.position.y, pl.position.z);
             assert!(

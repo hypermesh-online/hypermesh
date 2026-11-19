@@ -16,8 +16,8 @@ use crate::assets::pipeline::{
     key_derivation::derive_master_key,
     orchestrator::DecryptionKey,
     segment::{
-        AssetManifest, SegmentIndexEntry, FLAG_INDEX_INLINED, FLAG_SEGMENTED,
-        MAX_INLINE_SEGMENTS, segment_count, segment_size_for_asset,
+        segment_count, segment_size_for_asset, AssetManifest, SegmentIndexEntry,
+        FLAG_INDEX_INLINED, FLAG_SEGMENTED, MAX_INLINE_SEGMENTS,
     },
     sharding::{Shard, Sharder, ShardingConfig},
     PipelineError, PipelineInputMetadata, PipelineResult,
@@ -122,10 +122,9 @@ impl StreamingAssetPipeline {
 
         // Determine effective compression algorithm
         let effective_algo = match self.config.compression {
-            CompressionAlgorithm::Auto => {
-                self.compressor
-                    .select_algorithm(&self.config.content_type, data.len())
-            }
+            CompressionAlgorithm::Auto => self
+                .compressor
+                .select_algorithm(&self.config.content_type, data.len()),
             algo => algo,
         };
 
@@ -133,13 +132,8 @@ impl StreamingAssetPipeline {
         let mut shard_sets = Vec::with_capacity(seg_count as usize);
 
         for i in 0..seg_count {
-            let (segment_entries, segment_shards) = self.process_single_segment(
-                data,
-                i,
-                seg_size,
-                effective_algo,
-                &master_key,
-            )?;
+            let (segment_entries, segment_shards) =
+                self.process_single_segment(data, i, seg_size, effective_algo, &master_key)?;
             segment_index_entries.push(segment_entries);
             shard_sets.push(segment_shards);
         }
@@ -211,8 +205,13 @@ impl StreamingAssetPipeline {
         let mut output = Vec::with_capacity(manifest.original_size as usize);
 
         for (i, shards) in segment_shards.iter().enumerate() {
-            let segment_data =
-                self.reconstruct_single_segment(shards, &master_key, i as u32, manifest, decompress_algo)?;
+            let segment_data = self.reconstruct_single_segment(
+                shards,
+                &master_key,
+                i as u32,
+                manifest,
+                decompress_algo,
+            )?;
             output.extend_from_slice(&segment_data);
         }
 
@@ -304,10 +303,9 @@ impl StreamingAssetPipeline {
 
         // Determine effective compression algorithm
         let effective_algo = match self.config.compression {
-            CompressionAlgorithm::Auto => {
-                self.compressor
-                    .select_algorithm(&self.config.content_type, total_size as usize)
-            }
+            CompressionAlgorithm::Auto => self
+                .compressor
+                .select_algorithm(&self.config.content_type, total_size as usize),
             algo => algo,
         };
 
@@ -323,23 +321,16 @@ impl StreamingAssetPipeline {
             };
 
             let mut segment_buf = vec![0u8; expected_len];
-            reader
-                .read_exact(&mut segment_buf)
-                .await
-                .map_err(|e| {
-                    PipelineError::InvalidData(format!("Failed to read segment {}: {}", i, e))
-                })?;
+            reader.read_exact(&mut segment_buf).await.map_err(|e| {
+                PipelineError::InvalidData(format!("Failed to read segment {}: {}", i, e))
+            })?;
 
             // Update incremental hash
             hasher.update(&segment_buf);
 
             // Process this segment: compress -> encrypt -> shard
-            let (entry, shard_set) = self.process_segment_buf(
-                &segment_buf,
-                i,
-                effective_algo,
-                &master_key,
-            )?;
+            let (entry, shard_set) =
+                self.process_segment_buf(&segment_buf, i, effective_algo, &master_key)?;
             segment_index_entries.push(entry);
             shard_sets.push(shard_set);
             // segment_buf dropped here -- memory freed before next segment
@@ -438,9 +429,10 @@ impl StreamingAssetPipeline {
             // decompressed dropped here -- memory freed
         }
 
-        writer.flush().await.map_err(|e| {
-            PipelineError::InvalidData(format!("Flush failed: {}", e))
-        })?;
+        writer
+            .flush()
+            .await
+            .map_err(|e| PipelineError::InvalidData(format!("Flush failed: {}", e)))?;
 
         // Verify content hash
         let hash = *hasher.finalize().as_bytes();
@@ -580,9 +572,9 @@ impl StreamingAssetPipeline {
         let sharder = Sharder::new(shard_config)?;
         let encrypted = sharder.reconstruct(shards)?;
 
-        let compressed =
-            self.encryptor
-                .decrypt_segment(&encrypted, master_key, segment_index)?;
+        let compressed = self
+            .encryptor
+            .decrypt_segment(&encrypted, master_key, segment_index)?;
 
         match decompress_algo {
             CompressionAlgorithm::None => Ok(compressed),
@@ -864,8 +856,7 @@ mod tests {
             .expect("test: stream process");
 
         // Reconstruct from streaming result
-        let all_shards: Vec<Vec<Shard>> =
-            shards_stream.into_iter().map(|s| s.shards).collect();
+        let all_shards: Vec<Vec<Shard>> = shards_stream.into_iter().map(|s| s.shards).collect();
         let reconstructed = pipeline
             .reconstruct_segmented(&manifest_stream, &key_stream, &all_shards)
             .expect("test: reconstruct");
@@ -892,8 +883,7 @@ mod tests {
             .process_segmented(&data, &test_metadata())
             .expect("test: process");
 
-        let all_shards: Vec<Vec<Shard>> =
-            shard_sets.into_iter().map(|s| s.shards).collect();
+        let all_shards: Vec<Vec<Shard>> = shard_sets.into_iter().map(|s| s.shards).collect();
 
         // Reconstruct to writer
         let mut output = Vec::new();
@@ -928,8 +918,7 @@ mod tests {
 
         assert_eq!(manifest.segment_count, 10);
 
-        let all_shards: Vec<Vec<Shard>> =
-            shard_sets.into_iter().map(|s| s.shards).collect();
+        let all_shards: Vec<Vec<Shard>> = shard_sets.into_iter().map(|s| s.shards).collect();
         let mut output = Vec::new();
         pipeline
             .reconstruct_to_writer(&manifest, &key, &all_shards, &mut output)

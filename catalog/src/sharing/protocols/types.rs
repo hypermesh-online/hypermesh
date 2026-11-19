@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 
-use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
+use crate::{AssetPackage, AssetRegistration, PackageSpecMetadata};
 
 /// Share permission levels
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

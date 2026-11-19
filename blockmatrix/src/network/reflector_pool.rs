@@ -182,7 +182,10 @@ impl ReflectorPool {
     ///
     /// Returns true if the reflector was found and removed.
     pub fn remove_reflector(&mut self, network_id: &str, node_id: &str) -> bool {
-        if let Some(entry) = self.reflectors.get_mut(&NetworkId::from_wire_str(network_id)) {
+        if let Some(entry) = self
+            .reflectors
+            .get_mut(&NetworkId::from_wire_str(network_id))
+        {
             let removed = entry.nodes.remove(node_id).is_some();
             if removed {
                 debug!(
@@ -291,13 +294,11 @@ impl ReflectorPool {
     /// On `success`, the score is incremented by 0.05 (clamped to 1.0).
     /// On failure, it is decremented by 0.1 (clamped to 0.0).
     /// The reflector is looked up by `node_id` within the given `network_id`.
-    pub fn update_reflector_health(
-        &mut self,
-        node_id: &str,
-        network_id: &str,
-        success: bool,
-    ) {
-        if let Some(entry) = self.reflectors.get_mut(&NetworkId::from_wire_str(network_id)) {
+    pub fn update_reflector_health(&mut self, node_id: &str, network_id: &str, success: bool) {
+        if let Some(entry) = self
+            .reflectors
+            .get_mut(&NetworkId::from_wire_str(network_id))
+        {
             if let Some(reflector) = entry.nodes.get_mut(node_id) {
                 if success {
                     reflector.health_score = (reflector.health_score + 0.05).min(1.0);

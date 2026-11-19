@@ -149,7 +149,10 @@ mod tests {
             certificate_fingerprint: Some(fingerprint),
         };
         assert_eq!(ni.node.node_id, node.node_id);
-        assert_eq!(ni.scope.blockchain_scope, hypermesh_lib::BlockchainScope::Network);
+        assert_eq!(
+            ni.scope.blockchain_scope,
+            hypermesh_lib::BlockchainScope::Network
+        );
         assert!(ni.scope.tracked);
         assert_eq!(ni.certificate_fingerprint, Some(fingerprint));
     }
@@ -208,10 +211,13 @@ mod tests {
         let bytes = ext.to_bytes();
         assert_eq!(bytes, [1, 1, 1, 1]); // Service=1, Network=1, tracked=1, Service=1
 
-        let decoded = IdentityScopeExtension::from_bytes(&bytes)
-            .expect("test: decode should succeed");
+        let decoded =
+            IdentityScopeExtension::from_bytes(&bytes).expect("test: decode should succeed");
         assert_eq!(decoded.subject_type, CertificateSubjectType::Service);
-        assert_eq!(decoded.blockchain_scope, hypermesh_lib::BlockchainScope::Network);
+        assert_eq!(
+            decoded.blockchain_scope,
+            hypermesh_lib::BlockchainScope::Network
+        );
         assert!(decoded.tracked);
         assert_eq!(decoded.workload_type, hypermesh_lib::WorkloadType::Service);
     }
@@ -219,10 +225,7 @@ mod tests {
     #[test]
     fn test_identity_scope_extension_from_scope() {
         let scope = hypermesh_lib::IdentityScope::anonymous_device();
-        let ext = IdentityScopeExtension::from_scope(
-            &scope,
-            hypermesh_lib::WorkloadType::Agent,
-        );
+        let ext = IdentityScopeExtension::from_scope(&scope, hypermesh_lib::WorkloadType::Agent);
         assert_eq!(ext.subject_type, CertificateSubjectType::Agent);
         assert_eq!(ext.blockchain_scope, hypermesh_lib::BlockchainScope::Device);
         assert!(!ext.tracked);

@@ -126,10 +126,7 @@ fn scan_asset_history(blocks: &[Block], asset_hash: &[u8; 32]) -> Vec<(u64, usiz
 /// the shard queries.
 ///
 /// Returns `(chain, all_asset_hashes, all_shard_hashes)`.
-async fn populate(
-    seed: u64,
-    block_count: usize,
-) -> (NodeBlockchain, Vec<[u8; 32]>, Vec<[u8; 32]>) {
+async fn populate(seed: u64, block_count: usize) -> (NodeBlockchain, Vec<[u8; 32]>, Vec<[u8; 32]>) {
     let chain = NodeBlockchain::new(coord());
     let mut rng = Rng(seed);
 
@@ -248,7 +245,10 @@ async fn s3_1_index_matches_brute_force_scan_for_hits_and_misses() {
             .collect();
         assert_eq!(indexed, scanned, "asset history disagrees with full scan");
         assert_eq!(
-            chain.asset_head(asset).await.map(|l| (l.block_index, l.entry_ix)),
+            chain
+                .asset_head(asset)
+                .await
+                .map(|l| (l.block_index, l.entry_ix)),
             scanned.last().copied(),
             "asset head is not the last entry the full scan finds",
         );
@@ -285,12 +285,20 @@ async fn s3_1_single_block_with_n_distinct_assets_is_fully_indexed() {
 
     for (ix, (asset, shard)) in assets.iter().zip(shards.iter()).enumerate() {
         let history = chain.asset_history(asset).await;
-        assert_eq!(history.len(), 1, "asset {ix} indexed {} times", history.len());
+        assert_eq!(
+            history.len(),
+            1,
+            "asset {ix} indexed {} times",
+            history.len()
+        );
         assert_eq!(history[0].block_index, block.index);
         assert_eq!(history[0].entry_ix, ix, "asset {ix} indexed at wrong entry");
         assert_eq!(history[0].block_hash, block.hash);
 
-        assert!(chain.authorizes_shard(shard).await, "shard {ix} not authorized");
+        assert!(
+            chain.authorizes_shard(shard).await,
+            "shard {ix} not authorized"
+        );
         let reg = chain
             .registration_for_shard(shard)
             .await
@@ -334,8 +342,7 @@ async fn s3_1_rebuild_from_blocks_equals_incremental_index() {
     );
 
     // Rebuild through the real `from_blocks` restore path.
-    let restored =
-        NodeBlockchain::from_blocks(coord(), blocks.clone()).expect("test: from_blocks");
+    let restored = NodeBlockchain::from_blocks(coord(), blocks.clone()).expect("test: from_blocks");
     assert_eq!(
         restored.asset_index_snapshot().await,
         incremental,
@@ -466,7 +473,11 @@ async fn s3_1_index_survives_a_real_persist_reload_round_trip() {
             loaded.push(block);
         }
     }
-    assert_eq!(loaded.len(), 3, "genesis + 2 runtime blocks must be on disk");
+    assert_eq!(
+        loaded.len(),
+        3,
+        "genesis + 2 runtime blocks must be on disk"
+    );
 
     let restored = NodeBlockchain::from_blocks(coord(), loaded).expect("test: from_blocks");
     assert_eq!(
@@ -491,7 +502,11 @@ async fn s3_1_prune_to_headers_removes_pruned_blocks_from_the_index() {
     for i in 1..=5u8 {
         let shard = [0xC0 + i; 32];
         shards.push(shard);
-        let asset = if i % 2 == 1 { [0xEE; 32] } else { [0xD0 + i; 32] };
+        let asset = if i % 2 == 1 {
+            [0xEE; 32]
+        } else {
+            [0xD0 + i; 32]
+        };
         chain
             .add_block(vec![sharded(asset, vec![shard])])
             .await
@@ -507,7 +522,11 @@ async fn s3_1_prune_to_headers_removes_pruned_blocks_from_the_index() {
     chain.prune_to_headers(1..4).await;
 
     let remaining = chain.get_chain().await;
-    assert_eq!(remaining.len(), 3, "genesis + blocks 4 and 5 remain in full");
+    assert_eq!(
+        remaining.len(),
+        3,
+        "genesis + blocks 4 and 5 remain in full"
+    );
 
     // Every query must now agree with a brute-force scan of what is LEFT.
     for shard in &shards {
@@ -540,7 +559,10 @@ async fn s3_1_prune_to_headers_removes_pruned_blocks_from_the_index() {
     );
     assert_eq!(history.len(), 1);
     assert_eq!(history[0].block_index, 5);
-    assert_eq!(chain.asset_head(&[0xEE; 32]).await.map(|l| l.block_index), Some(5));
+    assert_eq!(
+        chain.asset_head(&[0xEE; 32]).await.map(|l| l.block_index),
+        Some(5)
+    );
 
     // A fully-pruned asset disappears entirely.
     assert!(chain.asset_history(&[0xD0 + 2; 32]).await.is_empty());

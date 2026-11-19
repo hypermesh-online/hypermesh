@@ -200,10 +200,12 @@ impl CertificateManager {
                         // Note: NetworkType::P2P produces strategy_name "Private",
                         // NetworkType::Federated produces "Federated".
                         // All non-Public strategies use self-signed certs.
-                        "Anonymous" | "P2P" | "Private" | "Federated" => rustls::ClientConfig::builder()
-                            .dangerous()
-                            .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
-                            .with_no_client_auth(),
+                        "Anonymous" | "P2P" | "Private" | "Federated" => {
+                            rustls::ClientConfig::builder()
+                                .dangerous()
+                                .with_custom_certificate_verifier(Arc::new(AcceptAllVerifier))
+                                .with_no_client_auth()
+                        }
                         _ => {
                             let mut root_store = rustls::RootCertStore::empty();
                             root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
@@ -289,14 +291,13 @@ impl CertificateManager {
                             // a private key, generate a dummy ephemeral key solely for
                             // the trait call. The strategy only inspects the certificate
                             // DER and metadata, never the private key.
-                            let ephemeral = rcgen::generate_simple_self_signed(
-                                vec!["validation-dummy.local".to_string()],
-                            )
+                            let ephemeral = rcgen::generate_simple_self_signed(vec![
+                                "validation-dummy.local".to_string(),
+                            ])
                             .map_err(|e| anyhow!("ephemeral keygen for validation: {e}"))?;
-                            let dummy_key = PrivateKeyDer::try_from(
-                                ephemeral.key_pair.serialize_der(),
-                            )
-                            .map_err(|e| anyhow!("serialize ephemeral key: {e}"))?;
+                            let dummy_key =
+                                PrivateKeyDer::try_from(ephemeral.key_pair.serialize_der())
+                                    .map_err(|e| anyhow!("serialize ephemeral key: {e}"))?;
 
                             let temp_cert = StoqNodeCertificate {
                                 node_id: "peer-validation".to_string(),
@@ -835,7 +836,10 @@ mod tests {
             .validate_certificate_chain(&cert_der)
             .await
             .expect("test: validation should not error");
-        assert!(result, "valid DER certificate should pass in localhost mode");
+        assert!(
+            result,
+            "valid DER certificate should pass in localhost mode"
+        );
     }
 
     #[tokio::test]
@@ -846,10 +850,7 @@ mod tests {
             .validate_certificate_chain(&[0xDE, 0xAD, 0xBE, 0xEF])
             .await
             .expect("test: validation should not error in localhost mode");
-        assert!(
-            result,
-            "localhost testing mode accepts all certificates"
-        );
+        assert!(result, "localhost testing mode accepts all certificates");
     }
 
     // -- Item 2.10: Certificate persistence to filesystem ---------------------
@@ -878,8 +879,8 @@ mod tests {
             .expect("test: create manager");
 
         // Verify certificate was persisted
-        let cache_dir = CertificateManager::resolve_cache_dir(&node_id)
-            .expect("test: resolve cache dir");
+        let cache_dir =
+            CertificateManager::resolve_cache_dir(&node_id).expect("test: resolve cache dir");
         let cert_path = cache_dir.join("cert.der");
         let key_path = cache_dir.join("key.der");
         let meta_path = cache_dir.join("meta.json");
@@ -996,7 +997,10 @@ mod tests {
             .check_peer_permission(&cert_der, "shard_fetch")
             .await
             .expect("test: permission check should not error");
-        assert!(allowed, "cert without EKU should allow all for backward compat");
+        assert!(
+            allowed,
+            "cert without EKU should allow all for backward compat"
+        );
     }
 
     #[tokio::test]
@@ -1036,8 +1040,8 @@ mod tests {
             .expect("test: get fingerprint");
 
         // Corrupt the key file to simulate a stale/mismatched key
-        let cache_dir = CertificateManager::resolve_cache_dir(&node_id)
-            .expect("test: resolve cache dir");
+        let cache_dir =
+            CertificateManager::resolve_cache_dir(&node_id).expect("test: resolve cache dir");
         let key_path = cache_dir.join("key.der");
 
         // Write a valid but DIFFERENT key (from a different self-signed cert)
@@ -1063,10 +1067,7 @@ mod tests {
             .expect("test: get fingerprint after recovery");
 
         // The fingerprints must differ because the stale cert was replaced
-        assert_ne!(
-            fp1, fp2,
-            "recovered manager should have a new certificate"
-        );
+        assert_ne!(fp1, fp2, "recovered manager should have a new certificate");
 
         // Cleanup
         let _ = std::fs::remove_dir_all(&cache_dir);

@@ -12,8 +12,8 @@
 #![cfg(feature = "future-tests")]
 
 use blockmatrix::assets::pipeline::{
-    Asset, PipelineInputMetadata, AssetPipeline, CompressionAlgorithm, CompressionConfig,
-    DistributionConfig, MatrixConstraints, PipelineConfig, ShardingConfig,
+    Asset, AssetPipeline, CompressionAlgorithm, CompressionConfig, DistributionConfig,
+    MatrixConstraints, PipelineConfig, PipelineInputMetadata, ShardingConfig,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 
@@ -193,7 +193,10 @@ async fn main() -> anyhow::Result<()> {
     // `distribution::distribute_shards_pos_aware`), which this offline demo has
     // no peers for — so placements are empty here by design.
     println!("📍 Shard Placements: computed on the store path (real peers), not in the pipeline");
-    println!("   placements in this offline demo: {}", processed.distributed.placements.len());
+    println!(
+        "   placements in this offline demo: {}",
+        processed.distributed.placements.len()
+    );
     println!();
 
     // Reconstruct asset

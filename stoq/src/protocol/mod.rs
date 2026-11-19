@@ -413,7 +413,11 @@ mod tests {
 
         let data = b"hypermesh packet payload";
         let prefix = handler.hypermesh_pos_prefix(data);
-        assert_eq!(prefix.len(), 44, "4-byte common header + 40-byte PoS payload");
+        assert_eq!(
+            prefix.len(),
+            44,
+            "4-byte common header + 40-byte PoS payload"
+        );
 
         // Common header at offset 0: magic in network byte order (0x48 0x4D).
         assert_eq!(prefix[0], 0x48);
@@ -440,7 +444,9 @@ mod tests {
         let handler = StoqProtocolHandler::new(extensions.clone(), None, 1400);
 
         let data = b"lead frame is the hypermesh header";
-        let frames = handler.apply_extensions(data).expect("test: apply_extensions");
+        let frames = handler
+            .apply_extensions(data)
+            .expect("test: apply_extensions");
         assert!(!frames.is_empty());
         // The FIRST frame is the HyperMesh cleartext extension header.
         let lead = &frames[0];
@@ -456,7 +462,9 @@ mod tests {
         let data = b"test data";
         let token = extensions.tokenize_packet(data);
 
-        let encoded = handler.encode_token_frame(&token).expect("test: expected success");
+        let encoded = handler
+            .encode_token_frame(&token)
+            .expect("test: expected success");
         assert!(!encoded.is_empty());
 
         // Decode the entire frame
@@ -476,10 +484,14 @@ mod tests {
         let handler = StoqProtocolHandler::new(extensions.clone(), None, 10);
 
         let data = b"this is test data for sharding";
-        let shards = extensions.shard_packet(data, 10).expect("test: shard operation");
+        let shards = extensions
+            .shard_packet(data, 10)
+            .expect("test: shard operation");
 
         for shard in shards {
-            let encoded = handler.encode_shard_frame(&shard).expect("test: shard operation");
+            let encoded = handler
+                .encode_shard_frame(&shard)
+                .expect("test: shard operation");
             assert!(!encoded.is_empty());
 
             // Decode the entire frame

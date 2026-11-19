@@ -517,7 +517,8 @@ mod tests {
     fn test_storage_type_serialization() {
         let storage_type = StorageType::Nvme;
         let serialized = serde_json::to_string(&storage_type).expect("test: serialization");
-        let deserialized: StorageType = serde_json::from_str(&serialized).expect("test: deserialization");
+        let deserialized: StorageType =
+            serde_json::from_str(&serialized).expect("test: deserialization");
 
         assert!(matches!(deserialized, StorageType::Nvme));
     }

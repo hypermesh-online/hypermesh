@@ -79,9 +79,7 @@ impl<'a> SyncDispatcher<'a> {
                 health_score,
             ),
 
-            MatrixMessage::GenesisRequest { network_id } => {
-                self.handle_genesis_request(network_id)
-            }
+            MatrixMessage::GenesisRequest { network_id } => self.handle_genesis_request(network_id),
 
             MatrixMessage::HeaderRequest {
                 network_id,
@@ -104,8 +102,7 @@ impl<'a> SyncDispatcher<'a> {
             } => self.handle_genesis_response(network_id, genesis_block_json),
 
             // Remaining response variants are handled by the caller
-            MatrixMessage::HeaderResponse { .. }
-            | MatrixMessage::SyncBlockResponse { .. } => {
+            MatrixMessage::HeaderResponse { .. } | MatrixMessage::SyncBlockResponse { .. } => {
                 debug!("SyncDispatcher: response message handled by caller");
                 DispatchResponse::None
             }

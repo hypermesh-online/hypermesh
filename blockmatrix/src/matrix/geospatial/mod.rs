@@ -92,7 +92,9 @@ mod integration_tests {
         let mut matrix_coords = Vec::new();
         for (name, lat, lon) in &cities {
             let gps = GpsCoordinate::at_sea_level(*lat, *lon).expect("test: expected success");
-            let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
+            let matrix = converter
+                .gps_to_matrix(&gps)
+                .expect("test: expected success");
             matrix_coords.push((name.to_string(), matrix));
         }
 
@@ -100,7 +102,8 @@ mod integration_tests {
         let hierarchy = GeographicHierarchy::with_defaults();
 
         // NYC should be in USA
-        let nyc_gps = GpsCoordinate::at_sea_level(40.7128, -74.0060).expect("test: expected success");
+        let nyc_gps =
+            GpsCoordinate::at_sea_level(40.7128, -74.0060).expect("test: expected success");
         let zones = hierarchy.find_zones_containing(&nyc_gps);
         let zone_ids: Vec<&str> = zones.iter().map(|z| z.id.as_str()).collect();
         assert!(zone_ids.contains(&"usa"));
@@ -119,13 +122,18 @@ mod integration_tests {
 
         for (name, coord) in &matrix_coords {
             let mut node = TopologyNode::new(name.clone(), *coord);
-            let gps = match name.as_str() {
-                "NYC" => GpsCoordinate::at_sea_level(40.7128, -74.0060).expect("test: expected success"),
-                "LA" => GpsCoordinate::at_sea_level(34.0522, -118.2437).expect("test: expected success"),
-                "Chicago" => GpsCoordinate::at_sea_level(41.8781, -87.6298).expect("test: expected success"),
-                "Houston" => GpsCoordinate::at_sea_level(29.7604, -95.3698).expect("test: expected success"),
-                _ => GpsCoordinate::at_sea_level(0.0, 0.0).expect("test: expected success"),
-            };
+            let gps =
+                match name.as_str() {
+                    "NYC" => GpsCoordinate::at_sea_level(40.7128, -74.0060)
+                        .expect("test: expected success"),
+                    "LA" => GpsCoordinate::at_sea_level(34.0522, -118.2437)
+                        .expect("test: expected success"),
+                    "Chicago" => GpsCoordinate::at_sea_level(41.8781, -87.6298)
+                        .expect("test: expected success"),
+                    "Houston" => GpsCoordinate::at_sea_level(29.7604, -95.3698)
+                        .expect("test: expected success"),
+                    _ => GpsCoordinate::at_sea_level(0.0, 0.0).expect("test: expected success"),
+                };
             node.set_gps(gps);
             topology.add_node(node).expect("test: insertion");
         }
@@ -159,8 +167,12 @@ mod integration_tests {
 
         for (name, lat, lon) in locations {
             let original = GpsCoordinate::at_sea_level(lat, lon).expect("test: expected success");
-            let matrix = converter.gps_to_matrix(&original).expect("test: expected success");
-            let recovered = converter.matrix_to_gps(&matrix).expect("test: expected success");
+            let matrix = converter
+                .gps_to_matrix(&original)
+                .expect("test: expected success");
+            let recovered = converter
+                .matrix_to_gps(&matrix)
+                .expect("test: expected success");
 
             // Integer matrix coordinates lose precision in the round trip.
             // Fine resolution (10 units/km) gives ~0.1 km granularity, which
@@ -223,9 +235,9 @@ mod integration_tests {
 
         // Create nodes in different regions
         let nodes = vec![
-            MatrixCoordinate::new(0, 100, 0).expect("test: valid coordinate"),    // Northeast
+            MatrixCoordinate::new(0, 100, 0).expect("test: valid coordinate"), // Northeast
             MatrixCoordinate::new(-50, -100, 0).expect("test: valid coordinate"), // Southeast
-            MatrixCoordinate::new(-200, 0, 0).expect("test: valid coordinate"),   // West
+            MatrixCoordinate::new(-200, 0, 0).expect("test: valid coordinate"), // West
         ];
 
         clustering.hierarchical(&nodes, &zones);
@@ -257,7 +269,9 @@ mod integration_tests {
             .integrate_blockchain_node("blockchain_node", &coord)
             .expect("test: expected success");
 
-        let topo_node = topology.get_node("blockchain_node").expect("test: expected success");
+        let topo_node = topology
+            .get_node("blockchain_node")
+            .expect("test: expected success");
         assert_eq!(topo_node.blockchain_id, Some("blockchain_node".to_string()));
         assert!(topo_node.metadata.contains_key("blockchain_coordinate"));
     }
@@ -277,8 +291,11 @@ mod integration_tests {
 
         // Add nodes to this zone
         for i in 0..10 {
-            let gps = GpsCoordinate::at_sea_level(40.5 + (i as f64) * 0.05, -74.0).expect("test: expected success");
-            let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
+            let gps = GpsCoordinate::at_sea_level(40.5 + (i as f64) * 0.05, -74.0)
+                .expect("test: expected success");
+            let matrix = converter
+                .gps_to_matrix(&gps)
+                .expect("test: expected success");
 
             let mut node = TopologyNode::new(format!("node{i}"), matrix);
             node.zone_id = Some("test_zone".to_string());

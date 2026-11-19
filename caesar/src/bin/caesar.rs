@@ -75,10 +75,7 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // Create STOQ API server
-    let api = Arc::new(
-        CaesarStoqApi::new(stoq_config, app_state)
-            .await?,
-    );
+    let api = Arc::new(CaesarStoqApi::new(stoq_config, app_state).await?);
 
     // Spawn server and wait for Ctrl+C
     let server = Arc::clone(&api);

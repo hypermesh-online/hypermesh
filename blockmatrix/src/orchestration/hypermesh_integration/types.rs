@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
 use crate::assets::core::{
-    AssetAllocation, AssetStatus, AssetType, StateProof, PrivacyMode, WorkloadType,
+    AssetAllocation, AssetStatus, AssetType, PrivacyMode, StateProof, WorkloadType,
 };
 use crate::container::runtime::ContainerHandle;
 use crate::container::{ContainerId, ContainerStatus};

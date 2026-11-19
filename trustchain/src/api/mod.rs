@@ -12,9 +12,9 @@ use std::net::Ipv6Addr;
 use std::time::SystemTime;
 
 use crate::ca::IssuedCertificate;
-use crate::proof_of_state::StateProof;
 use crate::ct::SignedCertificateTimestamp;
 use crate::dns::DnsResponse;
+use crate::proof_of_state::StateProof;
 
 // STOQ API (Primary interface)
 pub mod stoq_api;
@@ -213,7 +213,8 @@ mod tests {
 
         // Test serialization/deserialization roundtrip
         let json = serde_json::to_string(&request).expect("test: serialization");
-        let deserialized: CertificateIssueRequest = serde_json::from_str(&json).expect("test: deserialization");
+        let deserialized: CertificateIssueRequest =
+            serde_json::from_str(&json).expect("test: deserialization");
 
         assert_eq!(request.common_name, deserialized.common_name);
         assert_eq!(request.san_entries.len(), deserialized.san_entries.len());

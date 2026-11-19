@@ -16,8 +16,8 @@ use rcgen::{Certificate as RcgenCertificate, CertificateParams, KeyPair};
 use x509_parser::parse_x509_certificate;
 
 use crate::proof_of_state::{
-    StateProofClientMetrics, StateProofContext, StateProofValidationResult,
-    StateProofValidationStatus, HyperMeshStateProofClient,
+    HyperMeshStateProofClient, StateProofClientMetrics, StateProofContext,
+    StateProofValidationResult, StateProofValidationStatus,
 };
 
 use super::certificate_store::CertificateStore as CertStore;
@@ -251,11 +251,12 @@ impl TrustChainCA {
                     work_proof_valid: true,
                     time_proof_valid: true,
                 },
-                bft_status: crate::proof_of_state::hypermesh_client::ByzantineFaultToleranceStatus {
-                    byzantine_nodes_detected: 0,
-                    fault_tolerance_maintained: true,
-                    recovery_action_taken: None,
-                },
+                bft_status:
+                    crate::proof_of_state::hypermesh_client::ByzantineFaultToleranceStatus {
+                        byzantine_nodes_detected: 0,
+                        fault_tolerance_maintained: true,
+                        recovery_action_taken: None,
+                    },
                 performance_stats: crate::proof_of_state::hypermesh_client::PerformanceStatistics {
                     state_proof_latency_ms: 0,
                     throughput_ops_per_sec: 0.0,
@@ -408,11 +409,23 @@ impl TrustChainCA {
                 // Anonymous: ephemeral (15 minutes)
                 15 * 60
             }
-            Some(scope) if scope.tracked && matches!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Device) => {
+            Some(scope)
+                if scope.tracked
+                    && matches!(
+                        scope.blockchain_scope,
+                        hypermesh_lib::BlockchainScope::Device
+                    ) =>
+            {
                 // Private/bounded group: medium validity (7 days)
                 7 * 24 * 60 * 60
             }
-            Some(scope) if scope.tracked && matches!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Network) => {
+            Some(scope)
+                if scope.tracked
+                    && matches!(
+                        scope.blockchain_scope,
+                        hypermesh_lib::BlockchainScope::Network
+                    ) =>
+            {
                 // Public/network: full chain (90 days)
                 90 * 24 * 60 * 60
             }
@@ -428,9 +441,7 @@ impl TrustChainCA {
 
         // Item 2.4: Set KeyUsage and ExtendedKeyUsage based on subject type
         let subject_type = request.subject_type.unwrap_or(CertificateSubjectType::Node);
-        let mut key_usages = vec![
-            rcgen::KeyUsagePurpose::DigitalSignature,
-        ];
+        let mut key_usages = vec![rcgen::KeyUsagePurpose::DigitalSignature];
         let mut eku_purposes = Vec::new();
 
         match subject_type {
@@ -453,28 +464,38 @@ impl TrustChainCA {
         if let Some(ref scope) = request.identity_scope {
             let scope_ext = crate::trust::hypermesh_integration::types::IdentityScopeExtension {
                 subject_type: match subject_type {
-                    CertificateSubjectType::Node => crate::trust::hypermesh_integration::types::CertificateSubjectType::Node,
-                    CertificateSubjectType::Service => crate::trust::hypermesh_integration::types::CertificateSubjectType::Service,
-                    CertificateSubjectType::Agent => crate::trust::hypermesh_integration::types::CertificateSubjectType::Agent,
+                    CertificateSubjectType::Node => {
+                        crate::trust::hypermesh_integration::types::CertificateSubjectType::Node
+                    }
+                    CertificateSubjectType::Service => {
+                        crate::trust::hypermesh_integration::types::CertificateSubjectType::Service
+                    }
+                    CertificateSubjectType::Agent => {
+                        crate::trust::hypermesh_integration::types::CertificateSubjectType::Agent
+                    }
                 },
                 blockchain_scope: scope.blockchain_scope,
                 tracked: scope.tracked,
                 workload_type: hypermesh_lib::WorkloadType::from(subject_type),
             };
             let scope_bytes = scope_ext.to_bytes();
-            let oid_parts: Vec<u64> = crate::trust::hypermesh_integration::types::IDENTITY_SCOPE_EXTENSION_OID
-                .split('.')
-                .filter_map(|s| s.parse::<u64>().ok())
-                .collect();
+            let oid_parts: Vec<u64> =
+                crate::trust::hypermesh_integration::types::IDENTITY_SCOPE_EXTENSION_OID
+                    .split('.')
+                    .filter_map(|s| s.parse::<u64>().ok())
+                    .collect();
             if oid_parts.len() >= 2 {
-                params.custom_extensions.push(
-                    rcgen::CustomExtension::from_oid_content(
+                params
+                    .custom_extensions
+                    .push(rcgen::CustomExtension::from_oid_content(
                         &oid_parts,
                         scope_bytes.to_vec(),
-                    ),
-                );
+                    ));
             }
-            debug!("Added identity scope extension: scope={:?}, tracked={}", scope.blockchain_scope, scope.tracked);
+            debug!(
+                "Added identity scope extension: scope={:?}, tracked={}",
+                scope.blockchain_scope, scope.tracked
+            );
         }
 
         // Add HyperMesh Proof of State metadata as certificate extension
@@ -827,7 +848,10 @@ mod tests {
             &signature,
         )
         .expect("test: verify_signature");
-        assert!(valid, "Threshold signature should verify with original public key");
+        assert!(
+            valid,
+            "Threshold signature should verify with original public key"
+        );
     }
 
     #[tokio::test]
@@ -869,7 +893,10 @@ mod tests {
         assert!(ca.ca_key_shares().is_none());
 
         let result = ca.sign_with_threshold(b"msg", &[]);
-        assert!(result.is_err(), "sign_with_threshold without config should fail");
+        assert!(
+            result.is_err(),
+            "sign_with_threshold without config should fail"
+        );
         let err_msg = result.err().expect("test: expected error").to_string();
         assert!(
             err_msg.contains("Threshold not configured"),

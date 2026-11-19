@@ -23,8 +23,9 @@
 
 use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{
-    attestation_footprint_bytes, PresentedAssetChain, MirrorAttestationPool, NodeBlockchain,
-    PoolFull, MAX_ATTESTATIONS_PER_ASSET, MAX_ATTESTATION_POOL_BYTES, MAX_TOTAL_ATTESTATIONS,
+    attestation_footprint_bytes, MirrorAttestationPool, NodeBlockchain, PoolFull,
+    PresentedAssetChain, MAX_ATTESTATIONS_PER_ASSET, MAX_ATTESTATION_POOL_BYTES,
+    MAX_TOTAL_ATTESTATIONS,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::attestation_wire::{
@@ -217,9 +218,18 @@ fn s3_4_attestation_wire_survives_a_real_fuzz_pass() {
     let mirror = FalconIdentity::generate();
     // A realistic message: real FALCON-1024 key and signature material, so the
     // corpus mutates something the size and shape of a live attestation.
-    let sample = attest(&mirror, [0x5Au8; 32], MatrixIndex::new(4, -5, 6), "spine", 11);
+    let sample = attest(
+        &mirror,
+        [0x5Au8; 32],
+        MatrixIndex::new(4, -5, 6),
+        "spine",
+        11,
+    );
     let good = encode_mirror_attestation(&sample).expect("test: encode");
-    assert!(good.len() > 2000, "the fuzz corpus must be realistically sized");
+    assert!(
+        good.len() > 2000,
+        "the fuzz corpus must be realistically sized"
+    );
 
     let mut decoded_ok = 0usize;
     let mut refused = 0usize;
@@ -238,7 +248,11 @@ fn s3_4_attestation_wire_survives_a_real_fuzz_pass() {
         let ok = decode_mirror_attestation(&good[..cut]).is_ok();
         if ok {
             truncations_decoded += 1;
-            assert_eq!(cut, good.len(), "a truncated message decoded at {cut} bytes");
+            assert_eq!(
+                cut,
+                good.len(),
+                "a truncated message decoded at {cut} bytes"
+            );
         }
         note(ok);
     }
@@ -343,8 +357,7 @@ async fn s3_4_wire_attestation_from_the_wrong_key_is_rejected() {
     // (a) IMPERSONATION — a real signature from the stranger's key, presented
     //     under the honest mirror's identity string. This is the exact thing the
     //     wire surface must not let a submitter do.
-    let mut impersonation =
-        attest(&stranger, asset, MatrixIndex::new(4, 4, 4), &spine, seq);
+    let mut impersonation = attest(&stranger, asset, MatrixIndex::new(4, 4, 4), &spine, seq);
     impersonation.mirror = mirror.node_id().to_string();
     chain
         .accept_wire_attestation(over_the_wire(&impersonation))
@@ -453,7 +466,10 @@ async fn s3_4_per_asset_attestation_bound_holds_under_flood_and_evicts_nothing()
     let mut refusals = 0usize;
     for n in 1..(MAX_ATTESTATIONS_PER_ASSET + 32) as i64 {
         let candidate = attest(&flooder, asset, MatrixIndex::new(n, 0, 0), &spine, seq);
-        if let Err(e) = chain.accept_wire_attestation(over_the_wire(&candidate)).await {
+        if let Err(e) = chain
+            .accept_wire_attestation(over_the_wire(&candidate))
+            .await
+        {
             assert!(
                 e.contains("mirror attestations"),
                 "expected the pool bound, got: {e}"
@@ -558,7 +574,10 @@ fn s3_4_global_attestation_bound_holds_and_evicts_nothing() {
     // Replacement still works at the global cap.
     let mut renewed = synthetic(0, 0);
     renewed.spine_seq = 99;
-    assert!(pool.try_insert(renewed).expect("test: replacement").is_some());
+    assert!(pool
+        .try_insert(renewed)
+        .expect("test: replacement")
+        .is_some());
     assert_eq!(pool.total(), MAX_TOTAL_ATTESTATIONS);
 
     // Releasing an asset gives the budget back, and nothing else was evicted.
@@ -610,11 +629,8 @@ fn s3_4_the_pool_bound_is_a_byte_budget_that_fits_r13() {
     // Honest material: a `lineage_id` is hex of a BLAKE3 digest — 64 bytes.
     let honest = attestation_footprint_bytes(&weighed([1u8; 32], 0, &"ab".repeat(32)));
     // The heaviest attestation the audit gate will now admit.
-    let worst = attestation_footprint_bytes(&weighed(
-        [1u8; 32],
-        0,
-        &"c".repeat(MAX_SPINE_POINT_BYTES),
-    ));
+    let worst =
+        attestation_footprint_bytes(&weighed([1u8; 32], 0, &"c".repeat(MAX_SPINE_POINT_BYTES)));
     // What the pool used to allow per slot, before the field cap.
     let unbounded = attestation_footprint_bytes(&weighed([1u8; 32], 0, &"S".repeat(13_400)));
 
@@ -702,7 +718,11 @@ fn s3_4_pool_byte_budget_refuses_and_evicts_nothing() {
         pool.bytes_held() <= MAX_ATTESTATION_POOL_BYTES,
         "the budget must hold exactly"
     );
-    assert_eq!(pool.bytes_held(), pool.recomputed_bytes(), "accounting must not drift");
+    assert_eq!(
+        pool.bytes_held(),
+        pool.recomputed_bytes(),
+        "accounting must not drift"
+    );
     assert_eq!(pool.total(), admitted);
     println!("byte budget reached after {admitted} attestations of {per} B each");
 
@@ -953,7 +973,13 @@ async fn s3_4_forgetting_a_received_chain_releases_its_pooled_attestations() {
         .await
         .expect("test: received chain adopted");
 
-    let on_received = attest(&mirror, received_asset, MatrixIndex::new(2, 2, 2), &spine, seq);
+    let on_received = attest(
+        &mirror,
+        received_asset,
+        MatrixIndex::new(2, 2, 2),
+        &spine,
+        seq,
+    );
     chain
         .accept_wire_attestation(over_the_wire(&on_received))
         .await
@@ -1018,6 +1044,7 @@ fn s3_4_per_asset_bound_reports_itself_and_leaves_no_empty_slot() {
     let mut other = make(0);
     other.asset_hash = [0x77u8; 32];
     assert_eq!(pool.asset_count(), 1);
-    pool.try_insert(other).expect("test: a different asset has its own budget");
+    pool.try_insert(other)
+        .expect("test: a different asset has its own budget");
     assert_eq!(pool.asset_count(), 2);
 }

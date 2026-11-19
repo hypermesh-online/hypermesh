@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
-use hypermesh_lib::{ContentHash, NetworkId};
 use super::shard_store::ShardStore;
+use hypermesh_lib::{ContentHash, NetworkId};
 
 /// Default provider-record lifetime (P6). Mirrors the DNS TTL cache
 /// (`dns/cache.rs`): a provider learned via `TAG_SHARD_ANNOUNCE` is trusted
@@ -140,8 +140,12 @@ impl ShardLocationIndex {
     /// Atomically claim serve bytes and register one local mirror provider hint.
     /// Lock order: index write → synchronous store lock; no await while locked.
     pub(crate) async fn register_mirror_provider_in_network(
-        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
-        store: Arc<ShardStore>, data: &[u8],
+        &self,
+        network_id: NetworkId,
+        node_id: &str,
+        shard_id: ContentHash,
+        store: Arc<ShardStore>,
+        data: &[u8],
     ) -> bool {
         let mut locs = self.locations.write().await;
         self.insert_mirror_entry(&mut locs, network_id, node_id, shard_id, store, data)
@@ -150,23 +154,33 @@ impl ShardLocationIndex {
     fn insert_mirror_entry(
         &self,
         locs: &mut HashMap<(NetworkId, ContentHash), HashMap<String, ProviderEntry>>,
-        network_id: NetworkId, node_id: &str, shard_id: ContentHash,
-        store: Arc<ShardStore>, data: &[u8],
+        network_id: NetworkId,
+        node_id: &str,
+        shard_id: ContentHash,
+        store: Arc<ShardStore>,
+        data: &[u8],
     ) -> bool {
         let key = (network_id, shard_id);
         if let Some(entry) = locs.get_mut(&key).and_then(|p| p.get_mut(node_id)) {
             return self.refresh_mirror_entry(entry, shard_id, store, data);
         }
-        if !store.claim_mirror(shard_id, data) { return false; }
+        if !store.claim_mirror(shard_id, data) {
+            return false;
+        }
         let mut entry = ProviderEntry::new(self.ttl);
         entry.mirror_hold = Some((store, shard_id));
-        locs.entry(key).or_default().insert(node_id.to_string(), entry);
+        locs.entry(key)
+            .or_default()
+            .insert(node_id.to_string(), entry);
         true
     }
 
     fn refresh_mirror_entry(
-        &self, entry: &mut ProviderEntry, shard_id: ContentHash,
-        store: Arc<ShardStore>, data: &[u8],
+        &self,
+        entry: &mut ProviderEntry,
+        shard_id: ContentHash,
+        store: Arc<ShardStore>,
+        data: &[u8],
     ) -> bool {
         if let Some((held, _)) = &entry.mirror_hold {
             if !Arc::ptr_eq(held, &store) || !store.mirror_bytes_match(&shard_id, data) {
@@ -175,7 +189,9 @@ impl ShardLocationIndex {
             entry.refresh(self.ttl);
             return true;
         }
-        if !store.claim_mirror(shard_id, data) { return false; }
+        if !store.claim_mirror(shard_id, data) {
+            return false;
+        }
         entry.mirror_hold = Some((store, shard_id));
         entry.refresh(self.ttl);
         true
@@ -183,8 +199,13 @@ impl ShardLocationIndex {
 
     #[cfg(test)]
     pub(crate) async fn register_mirror_with_hook<F: FnOnce() + Send>(
-        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
-        store: Arc<ShardStore>, data: &[u8], hook: F,
+        &self,
+        network_id: NetworkId,
+        node_id: &str,
+        shard_id: ContentHash,
+        store: Arc<ShardStore>,
+        data: &[u8],
+        hook: F,
     ) -> bool {
         let mut locs = self.locations.write().await;
         hook();
@@ -193,11 +214,18 @@ impl ShardLocationIndex {
 
     #[cfg(test)]
     pub(crate) async fn expire_provider_for_test(
-        &self, network_id: NetworkId, node_id: &str, shard_id: ContentHash,
+        &self,
+        network_id: NetworkId,
+        node_id: &str,
+        shard_id: ContentHash,
     ) {
         let mut locs = self.locations.write().await;
-        let Some(entry) = locs.get_mut(&(network_id, shard_id))
-            .and_then(|providers| providers.get_mut(node_id)) else { return; };
+        let Some(entry) = locs
+            .get_mut(&(network_id, shard_id))
+            .and_then(|providers| providers.get_mut(node_id))
+        else {
+            return;
+        };
         entry.expires_at = SystemTime::UNIX_EPOCH;
     }
 
@@ -449,10 +477,7 @@ mod tests {
 
     #[test]
     fn test_shard_locate_response_roundtrip() {
-        let ids = vec![
-            "9f4fc6ed4ba7".to_string(),
-            "deadbeefcafe0011".to_string(),
-        ];
+        let ids = vec!["9f4fc6ed4ba7".to_string(), "deadbeefcafe0011".to_string()];
         let resp = build_shard_locate_response(&ids);
         assert_eq!(resp[0], TAG_SHARD_LOCATE_RESPONSE);
         let parsed = parse_shard_locate_response(&resp);

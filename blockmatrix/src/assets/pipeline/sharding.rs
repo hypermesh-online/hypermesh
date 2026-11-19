@@ -15,8 +15,8 @@
 //! (`ngauge::Sharder`) rather than owning it; everything else in the pipeline
 //! (compress, encrypt, hash, distribute) stays in blockmatrix.
 
-pub use ngauge::sharding::{Sharder, ShardingConfig};
 pub use hypermesh_lib::{Shard, ShardMetadata, ShardingError, ShardingStats};
+pub use ngauge::sharding::{Sharder, ShardingConfig};
 
 #[cfg(test)]
 mod tests {
@@ -41,9 +41,7 @@ mod tests {
             .into_iter()
             .filter(|s| !s.metadata.is_parity)
             .collect();
-        let reconstructed = sharder
-            .reconstruct(&data_only)
-            .expect("test: reconstruct");
+        let reconstructed = sharder.reconstruct(&data_only).expect("test: reconstruct");
         assert_eq!(reconstructed, data, "round-trip must be byte-identical");
     }
 

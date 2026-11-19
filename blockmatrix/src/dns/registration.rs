@@ -6,19 +6,17 @@
 //!
 //! Handles DNS record registration with blockchain integration.
 
-use super::{DnsError, DnsPoolManager, DnsRecord, DnsRecordData, DnsRecordType, DnsResult, Domain};
 use super::domain::DomainRegistration;
 use super::grant::FoundationGrant;
 use super::pools::PoolVisibility;
 use super::reserved;
-use crate::assets::core::asset_id::{
-    AssetCategory, AssetData, BaseSystemType, NetworkScope,
-};
+use super::{DnsError, DnsPoolManager, DnsRecord, DnsRecordData, DnsRecordType, DnsResult, Domain};
+use crate::assets::core::asset_id::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 use crate::assets::core::AssetRegistration;
 use crate::blockchain::NodeBlockchain;
 use crate::bootstrap::PrivacyMode;
-use crate::proof_of_state::StateProof;
 use crate::dns::validation::DnsValidator;
+use crate::proof_of_state::StateProof;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -442,7 +440,11 @@ impl DnsRegistrar {
             crate::dns::DnsRecordType::TXT,
             crate::dns::DnsRecordData::TXT(format!(
                 "DOMAIN:REGISTER:{}:{}",
-                reg.network_id, reg.chain_id.iter().map(|b| format!("{b:02x}")).collect::<String>()
+                reg.network_id,
+                reg.chain_id
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect::<String>()
             )),
             3600,
             reg.owner_node_id.clone(),
@@ -465,7 +467,10 @@ impl DnsRegistrar {
         let mut domains = self.domain_registrations.write().await;
         domains.insert(domain_name.to_string(), reg.clone());
 
-        info!("Domain registered: {} (network: {})", domain_name, reg.network_id);
+        info!(
+            "Domain registered: {} (network: {})",
+            domain_name, reg.network_id
+        );
         Ok(reg)
     }
 
@@ -564,10 +569,10 @@ fn extract_parent(domain_name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dns::{DnsRecordData, DnsRecordType};
     use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof,
     };
-    use crate::dns::{DnsRecordData, DnsRecordType};
     use std::net::Ipv6Addr;
     use std::time::Duration;
 
@@ -585,7 +590,12 @@ mod tests {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string());
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
-        let work = WorkProof::new("owner".to_string(), "workload".to_string(), *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes()).as_bytes());
+        let work = WorkProof::new(
+            "owner".to_string(),
+            "workload".to_string(),
+            *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes())
+                .as_bytes(),
+        );
 
         StateProof::new(stake, time, space, work)
     }
@@ -643,8 +653,14 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let registration = registrar.get_registration("nike").await.expect("test: async operation");
+        let registration = registrar
+            .get_registration("nike")
+            .await
+            .expect("test: async operation");
         assert!(registration.is_some());
-        assert_eq!(registration.expect("test: assertion value").domain.full, "nike");
+        assert_eq!(
+            registration.expect("test: assertion value").domain.full,
+            "nike"
+        );
     }
 }

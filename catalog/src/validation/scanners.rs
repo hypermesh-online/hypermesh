@@ -280,9 +280,7 @@ impl StaticSecurityScanner {
             }
             "json" | "json-schema" => {
                 if !content.is_empty() {
-                    if let Err(e) =
-                        serde_json::from_slice::<serde_json::Value>(content)
-                    {
+                    if let Err(e) = serde_json::from_slice::<serde_json::Value>(content) {
                         issues.push(Vulnerability {
                             cve: None,
                             description: format!("Invalid JSON content: {e}"),
@@ -455,9 +453,7 @@ impl SecurityScanner for StaticSecurityScanner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assets::{
-        AssetContentResolved, AssetSpec, AssetSpecification, PackageSpecMetadata,
-    };
+    use crate::assets::{AssetContentResolved, AssetSpec, AssetSpecification, PackageSpecMetadata};
 
     fn make_test_package(name: &str, content: &str, hash: &str) -> AssetPackage {
         AssetPackage {
@@ -573,9 +569,15 @@ mod tests {
         let scanner = StaticSecurityScanner::new();
         let package = make_test_package("good-pkg", "hello world", "some-hash");
 
-        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        let result = scanner
+            .scan(&package)
+            .await
+            .expect("test: scan should succeed");
         // Should pass: small size, non-hex hash (not treated as BLAKE3)
-        assert!(result.score > 0, "score should be positive for valid package");
+        assert!(
+            result.score > 0,
+            "score should be positive for valid package"
+        );
     }
 
     #[tokio::test]
@@ -584,7 +586,10 @@ mod tests {
         let mut package = make_test_package("", "content", "hash");
         package.spec.metadata.version = String::new();
 
-        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        let result = scanner
+            .scan(&package)
+            .await
+            .expect("test: scan should succeed");
         // Should have vulnerabilities for empty name and version
         let metadata_issues: Vec<_> = result
             .vulnerabilities
@@ -603,7 +608,10 @@ mod tests {
         let mut package = make_test_package("json-pkg", "not valid json {{{", "hash");
         package.spec.spec.asset_type = "json".to_string();
 
-        let result = scanner.scan(&package).await.expect("test: scan should succeed");
+        let result = scanner
+            .scan(&package)
+            .await
+            .expect("test: scan should succeed");
         let type_issues: Vec<_> = result
             .vulnerabilities
             .iter()

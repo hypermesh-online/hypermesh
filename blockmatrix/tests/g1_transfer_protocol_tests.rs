@@ -214,7 +214,8 @@ async fn test_happy_path_a_to_b_transfer() {
     // Target chain: registration + receipt = 2 new blocks.
     let height_b = chain_b.get_height().await;
     assert_eq!(
-        height_b, initial_b + 2,
+        height_b,
+        initial_b + 2,
         "target chain should have registration+receipt"
     );
 
@@ -244,7 +245,9 @@ async fn test_target_rejection_rolls_back() {
     let chain_a = make_chain(0, 0, 0);
     let initial_a = chain_a.get_height().await;
     let transport = Arc::new(ProgrammableTransport::new());
-    transport.set_mode(Mode::Reject("hash mismatch".into())).await;
+    transport
+        .set_mode(Mode::Reject("hash mismatch".into()))
+        .await;
 
     let coord_a = TransferCoordinator::new(
         chain_a.clone(),
@@ -351,17 +354,10 @@ async fn test_lock_state_persists_on_restart_g1_stub() {
     // Empty chain → empty result.
     let chain = make_chain(0, 0, 0);
     let transport: Arc<dyn TransferTransport> = Arc::new(ProgrammableTransport::new());
-    let coord = TransferCoordinator::new(
-        chain,
-        transport,
-        Arc::new(AllowAllFederation),
-        "any".into(),
-    );
+    let coord =
+        TransferCoordinator::new(chain, transport, Arc::new(AllowAllFederation), "any".into());
     let resumed = coord.resume_in_flight().await.expect("test: scan ok");
-    assert!(
-        resumed.is_empty(),
-        "fresh chain has no in-flight transfers"
-    );
+    assert!(resumed.is_empty(), "fresh chain has no in-flight transfers");
 }
 
 // ---------------------------------------------------------------------------

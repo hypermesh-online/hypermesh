@@ -32,7 +32,10 @@ pub struct PresentedAssetChain {
 impl PresentedAssetChain {
     /// Present `entries` as `asset_hash`'s chain.
     pub fn new(asset_hash: [u8; 32], entries: Vec<BlockAssetEntry>) -> Self {
-        Self { asset_hash, entries }
+        Self {
+            asset_hash,
+            entries,
+        }
     }
 
     /// Number of entries presented.

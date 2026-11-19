@@ -193,11 +193,7 @@ mod tests {
 
     #[test]
     fn wallet_methods_map_to_wallet() {
-        for m in &[
-            "caesar.transfer",
-            "caesar.staking",
-            "caesar.rewards",
-        ] {
+        for m in &["caesar.transfer", "caesar.staking", "caesar.rewards"] {
             assert_eq!(
                 required_capability(m),
                 Capability::Wallet,
@@ -251,7 +247,10 @@ mod tests {
 
     #[test]
     fn unknown_method_defaults_to_admin() {
-        assert_eq!(required_capability("totally.fake.method"), Capability::Admin);
+        assert_eq!(
+            required_capability("totally.fake.method"),
+            Capability::Admin
+        );
         assert_eq!(required_capability(""), Capability::Admin);
         assert_eq!(required_capability("future.experiment"), Capability::Admin);
     }

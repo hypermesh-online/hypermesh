@@ -9,9 +9,7 @@ use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
 use super::types::ResourceUsageReport;
-use crate::assets::core::{
-    AssetAllocation, AssetRegistration, AssetType, StateProof, PrivacyMode,
-};
+use crate::assets::core::{AssetAllocation, AssetRegistration, AssetType, PrivacyMode, StateProof};
 
 /// Asset creation specification
 #[derive(Debug, Clone, Serialize, Deserialize)]

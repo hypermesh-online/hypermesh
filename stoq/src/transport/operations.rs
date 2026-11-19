@@ -30,8 +30,7 @@ impl StoqTransport {
         // the payload (papers/HYPERMESH.md §5.1). This makes `magic == 0x484D`
         // land at the UDP-payload offset the XDP program reads at wire speed.
         if let Some(ref socket) = self.af_xdp_socket {
-            let mut framed =
-                self.protocol_handler.hypermesh_pos_prefix(data);
+            let mut framed = self.protocol_handler.hypermesh_pos_prefix(data);
             framed.extend_from_slice(data);
             if socket.send(&framed).await.is_ok() {
                 self.metrics.record_bytes_sent(framed.len());

@@ -276,8 +276,12 @@ impl SyncManager {
                 }
                 ConflictResolution::StateProofWins => {
                     // Check state proof scores
-                    if self.get_state_proof_result(&conflict.remote_metadata).await?
-                        > self.get_state_proof_result(&conflict.local_metadata).await?
+                    if self
+                        .get_state_proof_result(&conflict.remote_metadata)
+                        .await?
+                        > self
+                            .get_state_proof_result(&conflict.local_metadata)
+                            .await?
                     {
                         // Use remote version
                         if let Ok(package) = self

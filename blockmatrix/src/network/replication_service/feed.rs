@@ -48,10 +48,7 @@ pub(super) fn spawn(svc: &ReplicationService) {
             // across await, so all awaits happen first.
             let mut per_network: Vec<(
                 hypermesh_lib::NetworkId,
-                std::collections::HashMap<
-                    hypermesh_lib::ContentHash,
-                    crate::network::DemandEntry,
-                >,
+                std::collections::HashMap<hypermesh_lib::ContentHash, crate::network::DemandEntry>,
             )> = Vec::new();
             for network in &networks {
                 let snapshot = feed_tracker.snapshot_in_network(*network).await;
@@ -79,9 +76,8 @@ pub(super) fn spawn(svc: &ReplicationService) {
                     for (network, snapshot) in &per_network {
                         for (shard_id, entry) in snapshot {
                             for requester_id in &entry.requester_ids {
-                                let consumer_id = hypermesh_lib::NodeId::from_public_key(
-                                    requester_id.as_bytes(),
-                                );
+                                let consumer_id =
+                                    hypermesh_lib::NodeId::from_public_key(requester_id.as_bytes());
                                 // P3: proximity-derived placement coordinate for
                                 // the requesting peer; fall back to our own
                                 // coordinate when unmeasured (cold start).

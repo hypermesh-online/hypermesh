@@ -655,8 +655,7 @@ mod tests {
             proof_hash: [0xFF; 32],
         };
         let json = serde_json::to_string(&entry).expect("test: serialize");
-        let parsed: TransferLockEntry =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let parsed: TransferLockEntry = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(parsed.transfer_id, "gw-tx-1");
         assert_eq!(parsed.asset_id, "asset-123");
         assert_eq!(parsed.source_scope, BlockchainScope::Device);
@@ -691,8 +690,7 @@ mod tests {
             reason: "timeout".into(),
         };
         let json = serde_json::to_string(&entry).expect("test: serialize");
-        let parsed: TransferReleaseEntry =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let parsed: TransferReleaseEntry = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(parsed.transfer_id, "gw-tx-3");
         assert_eq!(parsed.reason, "timeout");
     }

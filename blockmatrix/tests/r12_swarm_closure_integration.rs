@@ -21,16 +21,14 @@
 
 use std::sync::Arc;
 
+use blockmatrix::intelligence::ngauge_bridge::NGaugeBridge;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
-use blockmatrix::network::consumer_provider::{
-    broadcast_announcement, ConsumerProviderManager,
-};
+use blockmatrix::network::consumer_provider::{broadcast_announcement, ConsumerProviderManager};
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::swarm_provider::ShardLocationIndex;
 use blockmatrix::network::SwarmDemandTracker;
-use blockmatrix::intelligence::ngauge_bridge::NGaugeBridge;
-use ngauge::SwarmAnalytics;
 use hypermesh_lib::{ContentHash, MatrixPosition, NodeId, DEFAULT_NETWORK};
+use ngauge::SwarmAnalytics;
 
 fn test_hash(seed: u8) -> ContentHash {
     ContentHash([seed; 32])
@@ -73,10 +71,7 @@ async fn fetched_shards_are_announced_and_indexed_on_peer() {
     let h1 = test_hash(0xA1);
     let h2 = test_hash(0xA2);
     let result = mgr
-        .process_fetched_shards(vec![
-            (h1, vec![1, 2, 3, 4]),
-            (h2, vec![5, 6, 7, 8]),
-        ])
+        .process_fetched_shards(vec![(h1, vec![1, 2, 3, 4]), (h2, vec![5, 6, 7, 8])])
         .await;
 
     // Sanity: payload built, A is now a provider locally.
@@ -103,8 +98,12 @@ async fn fetched_shards_are_announced_and_indexed_on_peer() {
 
     // CRITICAL ASSERTION: from B's perspective, A is now a known provider
     // for both shards — this is the visibility property R12 requires.
-    let providers_h1 = node_b_index.get_providers_in_network(DEFAULT_NETWORK, &h1).await;
-    let providers_h2 = node_b_index.get_providers_in_network(DEFAULT_NETWORK, &h2).await;
+    let providers_h1 = node_b_index
+        .get_providers_in_network(DEFAULT_NETWORK, &h1)
+        .await;
+    let providers_h2 = node_b_index
+        .get_providers_in_network(DEFAULT_NETWORK, &h2)
+        .await;
     assert!(
         providers_h1.contains(&node_a_id),
         "node B must learn A as provider for h1, got {:?}",
@@ -135,10 +134,7 @@ async fn anonymous_policy_skips_announce_and_provider_registration() {
 
     let h = test_hash(0xBB);
     let result = mgr
-        .process_fetched_shards_with_policy(
-            vec![(h, vec![9, 9, 9])],
-            DedupPolicy::HashOnly,
-        )
+        .process_fetched_shards_with_policy(vec![(h, vec![9, 9, 9])], DedupPolicy::HashOnly)
         .await;
 
     assert!(
@@ -146,7 +142,10 @@ async fn anonymous_policy_skips_announce_and_provider_registration() {
         "Anonymous (HashOnly) policy must NOT emit announce payload",
     );
     assert!(
-        index.get_providers_in_network(DEFAULT_NETWORK, &h).await.is_empty(),
+        index
+            .get_providers_in_network(DEFAULT_NETWORK, &h)
+            .await
+            .is_empty(),
         "Anonymous (HashOnly) policy must NOT register provider locally",
     );
 }
@@ -171,7 +170,11 @@ async fn replication_signals_fire_under_synthetic_demand() {
     let bridge = NGaugeBridge::new(
         tracker.clone(),
         analytics.clone(),
-        MatrixPosition { x: 0.0, y: 0.0, z: 0.0 },
+        MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
         DEFAULT_NETWORK,
     );
 
@@ -190,12 +193,15 @@ async fn replication_signals_fire_under_synthetic_demand() {
         let mut guard = analytics.lock().expect("analytics lock");
         for (shard_id, entry) in &snapshot {
             for requester_id in &entry.requester_ids {
-                let consumer_id =
-                    NodeId::from_public_key(requester_id.as_bytes());
+                let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
                 guard.record_request(
                     *shard_id,
                     consumer_id,
-                    MatrixPosition { x: 0.0, y: 0.0, z: 0.0 },
+                    MatrixPosition {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
                     entry.last_request_us,
                 );
             }
@@ -241,9 +247,7 @@ async fn end_to_end_swarm_closure_signal_flow() {
     let result = a_manager
         .process_fetched_shards(vec![(h, vec![0xDE, 0xAD, 0xBE, 0xEF])])
         .await;
-    let payload = result
-        .announcement_payload
-        .expect("announce payload");
+    let payload = result.announcement_payload.expect("announce payload");
 
     // --- B side: receive announce ---
     let b_index = Arc::new(ShardLocationIndex::new());
@@ -265,11 +269,17 @@ async fn end_to_end_swarm_closure_signal_flow() {
     let bridge = NGaugeBridge::new(
         tracker.clone(),
         analytics.clone(),
-        MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+        MatrixPosition {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        },
         DEFAULT_NETWORK,
     );
     for i in 0..120 {
-        tracker.record_fetch_in_network(DEFAULT_NETWORK, h, &format!("c-{i}")).await;
+        tracker
+            .record_fetch_in_network(DEFAULT_NETWORK, h, &format!("c-{i}"))
+            .await;
     }
     {
         let snapshot = tracker.snapshot().await;
@@ -279,7 +289,11 @@ async fn end_to_end_swarm_closure_signal_flow() {
                 guard.record_request(
                     *sid,
                     NodeId::from_public_key(rid.as_bytes()),
-                    MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+                    MatrixPosition {
+                        x: 1.0,
+                        y: 2.0,
+                        z: 3.0,
+                    },
                     entry.last_request_us,
                 );
             }
@@ -296,7 +310,10 @@ async fn end_to_end_swarm_closure_signal_flow() {
     // decision are present.
     let providers = b_index.get_providers_in_network(DEFAULT_NETWORK, &h).await;
     assert!(!providers.is_empty(), "B has at least one provider");
-    assert!(hot.urgency > 0.0, "signal urgency drives the fetch decision");
+    assert!(
+        hot.urgency > 0.0,
+        "signal urgency drives the fetch decision"
+    );
 }
 
 /// Distinct unused import keeps coordinate import live for future fixtures.

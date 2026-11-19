@@ -62,8 +62,7 @@ async fn test_full_share_lifecycle() {
     let bob = FalconIdentity::generate();
 
     // 2. Alice creates an asset through the streaming pipeline
-    let data: Vec<u8> = b"Hello Bob, this is a secret file shared over HyperMesh!"
-        .repeat(200);
+    let data: Vec<u8> = b"Hello Bob, this is a secret file shared over HyperMesh!".repeat(200);
 
     let pipeline = StreamingAssetPipeline::new(StreamingPipelineConfig {
         segment_size: 10_000,
@@ -91,9 +90,8 @@ async fn test_full_share_lifecycle() {
     }
 
     // 4. Alice wraps the decryption key for bob using bob's Kyber public key
-    let (encrypted_key, kem_ct) =
-        wrap_key_for_recipient(&decryption_key, &bob.kyber_public_key)
-            .expect("test: wrap_key_for_recipient");
+    let (encrypted_key, kem_ct) = wrap_key_for_recipient(&decryption_key, &bob.kyber_public_key)
+        .expect("test: wrap_key_for_recipient");
 
     // 5. Alice builds and signs a ShareInvite
     let shard_count: u32 = shard_sets.iter().map(|s| s.shards.len() as u32).sum();
@@ -149,8 +147,7 @@ async fn test_full_share_lifecycle() {
     .expect("test: unwrap_key");
 
     // 10. Bob fetches shards and reconstructs the asset
-    let all_shards: Vec<Vec<Shard>> =
-        shard_sets.iter().map(|s| s.shards.clone()).collect();
+    let all_shards: Vec<Vec<Shard>> = shard_sets.iter().map(|s| s.shards.clone()).collect();
     let reconstructed = pipeline
         .reconstruct_segmented(&manifest, &unwrapped_key, &all_shards)
         .expect("test: reconstruct_segmented");
@@ -161,7 +158,10 @@ async fn test_full_share_lifecycle() {
         data.len(),
         "Reconstructed size must match original"
     );
-    assert_eq!(reconstructed, data, "Reconstructed data must match original");
+    assert_eq!(
+        reconstructed, data,
+        "Reconstructed data must match original"
+    );
 }
 
 // ── Test 2: Reject flow clears inbox ────────────────────────────────────────
@@ -195,9 +195,8 @@ fn test_wrong_recipient_key_fails() {
     });
 
     // Wrap with alice's public key
-    let (encrypted, kem_ct) =
-        wrap_key_for_recipient(&dk, alice_kyber.0.as_bytes())
-            .expect("test: wrap with alice pubkey");
+    let (encrypted, kem_ct) = wrap_key_for_recipient(&dk, alice_kyber.0.as_bytes())
+        .expect("test: wrap with alice pubkey");
 
     // Try unwrap with bob's secret key — must fail
     let result = unwrap_key(&encrypted, &kem_ct, bob_kyber.1.as_bytes());
@@ -278,9 +277,7 @@ async fn test_multi_node_share_and_fetch() {
     let recipient = FalconIdentity::generate();
 
     // Create asset
-    let data: Vec<u8> = (0..5000u32)
-        .flat_map(|i| i.to_le_bytes())
-        .collect();
+    let data: Vec<u8> = (0..5000u32).flat_map(|i| i.to_le_bytes()).collect();
 
     let pipeline = StreamingAssetPipeline::new(StreamingPipelineConfig {
         segment_size: 8_000,
@@ -310,9 +307,7 @@ async fn test_multi_node_share_and_fetch() {
     for set in &shard_sets {
         for shard in &set.shards {
             let hash = ContentHash(*blake3::hash(&shard.data).as_bytes());
-            stores[shard_idx % 3]
-                .store(hash, shard.data.clone())
-                .await;
+            stores[shard_idx % 3].store(hash, shard.data.clone()).await;
             shard_idx += 1;
         }
     }
@@ -396,15 +391,21 @@ fn test_key_wrap_preserves_kyber_segmented_variant() {
         original_size: 50_000,
     };
 
-    let (encrypted, kem_ct) =
-        wrap_key_for_recipient(&dk, &recipient.kyber_public_key)
-            .expect("test: wrap KyberSegmented");
+    let (encrypted, kem_ct) = wrap_key_for_recipient(&dk, &recipient.kyber_public_key)
+        .expect("test: wrap KyberSegmented");
 
     let restored = unwrap_key(&encrypted, &kem_ct, recipient.kyber_secret_key_bytes())
         .expect("test: unwrap KyberSegmented");
 
     assert!(
-        matches!(restored, DecryptionKey::KyberSegmented { segment_count: 5, original_size: 50_000, .. }),
+        matches!(
+            restored,
+            DecryptionKey::KyberSegmented {
+                segment_count: 5,
+                original_size: 50_000,
+                ..
+            }
+        ),
         "KyberSegmented variant must be preserved with correct fields"
     );
 }
@@ -431,8 +432,7 @@ fn test_invite_serialization_preserves_all_fields() {
     invite.sign(&alice).expect("test: sign");
 
     let json = serde_json::to_vec(&invite).expect("test: serialize");
-    let restored: ShareInvite =
-        serde_json::from_slice(&json).expect("test: deserialize");
+    let restored: ShareInvite = serde_json::from_slice(&json).expect("test: deserialize");
 
     assert_eq!(restored.invite_id, invite.invite_id);
     assert_eq!(restored.asset_id, invite.asset_id);

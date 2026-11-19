@@ -15,9 +15,9 @@
 
 use std::sync::Arc;
 
-use ngauge::routing_intel::{EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule};
 use hypermesh_ebpf::HyperMeshEbpf;
 use hypermesh_lib::{NetworkId, PrivacyMode, DEFAULT_NETWORK};
+use ngauge::routing_intel::{EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule};
 
 /// Adapter that pushes ngauge routing intelligence decisions into the
 /// kernel-level eBPF policy maps managed by [`HyperMeshEbpf`].
@@ -108,12 +108,28 @@ mod tests {
 
         let rules = vec![
             EbpfRoutingRule {
-                dest: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
-                next_hop: MatrixPosition { x: 4.0, y: 5.0, z: 6.0 },
+                dest: MatrixPosition {
+                    x: 1.0,
+                    y: 2.0,
+                    z: 3.0,
+                },
+                next_hop: MatrixPosition {
+                    x: 4.0,
+                    y: 5.0,
+                    z: 6.0,
+                },
             },
             EbpfRoutingRule {
-                dest: MatrixPosition { x: 7.0, y: 8.0, z: 9.0 },
-                next_hop: MatrixPosition { x: 10.0, y: 11.0, z: 12.0 },
+                dest: MatrixPosition {
+                    x: 7.0,
+                    y: 8.0,
+                    z: 9.0,
+                },
+                next_hop: MatrixPosition {
+                    x: 10.0,
+                    y: 11.0,
+                    z: 12.0,
+                },
             },
         ];
 
@@ -124,7 +140,11 @@ mod tests {
         assert_eq!(ebpf.routing_rule_count(), 2);
 
         let got = ebpf
-            .get_routing_rule(&MatrixPosition { x: 1.0, y: 2.0, z: 3.0 })
+            .get_routing_rule(&MatrixPosition {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            })
             .expect("rule present");
         assert_eq!(got.x, 4.0);
         assert_eq!(got.y, 5.0);

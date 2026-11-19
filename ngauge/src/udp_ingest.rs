@@ -126,12 +126,10 @@ mod tests {
             .expect("test: bind listener");
         let listen_addr = listener.local_addr().expect("test: local addr");
 
-        let pipeline = Arc::new(Mutex::new(MetricsIngestionPipeline::new(
-            IngestionConfig {
-                enable_privacy_filter: false,
-                ..Default::default()
-            },
-        )));
+        let pipeline = Arc::new(Mutex::new(MetricsIngestionPipeline::new(IngestionConfig {
+            enable_privacy_filter: false,
+            ..Default::default()
+        })));
         let app_state = Arc::new(NGaugeAppState::new());
 
         let pipeline_clone = pipeline.clone();
@@ -150,9 +148,7 @@ mod tests {
         });
 
         // Send a frame via UDP
-        let sender = UdpSocket::bind("[::1]:0")
-            .await
-            .expect("test: bind sender");
+        let sender = UdpSocket::bind("[::1]:0").await.expect("test: bind sender");
         let frame = test_capacity_frame(42);
         let bytes = serde_json::to_vec(&frame).expect("test: serialize");
         sender

@@ -79,15 +79,26 @@ pub(super) fn spawn(svc: &ReplicationService) {
             let _ = feed.publish_update(&source_pos, &source_pos, &candidate_ids);
 
             let modifiers = ngauge::RoutingAdvisor::compute_weight_adjustments(
-                &ri, &source_pos, &source_pos, &candidate_ids,
+                &ri,
+                &source_pos,
+                &source_pos,
+                &candidate_ids,
             );
             if !modifiers.is_empty() {
                 let weights = crate::intelligence::ngauge_bridge::compute_propagation_weights(
-                    &modifiers, &node_coords,
+                    &modifiers,
+                    &node_coords,
                 );
                 if !weights.is_empty() {
-                    h4_propagator.lock().await.set_propagation_weights(weights).await;
-                    debug!("Updated propagation weights from ngauge ({} modifiers)", modifiers.len());
+                    h4_propagator
+                        .lock()
+                        .await
+                        .set_propagation_weights(weights)
+                        .await;
+                    debug!(
+                        "Updated propagation weights from ngauge ({} modifiers)",
+                        modifiers.len()
+                    );
                 }
             }
 
@@ -98,9 +109,8 @@ pub(super) fn spawn(svc: &ReplicationService) {
             if !networks.is_empty() {
                 match h4_analytics.lock() {
                     Ok(analytics) => {
-                        let trigger = ngauge::ReplicationTrigger::new(
-                            ngauge::ReplicationConfig::default(),
-                        );
+                        let trigger =
+                            ngauge::ReplicationTrigger::new(ngauge::ReplicationConfig::default());
                         for network in &networks {
                             let signals = trigger.check_in_network(&analytics, *network);
                             for signal in &signals {

@@ -1,10 +1,10 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
+use super::to_json_ptr;
 use crate::error_state;
 use crate::handle::{borrow_handle, HypermeshClientHandle};
 use crate::{ptr_to_str, str_to_cstring};
-use super::to_json_ptr;
 use std::os::raw::c_char;
 
 /// Resolve a DNS name. Returns the address as a C string.
@@ -41,9 +41,7 @@ pub unsafe extern "C" fn hypermesh_dns_resolve(
 ///
 /// `client` must be a valid pointer returned by `hypermesh_connect`.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_dns_list(
-    client: *mut HypermeshClientHandle,
-) -> *mut c_char {
+pub unsafe extern "C" fn hypermesh_dns_list(client: *mut HypermeshClientHandle) -> *mut c_char {
     let h = match borrow_handle(client) {
         Some(h) => h,
         None => return std::ptr::null_mut(),

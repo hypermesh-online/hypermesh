@@ -62,7 +62,9 @@ mod tests {
     async fn test_container_scheduling_performance() {
         let config = ContainerConfig::default();
 
-        let orchestrator = ContainerOrchestrator::new(config).await.expect("test: async operation");
+        let orchestrator = ContainerOrchestrator::new(config)
+            .await
+            .expect("test: async operation");
 
         // Register a test node
         let node_state = NodeState {
@@ -105,7 +107,10 @@ mod tests {
             },
         };
 
-        orchestrator.register_node(node_state).await.expect("test: async operation");
+        orchestrator
+            .register_node(node_state)
+            .await
+            .expect("test: async operation");
 
         // Create test container specification
         let container_spec = ContainerSpec {

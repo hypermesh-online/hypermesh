@@ -522,10 +522,7 @@ impl CatalogRegistry {
     /// If the root itself is not registered, returns a graph whose `missing`
     /// contains only the root hash. No error is raised — missing is honest
     /// state, not a failure.
-    pub async fn resolve_dependencies(
-        &self,
-        root: &ContentHash,
-    ) -> Result<DependencyGraph> {
+    pub async fn resolve_dependencies(&self, root: &ContentHash) -> Result<DependencyGraph> {
         if !self.config.enable_dependency_resolution {
             return Ok(DependencyGraph::default());
         }
@@ -544,9 +541,7 @@ impl CatalogRegistry {
         };
 
         // 2. Compute direct dependencies = declared ∪ embedded.
-        let direct_hashes = self
-            .deps_for(&root_reg, Some(root))
-            .await;
+        let direct_hashes = self.deps_for(&root_reg, Some(root)).await;
 
         // 3. BFS. Track visited by ContentHash so cycles terminate.
         let mut direct: Vec<DependencyNode> = Vec::new();
@@ -652,8 +647,7 @@ impl CatalogRegistry {
             Ok(v) => v,
             Err(_) => return out,
         };
-        let embedded =
-            scan_schema_for_typedef_refs(&schema_bytes, self, self_hash).await;
+        let embedded = scan_schema_for_typedef_refs(&schema_bytes, self, self_hash).await;
         for h in embedded {
             if seen.insert(h) {
                 out.push(h);
@@ -913,8 +907,11 @@ mod tests {
     fn create_test_state_proof() -> StateProof {
         let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string());
         let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
-        let work_proof =
-            WorkProof::from_work("test-owner".to_string(), "test-workload".to_string(), b"work");
+        let work_proof = WorkProof::from_work(
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            b"work",
+        );
         let time_proof = TimeProof::new(Duration::from_secs(10));
         StateProof::new(stake_proof, time_proof, space_proof, work_proof)
     }
@@ -937,8 +934,14 @@ mod tests {
         let state_proof = create_test_state_proof();
         let type_def = AssetTypeDefinition::new("Vehicle".to_string(), schema, state_proof);
 
-        let asset_id = registry.register_type(type_def).await.expect("test: async operation");
-        let found_id = registry.find_type("Vehicle").await.expect("test: async operation");
+        let asset_id = registry
+            .register_type(type_def)
+            .await
+            .expect("test: async operation");
+        let found_id = registry
+            .find_type("Vehicle")
+            .await
+            .expect("test: async operation");
 
         assert_eq!(asset_id, found_id);
     }
@@ -956,7 +959,10 @@ mod tests {
             let schema = json!({ "type": "object" });
             let state_proof = create_test_state_proof();
             let type_def = AssetTypeDefinition::new(name.to_string(), schema, state_proof);
-            registry.register_type(type_def).await.expect("test: async operation");
+            registry
+                .register_type(type_def)
+                .await
+                .expect("test: async operation");
         }
 
         // Search for "Vehicle"
@@ -965,7 +971,10 @@ mod tests {
             ..Default::default()
         };
 
-        let results = registry.search_types(&query).await.expect("test: async operation");
+        let results = registry
+            .search_types(&query)
+            .await
+            .expect("test: async operation");
         assert_eq!(results.results.len(), 2); // Vehicle and VehicleInsurance
     }
 
@@ -995,14 +1004,26 @@ mod tests {
         });
 
         let state_proof = create_test_state_proof();
-        let type_def = AssetTypeDefinition::new("TestType".to_string(), schema.clone(), state_proof);
-        registry.register_type(type_def).await.expect("test: register");
+        let type_def =
+            AssetTypeDefinition::new("TestType".to_string(), schema.clone(), state_proof);
+        registry
+            .register_type(type_def)
+            .await
+            .expect("test: register");
 
-        let reg = registry.lookup_type("TestType").await.expect("test: lookup");
+        let reg = registry
+            .lookup_type("TestType")
+            .await
+            .expect("test: lookup");
 
         // Verify hash matches BLAKE3 of canonical schema JSON
         let expected_hash = hex::encode(
-            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+            blake3::hash(
+                serde_json::to_string(&schema)
+                    .expect("test: json")
+                    .as_bytes(),
+            )
+            .as_bytes(),
         );
         assert_eq!(reg.type_hash, expected_hash);
         assert_eq!(reg.type_name, "TestType");
@@ -1020,14 +1041,20 @@ mod tests {
         let schema = json!({ "type": "object" });
         let proof1 = create_test_state_proof();
         let type_def1 = AssetTypeDefinition::new("DupType".to_string(), schema.clone(), proof1);
-        registry.register_type(type_def1).await.expect("test: first register");
+        registry
+            .register_type(type_def1)
+            .await
+            .expect("test: first register");
 
         let proof2 = create_test_state_proof();
         let type_def2 = AssetTypeDefinition::new("DupType".to_string(), schema, proof2);
         let result = registry.register_type(type_def2).await;
         assert!(result.is_err());
         assert!(
-            result.unwrap_err().to_string().contains("already registered"),
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("already registered"),
             "Error should mention already registered"
         );
     }
@@ -1043,7 +1070,10 @@ mod tests {
         let schema = json!({ "type": "object", "description": "test" });
         let proof = create_test_state_proof();
         let type_def = AssetTypeDefinition::new("ByNameType".to_string(), schema, proof);
-        registry.register_type(type_def).await.expect("test: register");
+        registry
+            .register_type(type_def)
+            .await
+            .expect("test: register");
 
         assert!(registry.lookup_type("ByNameType").await.is_some());
         assert!(registry.lookup_type("NonExistent").await.is_none());
@@ -1060,10 +1090,18 @@ mod tests {
         let schema = json!({ "type": "object", "id": "hash-test" });
         let proof = create_test_state_proof();
         let type_def = AssetTypeDefinition::new("HashLookup".to_string(), schema.clone(), proof);
-        registry.register_type(type_def).await.expect("test: register");
+        registry
+            .register_type(type_def)
+            .await
+            .expect("test: register");
 
         let expected_hash = hex::encode(
-            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+            blake3::hash(
+                serde_json::to_string(&schema)
+                    .expect("test: json")
+                    .as_bytes(),
+            )
+            .as_bytes(),
         );
 
         let reg = registry
@@ -1087,7 +1125,10 @@ mod tests {
             let schema = json!({ "type": "object", "name": name });
             let proof = create_test_state_proof();
             let type_def = AssetTypeDefinition::new(name.to_string(), schema, proof);
-            registry.register_type(type_def).await.expect("test: register");
+            registry
+                .register_type(type_def)
+                .await
+                .expect("test: register");
         }
 
         let all = registry.list_type_registrations().await;
@@ -1113,9 +1154,16 @@ mod tests {
         assert_eq!(all.len(), 3);
 
         // Verify schemas have expected required fields
-        let msg = registry.lookup_type("Message").await.expect("test: Message");
+        let msg = registry
+            .lookup_type("Message")
+            .await
+            .expect("test: Message");
         let required = msg.schema.get("required").expect("test: required field");
-        assert!(required.as_array().expect("test: array").iter().any(|v| v == "sender_node_id"));
+        assert!(required
+            .as_array()
+            .expect("test: array")
+            .iter()
+            .any(|v| v == "sender_node_id"));
     }
 
     // ===========================================================================
@@ -1145,9 +1193,17 @@ mod tests {
         for d in dependencies {
             type_def.add_dependency(d);
         }
-        registry.register_type(type_def).await.expect("test: register");
+        registry
+            .register_type(type_def)
+            .await
+            .expect("test: register");
         let hex_str = hex::encode(
-            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+            blake3::hash(
+                serde_json::to_string(&schema)
+                    .expect("test: json")
+                    .as_bytes(),
+            )
+            .as_bytes(),
         );
         let mut bytes = [0u8; 32];
         let decoded = hex::decode(&hex_str).expect("test: hex decode");
@@ -1157,8 +1213,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_empty() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         let root = register_named(&registry, "Solo", json!({"type": "object"}), vec![]).await;
         let graph = registry.resolve_dependencies(&root).await.expect("resolve");
@@ -1169,15 +1228,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_direct() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         // B is a leaf, A depends on B.
-        let b_hash = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
-        let a_hash =
-            register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b_hash]).await;
+        let b_hash =
+            register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
+        let a_hash = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![b_hash],
+        )
+        .await;
 
-        let graph = registry.resolve_dependencies(&a_hash).await.expect("resolve");
+        let graph = registry
+            .resolve_dependencies(&a_hash)
+            .await
+            .expect("resolve");
         assert_eq!(graph.direct.len(), 1, "exactly one direct dep");
         assert_eq!(graph.direct[0].name, "B");
         assert_eq!(graph.direct[0].type_hash, b_hash);
@@ -1188,13 +1259,28 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_transitive() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         // C leaf, B → C, A → B.
         let c = register_named(&registry, "C", json!({"type": "object", "id": "c"}), vec![]).await;
-        let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![c]).await;
-        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        let b = register_named(
+            &registry,
+            "B",
+            json!({"type": "object", "id": "b"}),
+            vec![c],
+        )
+        .await;
+        let a = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![b],
+        )
+        .await;
 
         let graph = registry.resolve_dependencies(&a).await.expect("resolve");
         assert_eq!(graph.direct.len(), 1);
@@ -1208,8 +1294,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_missing() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         // A declares a dep on a hash that does NOT exist in the registry.
         let phantom = ContentHash::from_bytes(*blake3::hash(b"phantom").as_bytes());
@@ -1222,18 +1311,27 @@ mod tests {
         .await;
 
         let graph = registry.resolve_dependencies(&a).await.expect("resolve");
-        assert!(graph.direct.is_empty(), "phantom resolved → missing, not direct");
+        assert!(
+            graph.direct.is_empty(),
+            "phantom resolved → missing, not direct"
+        );
         assert_eq!(graph.missing.len(), 1);
         assert_eq!(graph.missing[0], phantom);
     }
 
     #[tokio::test]
     async fn test_resolve_dependencies_root_missing() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         let nonexistent = ContentHash::from_bytes(*blake3::hash(b"unknown-root").as_bytes());
-        let graph = registry.resolve_dependencies(&nonexistent).await.expect("resolve");
+        let graph = registry
+            .resolve_dependencies(&nonexistent)
+            .await
+            .expect("resolve");
         assert!(graph.direct.is_empty());
         assert!(graph.transitive.is_empty());
         assert_eq!(graph.missing, vec![nonexistent]);
@@ -1241,13 +1339,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_cycle() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         // Register B first with NO deps (its canonical hash is fixed by schema).
         let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
         // Register A → B.
-        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        let a = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![b],
+        )
+        .await;
         // Mutate B's stored definition so B → A (introduce the cycle).
         // We do this directly on the type_definitions map because the public
         // API does not support replacing a registered definition.
@@ -1277,7 +1384,13 @@ mod tests {
         let registry = CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), cfg);
 
         let b = register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![]).await;
-        let a = register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        let a = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![b],
+        )
+        .await;
         let graph = registry.resolve_dependencies(&a).await.expect("resolve");
         assert!(graph.direct.is_empty());
         assert!(graph.transitive.is_empty());
@@ -1286,8 +1399,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_resolve_dependencies_embedded_ref_via_scanner() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, relaxed_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            relaxed_policy(),
+            RegistryConfig::default(),
+        );
 
         // Register a leaf typedef, then a parent whose schema body EMBEDS the
         // leaf's hex hash (without declaring it via `dependencies`).
@@ -1301,7 +1417,10 @@ mod tests {
         });
         let parent_hash = register_named(&registry, "Parent", parent_schema, vec![]).await;
 
-        let graph = registry.resolve_dependencies(&parent_hash).await.expect("resolve");
+        let graph = registry
+            .resolve_dependencies(&parent_hash)
+            .await
+            .expect("resolve");
         assert_eq!(
             graph.direct.len(),
             1,

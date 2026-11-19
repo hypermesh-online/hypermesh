@@ -41,9 +41,7 @@ impl PrivacyAllocationType {
                 "Cross-network accessible with full discovery capabilities"
             }
             PrivacyAllocationType::Anonymous => "Privacy-first sharing with no identity tracking",
-            PrivacyAllocationType::Verified => {
-                "Maximum security with full state proof validation"
-            }
+            PrivacyAllocationType::Verified => "Maximum security with full state proof validation",
         }
     }
 

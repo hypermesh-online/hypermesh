@@ -244,10 +244,20 @@ mod tests {
         // missing, all depths correct.
         let registry = new_registry();
         let c = register_named(&registry, "C", json!({"type": "object", "id": "c"}), vec![]).await;
-        let b =
-            register_named(&registry, "B", json!({"type": "object", "id": "b"}), vec![c]).await;
-        let a =
-            register_named(&registry, "A", json!({"type": "object", "id": "a"}), vec![b]).await;
+        let b = register_named(
+            &registry,
+            "B",
+            json!({"type": "object", "id": "b"}),
+            vec![c],
+        )
+        .await;
+        let a = register_named(
+            &registry,
+            "A",
+            json!({"type": "object", "id": "a"}),
+            vec![b],
+        )
+        .await;
 
         let adapter = CatalogRegistryAdapter::new(registry);
         let graph = adapter
@@ -306,8 +316,13 @@ mod tests {
     #[tokio::test]
     async fn test_adapter_lookup_by_name() {
         let registry = new_registry();
-        let b_hash =
-            register_named(&registry, "B", json!({"type": "object", "id": "b-lk"}), vec![]).await;
+        let b_hash = register_named(
+            &registry,
+            "B",
+            json!({"type": "object", "id": "b-lk"}),
+            vec![],
+        )
+        .await;
 
         let adapter = CatalogRegistryAdapter::new(registry);
         let info = adapter

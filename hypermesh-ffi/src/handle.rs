@@ -39,9 +39,7 @@ pub unsafe extern "C" fn hypermesh_connect(
         match CStr::from_ptr(socket_path).to_str() {
             Ok(s) => Some(PathBuf::from(s)),
             Err(e) => {
-                error_state::set_last_error(format!(
-                    "socket_path is not valid UTF-8: {e}"
-                ));
+                error_state::set_last_error(format!("socket_path is not valid UTF-8: {e}"));
                 return std::ptr::null_mut();
             }
         }

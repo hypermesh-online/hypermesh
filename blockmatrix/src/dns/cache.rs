@@ -236,7 +236,10 @@ mod tests {
 
         std::thread::sleep(std::time::Duration::from_millis(10));
 
-        let result = cache.get("test", &DnsRecordType::AAAA).await.expect("test: async operation");
+        let result = cache
+            .get("test", &DnsRecordType::AAAA)
+            .await
+            .expect("test: async operation");
         assert!(result.is_none());
     }
 
@@ -274,7 +277,10 @@ mod tests {
             .expect("test: expected success");
 
         std::thread::sleep(std::time::Duration::from_millis(10));
-        let removed = cache.cleanup_expired().await.expect("test: async operation");
+        let removed = cache
+            .cleanup_expired()
+            .await
+            .expect("test: async operation");
         assert_eq!(removed, 1);
     }
 

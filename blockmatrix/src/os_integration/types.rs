@@ -238,7 +238,10 @@ impl DeviceFingerprint {
             (b"product_uuid".as_slice(), ids.product_uuid.as_deref()),
             (b"board_serial".as_slice(), ids.board_serial.as_deref()),
             (b"product_serial".as_slice(), ids.product_serial.as_deref()),
-            (b"disk_serial".as_slice(), ids.primary_disk_serial.as_deref()),
+            (
+                b"disk_serial".as_slice(),
+                ids.primary_disk_serial.as_deref(),
+            ),
             (b"mac".as_slice(), ids.primary_mac.as_deref()),
         ] {
             if let Some(v) = value {

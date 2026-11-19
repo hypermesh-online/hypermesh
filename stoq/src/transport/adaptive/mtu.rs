@@ -62,7 +62,10 @@ impl MtuDiscovery {
             if self.current_mtu > self.max_mtu {
                 self.current_mtu = self.max_mtu;
             }
-            info!("MTU discovery: WAN mode enabled (bounds {}-{} bytes)", self.min_mtu, self.max_mtu);
+            info!(
+                "MTU discovery: WAN mode enabled (bounds {}-{} bytes)",
+                self.min_mtu, self.max_mtu
+            );
         } else {
             info!("MTU discovery: LAN mode (jumbo frames allowed)");
         }

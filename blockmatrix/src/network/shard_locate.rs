@@ -141,9 +141,7 @@ pub async fn resolve_shard_locations(
         if seen.insert(node_id.clone()) {
             out.push(ResolvedProvider {
                 node_id,
-                source: ProviderSource::CanonicalPlacement {
-                    coordinate: *coord,
-                },
+                source: ProviderSource::CanonicalPlacement { coordinate: *coord },
             });
         }
     }
@@ -221,8 +219,14 @@ mod tests {
         ));
 
         // Canonical node_ids match the coordinate derivation.
-        assert_eq!(resolved[2].node_id, coordinate_to_node_id_hex(&placements[0]));
-        assert_eq!(resolved[3].node_id, coordinate_to_node_id_hex(&placements[1]));
+        assert_eq!(
+            resolved[2].node_id,
+            coordinate_to_node_id_hex(&placements[0])
+        );
+        assert_eq!(
+            resolved[3].node_id,
+            coordinate_to_node_id_hex(&placements[1])
+        );
     }
 
     #[tokio::test]
@@ -271,12 +275,10 @@ mod tests {
 
     #[test]
     fn test_merge_upstream_appends_new_and_dedups_known() {
-        let mut resolved = vec![
-            ResolvedProvider {
-                node_id: "known-live".to_string(),
-                source: ProviderSource::LiveMirror,
-            },
-        ];
+        let mut resolved = vec![ResolvedProvider {
+            node_id: "known-live".to_string(),
+            source: ProviderSource::LiveMirror,
+        }];
 
         // "known-live" is already present → skipped; "fresh-upstream" appended.
         merge_upstream(
@@ -286,6 +288,9 @@ mod tests {
 
         assert_eq!(resolved.len(), 2);
         assert_eq!(resolved[1].node_id, "fresh-upstream");
-        assert!(matches!(resolved[1].source, ProviderSource::UpstreamTracker));
+        assert!(matches!(
+            resolved[1].source,
+            ProviderSource::UpstreamTracker
+        ));
     }
 }

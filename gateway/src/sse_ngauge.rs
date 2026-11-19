@@ -34,12 +34,12 @@ use std::time::Duration;
 
 use anyhow::Result;
 use bytes::Bytes;
+use http::{header, HeaderMap, Response, StatusCode};
+use hypermesh_lib::{NodeId, PrivacyMode};
 use ngauge::capacity::CapacityMetrics;
 use ngauge::streaming::{
     CongestionSnapshot, EconomicSnapshot, MetricsFrame, RoutingSnapshot, SseFrameBridge,
 };
-use http::{header, HeaderMap, Response, StatusCode};
-use hypermesh_lib::{NodeId, PrivacyMode};
 use tokio::sync::broadcast::{self, error::RecvError};
 use tracing::{debug, info, warn};
 
@@ -109,7 +109,8 @@ impl NGaugeStream {
     /// In alpha, `require_capability` is `false` (anonymous reads accepted).
     /// When the capability-token system lands, callers can flip this to true.
     pub fn new(node_id: NodeId, privacy_mode: PrivacyMode) -> Self {
-        let bridge = SseFrameBridge::new(node_id, privacy_mode, 1.0, STUB_PUBLISH_INTERVAL.as_secs());
+        let bridge =
+            SseFrameBridge::new(node_id, privacy_mode, 1.0, STUB_PUBLISH_INTERVAL.as_secs());
         Self {
             bridge,
             require_capability: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -228,9 +229,15 @@ impl NGaugeStream {
 
         let (parts, _) = response.into_parts();
 
-        info!("ngauge SSE subscriber connected, total={}", self.bridge.subscriber_count());
+        info!(
+            "ngauge SSE subscriber connected, total={}",
+            self.bridge.subscriber_count()
+        );
 
-        SseHandshake::Stream(SseResponse { parts, chunks: chunk_rx })
+        SseHandshake::Stream(SseResponse {
+            parts,
+            chunks: chunk_rx,
+        })
     }
 }
 
@@ -403,7 +410,10 @@ mod tests {
             .expect("test: frame within 100ms")
             .expect("test: chunk");
         let payload = std::str::from_utf8(&next).expect("test: utf8");
-        assert!(payload.starts_with("data: "), "frame chunk should start with `data: `");
+        assert!(
+            payload.starts_with("data: "),
+            "frame chunk should start with `data: `"
+        );
         assert!(payload.ends_with("\n\n"));
     }
 

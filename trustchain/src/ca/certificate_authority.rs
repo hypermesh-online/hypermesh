@@ -19,12 +19,10 @@ use uuid::Uuid;
 
 use super::certificate_store::CertificateStore;
 use super::{CertificateMetadata, CertificateRequest, CertificateStatus, IssuedCertificate};
-use crate::proof_of_state::{
-    StateProof, StateRequirements, StateProofResult, FourProofValidator,
-};
 use crate::ct::CertificateTransparencyLog;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
 use crate::proof_of_state::StateProofOps;
+use crate::proof_of_state::{FourProofValidator, StateProof, StateProofResult, StateRequirements};
 
 // AWS CloudHSM dependencies REMOVED - software-only operation
 // All HSM-related types and clients have been removed.
@@ -314,11 +312,11 @@ impl TrustChainCA {
         params.is_ca = rcgen::IsCa::NoCa;
 
         // Sign leaf with CA using signed_by()
-        let cert = params.signed_by(&key_pair, &ca_cert, &ca_key_pair).map_err(|e| {
-            TrustChainError::CertificateGenerationFailed {
+        let cert = params
+            .signed_by(&key_pair, &ca_cert, &ca_key_pair)
+            .map_err(|e| TrustChainError::CertificateGenerationFailed {
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
         // rcgen 0.13 API: Use der() instead of serialize_der()
         let cert_der = cert.der().to_vec();
@@ -496,10 +494,10 @@ impl CertificateRotationManager {
                 }
 
                 // Check if within renewal window (expires_at - renewal_window < now)
-                let renewal_threshold =
-                    cert.expires_at
-                        .checked_sub(Self::DEFAULT_RENEWAL_WINDOW)
-                        .unwrap_or(cert.expires_at);
+                let renewal_threshold = cert
+                    .expires_at
+                    .checked_sub(Self::DEFAULT_RENEWAL_WINDOW)
+                    .unwrap_or(cert.expires_at);
 
                 if now >= renewal_threshold {
                     Some(cert.serial_number.clone())
@@ -571,7 +569,8 @@ mod tests {
     // AWS CloudHSM dependencies REMOVED - test_hsm_integration test removed
 
     #[tokio::test]
-    async fn test_certificate_issuance_with_state_proof() -> Result<(), Box<dyn std::error::Error>> {
+    async fn test_certificate_issuance_with_state_proof() -> Result<(), Box<dyn std::error::Error>>
+    {
         let config = CAConfiguration::default();
         let ca = TrustChainCA::new(config)
             .await

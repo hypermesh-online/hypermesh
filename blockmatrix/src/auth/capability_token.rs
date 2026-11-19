@@ -246,8 +246,8 @@ impl CapabilityToken {
     /// Variant of [`is_expired`] testable with an injected reference time.
     pub fn is_expired_at(&self, now: SystemTime) -> bool {
         match now.duration_since(self.valid_until) {
-            Ok(_) => true,    // now >= valid_until → expired
-            Err(_) => false,  // valid_until > now → still good
+            Ok(_) => true,   // now >= valid_until → expired
+            Err(_) => false, // valid_until > now → still good
         }
     }
 
@@ -283,7 +283,9 @@ impl CapabilityToken {
 }
 
 fn systime_to_secs(t: SystemTime) -> u64 {
-    t.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+    t.duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// Issues capability tokens signed with the daemon's FALCON identity.

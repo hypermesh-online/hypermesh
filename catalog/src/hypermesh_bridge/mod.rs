@@ -24,7 +24,7 @@ use crate::library::{AssetLibrary, LibraryAssetPackage, LibraryConfig, LibraryIn
 
 use anyhow::Result;
 use blockmatrix::assets::core::{
-    AssetAllocationRequest, AssetManager, AssetType, StateProof, ResourceRequirements,
+    AssetAllocationRequest, AssetManager, AssetType, ResourceRequirements, StateProof,
 };
 use chrono::{DateTime, Utc};
 use hypermesh_lib::PrivacyMode;
@@ -565,7 +565,10 @@ mod tests {
             offset: 0,
         };
 
-        let results = registry.search(&query).await.expect("test: async operation");
+        let results = registry
+            .search(&query)
+            .await
+            .expect("test: async operation");
         assert_eq!(results.total_count, 0);
     }
 }

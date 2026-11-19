@@ -296,8 +296,8 @@ pub async fn test_10k_connections() -> (bool, Vec<String>) {
 async fn simulate_split_brain() -> Result<bool> {
     use blockmatrix::blockchain::block::Block;
     use blockmatrix::blockchain::chain::NodeBlockchain;
-    use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use blockmatrix::identity::FalconIdentity;
+    use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use std::sync::Arc;
 
     let coord_a = MatrixCoordinate { x: 1, y: 1, z: 1 };
@@ -308,8 +308,10 @@ async fn simulate_split_brain() -> Result<bool> {
     let genesis_a = Block::genesis(coord_a);
     let genesis_b = Block::genesis(coord_b);
 
-    let _chain_a = NodeBlockchain::from_genesis(coord_a, genesis_a.clone()).with_signer(id_a.clone());
-    let chain_b = NodeBlockchain::from_genesis(coord_b, genesis_b.clone()).with_signer(id_b.clone());
+    let _chain_a =
+        NodeBlockchain::from_genesis(coord_a, genesis_a.clone()).with_signer(id_a.clone());
+    let chain_b =
+        NodeBlockchain::from_genesis(coord_b, genesis_b.clone()).with_signer(id_b.clone());
 
     // In a split brain, Partition A creates Block 1 rooted at Genesis A
     let entry_a = blockmatrix::blockchain::block::BlockAssetEntry {
@@ -375,8 +377,8 @@ async fn simulate_node_failure_detection() -> Result<bool> {
 async fn simulate_byzantine_generals() -> Result<bool> {
     use blockmatrix::blockchain::block::Block;
     use blockmatrix::blockchain::chain::NodeBlockchain;
-    use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use blockmatrix::identity::FalconIdentity;
+    use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use std::sync::Arc;
 
     let coord = MatrixCoordinate { x: 0, y: 0, z: 0 };
@@ -396,7 +398,10 @@ async fn simulate_byzantine_generals() -> Result<bool> {
     };
     let forged_block = Block::new(1, vec![forged_entry], genesis.hash.clone());
 
-    let rejected = honest_chain.insert_received_block(forged_block).await.is_err();
+    let rejected = honest_chain
+        .insert_received_block(forged_block)
+        .await
+        .is_err();
     Ok(rejected)
 }
 
@@ -424,13 +429,16 @@ async fn simulate_eclipse_attack() -> Result<bool> {
 }
 
 async fn simulate_double_spending() -> Result<bool> {
-    use blockmatrix::blockchain::lineage::AssetLineage;
     use blockmatrix::blockchain::block::BlockAssetEntry;
+    use blockmatrix::blockchain::lineage::AssetLineage;
 
     let coord = blockmatrix::matrix::coordinate::MatrixCoordinate { x: 1, y: 1, z: 1 };
     let reg = blockmatrix::assets::core::AssetRegistration::genesis(coord);
     let asset_hash = [0xD1u8; 32];
-    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(&asset_hash, &trustchain::proof_of_state::StateProof::new_for_testing());
+    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(
+        &asset_hash,
+        &trustchain::proof_of_state::StateProof::new_for_testing(),
+    );
 
     let entry = BlockAssetEntry {
         asset_hash,

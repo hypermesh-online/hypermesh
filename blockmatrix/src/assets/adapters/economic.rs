@@ -165,9 +165,7 @@ impl EconomicAssetAdapter {
 
             // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
             // location; capacity is descriptive and never gates admission.
-            if proof.space_proof.node_id.is_empty()
-                && proof.space_proof.storage_path.is_empty()
-            {
+            if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
                 return Err(AssetError::StateProofValidationFailed {
                     reason: "Economic operation has no bound location (WHERE)".to_string(),
                 });
@@ -182,8 +180,7 @@ impl EconomicAssetAdapter {
             }
 
             // Validate time proof for economic operation ordering
-            if proof.time_proof.network_time_offset > self.state_requirements.validation_timeout
-            {
+            if proof.time_proof.network_time_offset > self.state_requirements.validation_timeout {
                 return Err(AssetError::StateProofValidationFailed {
                     reason: "Time synchronization required for economic state proof".to_string(),
                 });
@@ -238,7 +235,11 @@ impl AssetAdapter for EconomicAssetAdapter {
         }
 
         let data = AssetData {
-            config: if config_bytes.is_empty() { vec![1, 2, 3] } else { config_bytes },
+            config: if config_bytes.is_empty() {
+                vec![1, 2, 3]
+            } else {
+                config_bytes
+            },
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };

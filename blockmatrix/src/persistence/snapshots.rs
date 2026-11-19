@@ -461,7 +461,10 @@ mod tests {
             .expect("test: expected success");
 
         // Restore
-        let restored: TestData = manager.restore_snapshot(&id).await.expect("test: async operation");
+        let restored: TestData = manager
+            .restore_snapshot(&id)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(restored, original);
     }
@@ -635,7 +638,10 @@ mod tests {
 
         // Verify parent relationship
         let snapshots = manager.list_snapshots().await;
-        let incremental = snapshots.iter().find(|s| s.id == inc_id).expect("test: query operation");
+        let incremental = snapshots
+            .iter()
+            .find(|s| s.id == inc_id)
+            .expect("test: query operation");
         assert_eq!(incremental.parent_id, Some(full_id));
     }
 
@@ -663,7 +669,12 @@ mod tests {
         // Corrupt the snapshot file
         for entry in std::fs::read_dir(&manager.storage_dir).expect("test: directory reading") {
             let entry = entry.expect("test: directory entry");
-            if entry.file_name().to_str().expect("test: directory entry").contains(&id[..8]) {
+            if entry
+                .file_name()
+                .to_str()
+                .expect("test: directory entry")
+                .contains(&id[..8])
+            {
                 let mut content = std::fs::read(entry.path()).expect("test: directory entry");
                 content[10] ^= 0xFF; // Flip some bits
                 std::fs::write(entry.path(), content).expect("test: directory entry");
@@ -710,7 +721,10 @@ mod tests {
         assert_eq!(manager.list_snapshots().await.len(), 1);
 
         // Delete
-        manager.delete_snapshot(&id).await.expect("test: async operation");
+        manager
+            .delete_snapshot(&id)
+            .await
+            .expect("test: async operation");
 
         // Verify deleted
         assert_eq!(manager.list_snapshots().await.len(), 0);

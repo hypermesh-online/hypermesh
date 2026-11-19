@@ -341,7 +341,10 @@ mod tests {
         let exporter = JsonExporter;
         let snapshot = create_test_snapshot();
 
-        let result = exporter.export(&snapshot).await.expect("test: async operation");
+        let result = exporter
+            .export(&snapshot)
+            .await
+            .expect("test: async operation");
         assert!(result.contains("\"ca\""));
         assert!(result.contains("\"total_operations\": 100"));
     }
@@ -351,7 +354,10 @@ mod tests {
         let exporter = PrometheusExporter::new("trustchain");
         let snapshot = create_test_snapshot();
 
-        let result = exporter.export(&snapshot).await.expect("test: async operation");
+        let result = exporter
+            .export(&snapshot)
+            .await
+            .expect("test: async operation");
         assert!(result.contains("# HELP"));
         assert!(result.contains("# TYPE"));
         assert!(result.contains("trustchain_ca_total 100"));
@@ -362,7 +368,10 @@ mod tests {
         let exporter = PlainTextExporter;
         let snapshot = create_test_snapshot();
 
-        let result = exporter.export(&snapshot).await.expect("test: async operation");
+        let result = exporter
+            .export(&snapshot)
+            .await
+            .expect("test: async operation");
         assert!(result.contains("TrustChain Metrics Report"));
         assert!(result.contains("CA Component:"));
         assert!(result.contains("Success Rate: 95.00%"));
@@ -373,7 +382,10 @@ mod tests {
         let exporter = CsvExporter;
         let snapshot = create_test_snapshot();
 
-        let result = exporter.export(&snapshot).await.expect("test: async operation");
+        let result = exporter
+            .export(&snapshot)
+            .await
+            .expect("test: async operation");
         assert!(result.contains("component,metric,value,timestamp"));
         assert!(result.contains("ca,total_operations,100,"));
     }

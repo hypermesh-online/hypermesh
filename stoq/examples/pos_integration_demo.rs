@@ -168,10 +168,7 @@ async fn demo_public_network(transport: &StoqTransport) -> Result<()> {
         "  Proof of Work (WHAT): work hash {} (a hash, not a difficulty)",
         hex_prefix(&pos_token.proof.work_proof.work_hash)
     );
-    info!(
-        "  Proof of Time (WHEN): sequence {}",
-        pos_token.sequence
-    );
+    info!("  Proof of Time (WHEN): sequence {}", pos_token.sequence);
 
     let result = transport
         .validate_connection_with_pos(

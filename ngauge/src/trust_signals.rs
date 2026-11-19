@@ -93,7 +93,10 @@ impl PeerTrustSignals {
         let activity_ok = self.activity_score.composite() >= FULL_ACTIVITY_FLOOR;
         let bandwidth_ok = self.capacity.bandwidth_available_bps >= FULL_BANDWIDTH_FLOOR_BPS;
         let uptime_ok = self.capacity.uptime_f64() >= FULL_UPTIME_FLOOR;
-        let organic = matches!(self.traffic_classification, TrafficClassification::Organic { .. });
+        let organic = matches!(
+            self.traffic_classification,
+            TrafficClassification::Organic { .. }
+        );
 
         if activity_ok && bandwidth_ok && uptime_ok && organic {
             TrustBand::Full
@@ -127,11 +130,11 @@ mod tests {
 
     fn good_capacity() -> CapacityMetrics {
         CapacityMetrics::new(
-            10_000_000,                // bytes_served
-            1_000_000,                 // compute_delivered
-            10 * 1024 * 1024 * 1024,   // 10 GB storage
-            100_000_000,               // 100 Mbps
-            0.99,                      // uptime
+            10_000_000,              // bytes_served
+            1_000_000,               // compute_delivered
+            10 * 1024 * 1024 * 1024, // 10 GB storage
+            100_000_000,             // 100 Mbps
+            0.99,                    // uptime
         )
     }
 

@@ -176,8 +176,14 @@ fn render_ip(bytes: &[u8]) -> String {
             }
             format!(
                 "IP:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}:{:x}",
-                groups[0], groups[1], groups[2], groups[3],
-                groups[4], groups[5], groups[6], groups[7],
+                groups[0],
+                groups[1],
+                groups[2],
+                groups[3],
+                groups[4],
+                groups[5],
+                groups[6],
+                groups[7],
             )
         }
         _ => format!("IP:<{} bytes>", bytes.len()),
@@ -188,12 +194,9 @@ fn render_ip(bytes: &[u8]) -> String {
 /// object with subject/issuer/validity/algorithm/usage/SAN/extension data.
 ///
 /// Returns `Err(message)` if the DER cannot be parsed. Never panics.
-pub fn parse_cert_to_json(
-    der: &[u8],
-    path: &str,
-) -> Result<serde_json::Value, String> {
-    let (_, cert) = x509_parser::parse_x509_certificate(der)
-        .map_err(|e| format!("parse failed: {e}"))?;
+pub fn parse_cert_to_json(der: &[u8], path: &str) -> Result<serde_json::Value, String> {
+    let (_, cert) =
+        x509_parser::parse_x509_certificate(der).map_err(|e| format!("parse failed: {e}"))?;
 
     let tbs = cert.tbs_certificate;
 

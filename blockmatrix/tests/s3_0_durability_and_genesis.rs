@@ -27,8 +27,7 @@ fn coord() -> MatrixCoordinate {
 /// A content-bound entry that satisfies the signed-to-content invariant.
 /// Used for LOCAL `add_block` paths, which do not require a signed_proof.
 fn bound_entry(tag: &[u8]) -> BlockAssetEntry {
-    let registration =
-        blockmatrix::assets::core::AssetRegistration::genesis(coord());
+    let registration = blockmatrix::assets::core::AssetRegistration::genesis(coord());
     let asset_hash = *blake3::hash(tag).as_bytes();
     BlockAssetEntry::new_bound(
         asset_hash,
@@ -44,17 +43,11 @@ fn bound_entry(tag: &[u8]) -> BlockAssetEntry {
 /// receiving node accepts it on the real H3 path (`insert_received_block`)
 /// WITHOUT the legacy accept-unsigned flag.
 fn authored_entry(tag: &[u8], author: &FalconIdentity) -> BlockAssetEntry {
-    let registration =
-        blockmatrix::assets::core::AssetRegistration::genesis(coord());
+    let registration = blockmatrix::assets::core::AssetRegistration::genesis(coord());
     let asset_hash = *blake3::hash(tag).as_bytes();
     let mut proof = StateProof::new_for_testing();
     proof.stake_proof.stake_holder_id = author.node_id().to_string();
-    BlockAssetEntry::new_bound(
-        asset_hash,
-        &proof,
-        StoragePointer::Genesis,
-        registration,
-    )
+    BlockAssetEntry::new_bound(asset_hash, &proof, StoragePointer::Genesis, registration)
 }
 
 async fn manager(dir: &std::path::Path) -> std::sync::Arc<PersistenceManager> {
@@ -186,11 +179,13 @@ async fn b1_received_block_is_persisted() {
     // receiver accepts it on the real H3 path — no legacy accept-unsigned flag,
     // so this test does not race parallel tests over a process-wide env var.
     let producer_identity = std::sync::Arc::new(FalconIdentity::generate());
-    let producer = NodeBlockchain::from_genesis(coord(), genesis.clone()).with_signer(
-        producer_identity.clone() as std::sync::Arc<dyn NodeSigner + Send + Sync>,
-    );
+    let producer = NodeBlockchain::from_genesis(coord(), genesis.clone())
+        .with_signer(producer_identity.clone() as std::sync::Arc<dyn NodeSigner + Send + Sync>);
     let produced = producer
-        .add_block(vec![authored_entry(b"s3-b1-received-asset", &producer_identity)])
+        .add_block(vec![authored_entry(
+            b"s3-b1-received-asset",
+            &producer_identity,
+        )])
         .await
         .expect("test: produce block");
 
@@ -318,10 +313,10 @@ async fn b4_concurrent_add_block_never_silently_loses_work() {
 /// byte-identical.
 #[tokio::test]
 async fn b2_genesis_is_deterministic_for_identical_inputs() {
+    use blockmatrix::os_integration::{DeviceFingerprint, DeviceIdentifiers};
     use blockmatrix::proof_of_state::genesis_proof::{
         generate_genesis_proof, GenesisEpoch, HardwareAssessment,
     };
-    use blockmatrix::os_integration::{DeviceFingerprint, DeviceIdentifiers};
 
     let fingerprint = DeviceFingerprint::compose(DeviceIdentifiers {
         machine_id: Some("machine-determinism".to_string()),
@@ -416,10 +411,10 @@ async fn b2_clock_driven_genesis_is_not_reproducible() {
 /// block.
 #[tokio::test]
 async fn b2_genesis_differs_when_inputs_differ() {
+    use blockmatrix::os_integration::{DeviceFingerprint, DeviceIdentifiers};
     use blockmatrix::proof_of_state::genesis_proof::{
         generate_genesis_proof, GenesisEpoch, HardwareAssessment,
     };
-    use blockmatrix::os_integration::{DeviceFingerprint, DeviceIdentifiers};
 
     let fp = |seed: &str| {
         DeviceFingerprint::compose(DeviceIdentifiers {

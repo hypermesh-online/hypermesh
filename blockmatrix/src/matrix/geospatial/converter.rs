@@ -312,7 +312,9 @@ mod tests {
 
         // Points on the equator
         let gps = GpsCoordinate::at_sea_level(0.0, 1.0).expect("test: expected success"); // ~111km east
-        let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
+        let matrix = converter
+            .gps_to_matrix(&gps)
+            .expect("test: expected success");
 
         // At equator, 1 degree longitude ≈ 111km
         assert!((matrix.x as f64 - 111.0).abs() < 1.0);
@@ -326,7 +328,9 @@ mod tests {
 
         // 1 degree latitude ≈ 111km everywhere
         let gps = GpsCoordinate::at_sea_level(1.0, 0.0).expect("test: expected success");
-        let matrix = converter.gps_to_matrix(&gps).expect("test: expected success");
+        let matrix = converter
+            .gps_to_matrix(&gps)
+            .expect("test: expected success");
 
         assert_eq!(matrix.x, 0);
         assert!((matrix.y as f64 - 111.0).abs() < 1.0);
@@ -346,8 +350,12 @@ mod tests {
         ];
 
         for original in test_coords {
-            let matrix = converter.gps_to_matrix(&original).expect("test: expected success");
-            let recovered = converter.matrix_to_gps(&matrix).expect("test: expected success");
+            let matrix = converter
+                .gps_to_matrix(&original)
+                .expect("test: expected success");
+            let recovered = converter
+                .matrix_to_gps(&matrix)
+                .expect("test: expected success");
 
             // Check accuracy (should be within ~0.1 degrees with Fine resolution)
             assert!((recovered.latitude - original.latitude).abs() < 0.1);
@@ -363,13 +371,17 @@ mod tests {
 
         // North pole
         let north_pole = GpsCoordinate::at_sea_level(90.0, 0.0).expect("test: expected success");
-        let matrix = converter.gps_to_matrix(&north_pole).expect("test: expected success");
+        let matrix = converter
+            .gps_to_matrix(&north_pole)
+            .expect("test: expected success");
         assert_eq!(matrix.x, 0); // Longitude is undefined at poles
         assert!((matrix.y as f64 - 10007.0).abs() < 10.0); // ~10007km from equator
 
         // South pole
         let south_pole = GpsCoordinate::at_sea_level(-90.0, 0.0).expect("test: expected success");
-        let matrix2 = converter.gps_to_matrix(&south_pole).expect("test: expected success");
+        let matrix2 = converter
+            .gps_to_matrix(&south_pole)
+            .expect("test: expected success");
         assert_eq!(matrix2.x, 0);
         assert!((matrix2.y as f64 + 10007.0).abs() < 10.0);
     }
@@ -382,8 +394,12 @@ mod tests {
         let west = GpsCoordinate::at_sea_level(0.0, 179.0).expect("test: expected success");
         let east = GpsCoordinate::at_sea_level(0.0, -179.0).expect("test: expected success");
 
-        let matrix_west = converter.gps_to_matrix(&west).expect("test: expected success");
-        let matrix_east = converter.gps_to_matrix(&east).expect("test: expected success");
+        let matrix_west = converter
+            .gps_to_matrix(&west)
+            .expect("test: expected success");
+        let matrix_east = converter
+            .gps_to_matrix(&east)
+            .expect("test: expected success");
 
         // In a flat projection centered at origin (0,0), these points are on opposite
         // sides of the map. Calculate the "short way around" distance: the full
@@ -408,7 +424,9 @@ mod tests {
 
         // Mount Everest height
         let everest = GpsCoordinate::new(27.9881, 86.9250, 8848.0).expect("test: creation");
-        let matrix = converter.gps_to_matrix(&everest).expect("test: expected success");
+        let matrix = converter
+            .gps_to_matrix(&everest)
+            .expect("test: expected success");
 
         // Z should represent ~8.8km elevation
         assert!((matrix.z as f64 - 8.8).abs() < 1.0);
@@ -421,14 +439,18 @@ mod tests {
         let converter = GpsConverter::with_origin(ScaleResolution::Standard, nyc);
 
         // NYC should map to (0,0,0)
-        let matrix = converter.gps_to_matrix(&nyc).expect("test: expected success");
+        let matrix = converter
+            .gps_to_matrix(&nyc)
+            .expect("test: expected success");
         assert_eq!(matrix.x, 0);
         assert_eq!(matrix.y, 0);
         assert_eq!(matrix.z, 0);
 
         // Philadelphia (~150km south)
         let philly = GpsCoordinate::new(39.9526, -75.1652, 10.0).expect("test: creation");
-        let matrix2 = converter.gps_to_matrix(&philly).expect("test: expected success");
+        let matrix2 = converter
+            .gps_to_matrix(&philly)
+            .expect("test: expected success");
         assert!(matrix2.y < -80); // South is negative Y
         assert!((matrix2.x as f64 + 80.0).abs() < 40.0); // West
     }

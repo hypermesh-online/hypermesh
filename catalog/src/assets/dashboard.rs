@@ -45,10 +45,7 @@ pub fn parse_manifest(toml_str: &str) -> Result<DashboardManifest, String> {
 /// Validate a parsed manifest against structural and filesystem rules.
 ///
 /// Returns `Ok(())` when valid, or `Err` with a list of validation errors.
-pub fn validate_manifest(
-    manifest: &DashboardManifest,
-    base_dir: &Path,
-) -> Result<(), Vec<String>> {
+pub fn validate_manifest(manifest: &DashboardManifest, base_dir: &Path) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
 
     if manifest.dashboard.name.is_empty() {
@@ -138,7 +135,10 @@ public = "dist/"
         assert_eq!(m.access.public.as_deref(), Some("dist/public/"));
         assert_eq!(m.access.private.as_deref(), Some("dist/private/"));
         assert_eq!(m.access.admin.as_deref(), Some("dist/admin/"));
-        assert_eq!(m.dependencies.get("charts").map(String::as_str), Some("0.2.0"));
+        assert_eq!(
+            m.dependencies.get("charts").map(String::as_str),
+            Some("0.2.0")
+        );
     }
 
     #[test]
@@ -247,8 +247,7 @@ admin = "admin/"
             },
             dependencies: HashMap::new(),
         };
-        let errs =
-            validate_manifest(&m, tmp.path()).expect_err("test: should fail on missing dir");
+        let errs = validate_manifest(&m, tmp.path()).expect_err("test: should fail on missing dir");
         assert!(errs.iter().any(|e| e.contains("does not exist")));
     }
 

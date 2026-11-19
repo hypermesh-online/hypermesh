@@ -227,7 +227,10 @@ mod tests {
         // Same RTT, different ids => same x, distinct points (bounded jitter).
         let a = embed("peer-a", 5_000);
         let b = embed("peer-b", 5_000);
-        assert!((a.x - b.x).abs() < 1e-9, "equal RTT => equal proximity axis");
+        assert!(
+            (a.x - b.x).abs() < 1e-9,
+            "equal RTT => equal proximity axis"
+        );
         assert_ne!(a, b, "distinct ids must not collapse onto one point");
     }
 
@@ -264,10 +267,18 @@ mod tests {
         // Mean pairwise distance within the near cluster is far smaller than the
         // distance between the two clusters — i.e. proximity is preserved.
         let near_coords: Vec<_> = (0..5)
-            .map(|i| provider.coordinate_for(&format!("near-{i}")).expect("test: near sample"))
+            .map(|i| {
+                provider
+                    .coordinate_for(&format!("near-{i}"))
+                    .expect("test: near sample")
+            })
             .collect();
         let far_coords: Vec<_> = (0..5)
-            .map(|i| provider.coordinate_for(&format!("far-{i}")).expect("test: far sample"))
+            .map(|i| {
+                provider
+                    .coordinate_for(&format!("far-{i}"))
+                    .expect("test: far sample")
+            })
             .collect();
 
         let mut intra_near = 0.0;
@@ -337,16 +348,14 @@ mod tests {
         }
 
         let advisor = DispersionAdvisor::new();
-        let placements = advisor.recommend_placement_in_network(DEFAULT_NETWORK, &shard, &analytics, 2);
+        let placements =
+            advisor.recommend_placement_in_network(DEFAULT_NETWORK, &shard, &analytics, 2);
         assert!(!placements.is_empty(), "advisor must recommend a placement");
 
         // The dominant recommended placement sits in the low-RTT band (x ≈ 5-6
         // units), not out at the far band (x ≈ 900) — placement followed the
         // real proximity signal.
-        let nearest_x = placements
-            .iter()
-            .map(|p| p.x)
-            .fold(f64::INFINITY, f64::min);
+        let nearest_x = placements.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
         assert!(
             nearest_x < 100.0,
             "a recommended placement must land in the nearby locality, got x={nearest_x}"

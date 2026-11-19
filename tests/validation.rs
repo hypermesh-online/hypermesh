@@ -248,14 +248,17 @@ async fn validate_cryptography() -> bool {
         &identity.public_key_bytes(),
         msg,
         &sig,
-    ).unwrap_or(false);
+    )
+    .unwrap_or(false);
 
     let tampered_msg = b"hypermesh-tampered-payload";
-    let tamper_rejected = !(<blockmatrix::identity::FalconIdentity as NodeSigner>::verify_signature(
-        &identity.public_key_bytes(),
-        tampered_msg,
-        &sig,
-    ).unwrap_or(true));
+    let tamper_rejected =
+        !(<blockmatrix::identity::FalconIdentity as NodeSigner>::verify_signature(
+            &identity.public_key_bytes(),
+            tampered_msg,
+            &sig,
+        )
+        .unwrap_or(true));
 
     verified && tamper_rejected
 }
@@ -306,7 +309,8 @@ async fn measure_trustchain_latency() -> f64 {
         &identity.public_key_bytes(),
         msg,
         &sig,
-    ).expect("verify");
+    )
+    .expect("verify");
     start.elapsed().as_secs_f64() * 1000.0
 }
 

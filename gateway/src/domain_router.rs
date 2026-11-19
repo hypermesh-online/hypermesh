@@ -445,7 +445,9 @@ mod tests {
         assert_eq!(route.backend_name, "persist");
         assert_eq!(
             route.backend_addr,
-            "[::1]:8080".parse::<SocketAddr>().expect("test: valid addr"),
+            "[::1]:8080"
+                .parse::<SocketAddr>()
+                .expect("test: valid addr"),
         );
     }
 

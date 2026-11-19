@@ -214,7 +214,6 @@ pub enum MatrixMessage {
     },
 
     // --- Distributed CA messages ---
-
     /// A CA key share being distributed to a reflector node.
     KeyShareDistribute {
         /// Share index (1-based).
@@ -456,7 +455,11 @@ impl MatrixStoqIntegration {
         }
 
         let mut result: Vec<_> = unique_neighbors.into_values().collect();
-        result.sort_by(|a, b| a.distance.partial_cmp(&b.distance).expect("distance comparison should be valid"));
+        result.sort_by(|a, b| {
+            a.distance
+                .partial_cmp(&b.distance)
+                .expect("distance comparison should be valid")
+        });
         result.truncate(max_count);
 
         Ok(result)
@@ -545,11 +548,7 @@ impl MatrixStoqIntegration {
     /// given `network_scope` at the specified `block_height`. It is
     /// encoded as a JSON `MatrixMessage::ReflectorHeartbeat` and
     /// returned as raw bytes ready for STOQ transmission.
-    pub fn announce_reflector_status(
-        &self,
-        network_scope: &str,
-        block_height: u64,
-    ) -> Vec<u8> {
+    pub fn announce_reflector_status(&self, network_scope: &str, block_height: u64) -> Vec<u8> {
         let msg = MatrixMessage::ReflectorHeartbeat {
             network_id: network_scope.to_string(),
             block_height,
@@ -592,7 +591,8 @@ mod tests {
         let json = serde_json::to_string(&message).expect("test: serialization");
 
         // Deserialize
-        let deserialized: MatrixMessage = serde_json::from_str(&json).expect("test: deserialization");
+        let deserialized: MatrixMessage =
+            serde_json::from_str(&json).expect("test: deserialization");
 
         match deserialized {
             MatrixMessage::Announcement(ann) => {
@@ -617,7 +617,8 @@ mod tests {
         let json = serde_json::to_string(&message).expect("test: serialization");
 
         // Should deserialize correctly
-        let _deserialized: MatrixMessage = serde_json::from_str(&json).expect("test: deserialization");
+        let _deserialized: MatrixMessage =
+            serde_json::from_str(&json).expect("test: deserialization");
     }
 
     #[test]
@@ -632,8 +633,7 @@ mod tests {
         let bytes = serde_json::to_vec(&msg).expect("test: serialize");
         assert!(!bytes.is_empty());
 
-        let parsed: MatrixMessage =
-            serde_json::from_slice(&bytes).expect("test: deserialize");
+        let parsed: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
         match parsed {
             MatrixMessage::ReflectorHeartbeat {
                 network_id,
@@ -757,8 +757,7 @@ mod tests {
             timestamp: 1700000000,
         };
         let bytes = serde_json::to_vec(&msg).expect("test: serialize");
-        let decoded: MatrixMessage =
-            serde_json::from_slice(&bytes).expect("test: deserialize");
+        let decoded: MatrixMessage = serde_json::from_slice(&bytes).expect("test: deserialize");
         match decoded {
             MatrixMessage::KeyRotation {
                 old_key_fingerprint,

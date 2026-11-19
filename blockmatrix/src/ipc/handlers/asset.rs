@@ -225,19 +225,14 @@ async fn handle_asset_register(
         other => {
             return Err(RpcError {
                 code: INVALID_PARAMS,
-                message: format!(
-                    "unknown category '{other}', expected 'system' or 'application'"
-                ),
+                message: format!("unknown category '{other}', expected 'system' or 'application'"),
                 data: None,
             });
         }
     };
 
-    let registration = AssetRegistration::from_asset_data(
-        &asset_data,
-        NetworkScope::Global,
-        asset_category,
-    );
+    let registration =
+        AssetRegistration::from_asset_data(&asset_data, NetworkScope::Global, asset_category);
 
     let content_hash_hex = hex::encode(registration.content_hash);
 
@@ -426,10 +421,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "asset.register",
-            serde_json::json!({"content": "aabb"}),
-        );
+        let req = RpcRequest::new("asset.register", serde_json::json!({"content": "aabb"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
         let err = resp.error.expect("test: error present");

@@ -349,7 +349,8 @@ async fn benchmark_cert_validation() -> f64 {
         &identity.public_key_bytes(),
         msg,
         &sig,
-    ).expect("verify");
+    )
+    .expect("verify");
     assert!(ok);
     start.elapsed().as_secs_f64() * 1000.0
 }
@@ -371,12 +372,8 @@ async fn benchmark_dns_resolution() -> f64 {
     let start = Instant::now();
     let hash = ContentHash::from_bytes([0x11u8; 32]);
     for i in 0..1000 {
-        let addr = AssetAddress::new(
-            i as i64,
-            (i + 1) as i64,
-            (i + 2) as i64,
-            &hash,
-        ).expect("valid address");
+        let addr = AssetAddress::new(i as i64, (i + 1) as i64, (i + 2) as i64, &hash)
+            .expect("valid address");
         let _ipv6 = addr.to_ipv6();
     }
     start.elapsed().as_secs_f64() * 1000.0
@@ -385,7 +382,10 @@ async fn benchmark_dns_resolution() -> f64 {
 async fn benchmark_dns_cache() -> f64 {
     let mut cache = HashMap::new();
     for i in 0..1000 {
-        cache.insert(format!("node-{i}.hypermesh.local"), format!("fd48:4d00::{i:x}"));
+        cache.insert(
+            format!("node-{i}.hypermesh.local"),
+            format!("fd48:4d00::{i:x}"),
+        );
     }
     let start = Instant::now();
     for i in 0..1000 {
@@ -405,8 +405,8 @@ async fn benchmark_dns_over_stoq() -> f64 {
 }
 
 async fn benchmark_asset_creation() -> f64 {
-    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::assets::core::AssetRegistration;
+    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use trustchain::proof_of_state::StateProof;
 
@@ -414,7 +414,10 @@ async fn benchmark_asset_creation() -> f64 {
     let coord = MatrixCoordinate { x: 1, y: 2, z: 3 };
     let reg = AssetRegistration::genesis(coord);
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(&content_hash, &StateProof::new_for_testing());
+    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(
+        &content_hash,
+        &StateProof::new_for_testing(),
+    );
 
     let start = Instant::now();
     let mut entry = BlockAssetEntry {
@@ -430,8 +433,8 @@ async fn benchmark_asset_creation() -> f64 {
 }
 
 async fn benchmark_asset_transfer() -> f64 {
-    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::assets::core::AssetRegistration;
+    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use trustchain::proof_of_state::StateProof;
 
@@ -439,7 +442,10 @@ async fn benchmark_asset_transfer() -> f64 {
     let coord = MatrixCoordinate { x: 2, y: 3, z: 4 };
     let reg = AssetRegistration::genesis(coord);
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(&content_hash, &StateProof::new_for_testing());
+    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(
+        &content_hash,
+        &StateProof::new_for_testing(),
+    );
 
     let mut entry = BlockAssetEntry {
         asset_hash: content_hash,
@@ -455,9 +461,13 @@ async fn benchmark_asset_transfer() -> f64 {
     // Simulate transfer by updating owner in authorization and resigning
     let new_identity = blockmatrix::identity::FalconIdentity::generate();
     entry.registration.authorization.owners.clear();
-    entry.registration.authorization.owners.push(hypermesh_lib::Owner::new(
-        hex::encode(new_identity.node_id.as_bytes()),
-    ));
+    entry
+        .registration
+        .authorization
+        .owners
+        .push(hypermesh_lib::Owner::new(hex::encode(
+            new_identity.node_id.as_bytes(),
+        )));
     entry.sign_proof(&new_identity).expect("re-sign");
     start.elapsed().as_secs_f64() * 1000.0
 }
@@ -475,8 +485,8 @@ async fn benchmark_asset_query() -> f64 {
 }
 
 async fn benchmark_asset_validation() -> f64 {
-    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::assets::core::AssetRegistration;
+    use blockmatrix::blockchain::block::{BlockAssetEntry, StoragePointer};
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
     use trustchain::proof_of_state::StateProof;
 
@@ -484,7 +494,10 @@ async fn benchmark_asset_validation() -> f64 {
     let coord = MatrixCoordinate { x: 3, y: 4, z: 5 };
     let reg = AssetRegistration::genesis(coord);
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(&content_hash, &StateProof::new_for_testing());
+    let (proof, proof_hash) = blockmatrix::blockchain::block::bind_proof_to_asset(
+        &content_hash,
+        &StateProof::new_for_testing(),
+    );
 
     let mut entry = BlockAssetEntry {
         asset_hash: content_hash,

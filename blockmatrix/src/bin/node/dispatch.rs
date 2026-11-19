@@ -8,13 +8,13 @@ use anyhow::Result;
 use tracing::{info, warn};
 
 use blockmatrix::bootstrap::NodeBootstrap;
+use blockmatrix::ipc;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::persistence::PersistenceManager;
-use blockmatrix::ipc;
 
 use crate::cli::{
-    CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction,
-    NGaugeAction, GatewayAction, MessageAction, ShareAction, TrustchainAction,
+    CaesarAction, CatalogAction, Cli, Commands, DnsAction, DomainAction, GatewayAction,
+    MessageAction, NGaugeAction, ShareAction, TrustchainAction,
 };
 use crate::commands::connect::service_ipc_call;
 use crate::commands::domain::{run_domain, run_join};
@@ -36,7 +36,12 @@ pub(crate) async fn dispatch_command(
             );
             eprintln!("Running as 'connect public --foreground'...");
             crate::commands::connect::run_connect(
-                &cli, coord, nid, data_dir, bootstrap, persistence,
+                &cli,
+                coord,
+                nid,
+                data_dir,
+                bootstrap,
+                persistence,
             )
             .await?;
         }
@@ -48,7 +53,12 @@ pub(crate) async fn dispatch_command(
                 return Ok(());
             }
             crate::commands::connect::run_connect(
-                &cli, coord, nid, data_dir, bootstrap, persistence,
+                &cli,
+                coord,
+                nid,
+                data_dir,
+                bootstrap,
+                persistence,
             )
             .await?;
         }
@@ -181,8 +191,9 @@ async fn dispatch_status(bootstrap: &NodeBootstrap, json: bool) {
             .await
         {
             if update_resp.get("up_to_date").and_then(|v| v.as_bool()) == Some(false) {
-                if let Some(version) =
-                    update_resp.get("available_version").and_then(|v| v.as_str())
+                if let Some(version) = update_resp
+                    .get("available_version")
+                    .and_then(|v| v.as_str())
                 {
                     let notes = update_resp
                         .get("release_notes_url")
@@ -388,11 +399,7 @@ async fn dispatch_dns(
                     .call_ok("dns.resolve", serde_json::json!({"name": name}))
                     .await
             }
-            DnsAction::List => {
-                client
-                    .call_ok("dns.list", serde_json::json!({}))
-                    .await
-            }
+            DnsAction::List => client.call_ok("dns.list", serde_json::json!({})).await,
         };
         match result {
             Ok(resp) => println!(
@@ -427,11 +434,7 @@ async fn dispatch_domain(
                     )
                     .await
             }
-            DomainAction::List => {
-                client
-                    .call_ok("domain.list", serde_json::json!({}))
-                    .await
-            }
+            DomainAction::List => client.call_ok("domain.list", serde_json::json!({})).await,
             _ => {
                 run_domain(action, bootstrap, data_dir, nid).await?;
                 return Ok(());
@@ -496,8 +499,7 @@ async fn dispatch_caesar(action: CaesarAction, json: bool) -> Result<()> {
 async fn dispatch_trustchain(action: TrustchainAction, json: bool) -> Result<()> {
     match action {
         TrustchainAction::Certs => {
-            service_ipc_call("trustchain.certificates", serde_json::json!({}), json)
-                .await?;
+            service_ipc_call("trustchain.certificates", serde_json::json!({}), json).await?;
         }
         TrustchainAction::Issue { subject, scope } => {
             service_ipc_call(
@@ -562,12 +564,7 @@ async fn dispatch_catalog(action: CatalogAction, json: bool) -> Result<()> {
             .await?;
         }
         CatalogAction::Search { query } => {
-            service_ipc_call(
-                "catalog.search",
-                serde_json::json!({"query": query}),
-                json,
-            )
-            .await?;
+            service_ipc_call("catalog.search", serde_json::json!({"query": query}), json).await?;
         }
         CatalogAction::Info { name } => {
             service_ipc_call(
@@ -578,8 +575,7 @@ async fn dispatch_catalog(action: CatalogAction, json: bool) -> Result<()> {
             .await?;
         }
         CatalogAction::Stats => {
-            service_ipc_call("catalog.registry_stats", serde_json::json!({}), json)
-                .await?;
+            service_ipc_call("catalog.registry_stats", serde_json::json!({}), json).await?;
         }
     }
     Ok(())
@@ -628,12 +624,7 @@ async fn dispatch_share(action: ShareAction, json: bool) -> Result<()> {
             .await?;
         }
         ShareAction::Inbox { limit } => {
-            service_ipc_call(
-                "share.inbox",
-                serde_json::json!({"limit": limit}),
-                json,
-            )
-            .await?;
+            service_ipc_call("share.inbox", serde_json::json!({"limit": limit}), json).await?;
         }
         ShareAction::Accept { invite_id } => {
             service_ipc_call(
@@ -655,12 +646,7 @@ async fn dispatch_share(action: ShareAction, json: bool) -> Result<()> {
             service_ipc_call("identity.pubkey", serde_json::json!({}), json).await?;
         }
         ShareAction::PeerPubkey { node_id } => {
-            service_ipc_call(
-                "peer.pubkey",
-                serde_json::json!({"node_id": node_id}),
-                json,
-            )
-            .await?;
+            service_ipc_call("peer.pubkey", serde_json::json!({"node_id": node_id}), json).await?;
         }
     }
     Ok(())
@@ -685,12 +671,7 @@ async fn dispatch_message(action: MessageAction, json: bool) -> Result<()> {
             service_ipc_call("message.send", params, json).await?;
         }
         MessageAction::Inbox { limit } => {
-            service_ipc_call(
-                "message.inbox",
-                serde_json::json!({"limit": limit}),
-                json,
-            )
-            .await?;
+            service_ipc_call("message.inbox", serde_json::json!({"limit": limit}), json).await?;
         }
         MessageAction::History { peer, limit } => {
             service_ipc_call(

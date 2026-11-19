@@ -381,10 +381,7 @@ mod tests {
         assert!((hw.cpu_usage - 0.35).abs() < 1e-9);
         assert_eq!(hw.cpu_cores, 4);
         assert_eq!(hw.memory_total_bytes, 8_000_000_000);
-        assert_eq!(
-            hw.memory_available_bytes,
-            8_000_000_000 - 3_000_000_000
-        );
+        assert_eq!(hw.memory_available_bytes, 8_000_000_000 - 3_000_000_000);
         assert_eq!(hw.net_rx_bytes, 50_000_000);
         assert_eq!(hw.net_tx_bytes, 10_000_000);
     }

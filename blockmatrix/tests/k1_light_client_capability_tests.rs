@@ -16,9 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use blockmatrix::auth::{
-    Capability, CapabilityToken, CapabilityTokenIssuer, RevocationRegistry,
-};
+use blockmatrix::auth::{Capability, CapabilityToken, CapabilityTokenIssuer, RevocationRegistry};
 use blockmatrix::blockchain::block::BlockHeader;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::bootstrap::DnsResolver;
@@ -44,9 +42,7 @@ fn header(index: u64, hash: &str, prev: &str, entries_seed: &[u8]) -> BlockHeade
     }
 }
 
-async fn build_state_with_issuer(
-    issuer: Option<Arc<CapabilityTokenIssuer>>,
-) -> Arc<DaemonState> {
+async fn build_state_with_issuer(issuer: Option<Arc<CapabilityTokenIssuer>>) -> Arc<DaemonState> {
     let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
     let bc = Arc::new(NodeBlockchain::new(coord));
     let cfg = PersistenceConfig {
@@ -95,8 +91,8 @@ async fn build_state_with_issuer(
         capability_token_issuer: issuer,
         revocation_registry: Arc::new(RevocationRegistry::new()),
         light_sync_manager: None,
-            catalog_registry: None,
-            inbox_store: None,
+        catalog_registry: None,
+        inbox_store: None,
     })
 }
 
@@ -106,7 +102,8 @@ async fn build_state_with_issuer(
 async fn test_header_sync_manager_ingest_chains() {
     let mgr = HeaderSyncManager::new();
 
-    let mut prev_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+    let mut prev_hash =
+        "0000000000000000000000000000000000000000000000000000000000000000".to_string();
     for i in 0..100u64 {
         let hash = format!("blk-{:064}", i);
         let h = header(i, &hash, &prev_hash, &i.to_le_bytes());
@@ -185,7 +182,11 @@ fn test_capability_token_round_trip() {
 
     let device = FalconIdentity::generate().public_key.clone();
     let token = issuer
-        .issue(device.clone(), vec![Capability::Wallet], Duration::from_secs(60))
+        .issue(
+            device.clone(),
+            vec![Capability::Wallet],
+            Duration::from_secs(60),
+        )
         .expect("issue");
     assert!(token.verify(&id.public_key));
 
@@ -280,13 +281,16 @@ async fn test_auth_create_session_returns_signed_token() {
         }),
     );
     let resp = handler.dispatch(req).await;
-    assert!(resp.error.is_none(), "expected success, got: {:?}", resp.error);
+    assert!(
+        resp.error.is_none(),
+        "expected success, got: {:?}",
+        resp.error
+    );
     let result = resp.result.expect("result present");
 
     // Reconstruct token and verify.
     let token_json = result.get("token").expect("token present").clone();
-    let token: CapabilityToken =
-        serde_json::from_value(token_json).expect("deserialize token");
+    let token: CapabilityToken = serde_json::from_value(token_json).expect("deserialize token");
     assert!(token.verify(&id.public_key));
     assert_eq!(token.device_pubkey, device_pubkey);
     assert!(token.allows(&Capability::ViewOnly));
@@ -312,8 +316,7 @@ async fn test_auth_create_session_rejects_when_not_configured() {
     let resp = handler.dispatch(req).await;
     let err = resp.error.expect("expected inert rejection");
     assert!(
-        err.message.contains("auth not configured")
-            && err.message.contains("alpha-default inert"),
+        err.message.contains("auth not configured") && err.message.contains("alpha-default inert"),
         "expected alpha-default inert message, got: {}",
         err.message
     );
@@ -358,9 +361,7 @@ async fn test_session_audit_recorded_on_chain() {
 
     // The payload was JSON-serialized into StoragePointer::Local.
     let entry = &head.entries[0];
-    if let blockmatrix::blockchain::block::StoragePointer::Local { path } =
-        &entry.storage_pointer
-    {
+    if let blockmatrix::blockchain::block::StoragePointer::Local { path } = &entry.storage_pointer {
         assert!(
             path.contains("\"version\":1") || path.contains("session_id"),
             "expected SessionAudit JSON payload, got: {}",

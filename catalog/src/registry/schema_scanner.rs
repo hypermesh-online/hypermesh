@@ -31,9 +31,7 @@ use super::catalog_registry::CatalogRegistry;
 /// the registry, and uppercase variants are normalized below.
 fn hex64_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        Regex::new(r"\b[0-9a-fA-F]{64}\b").expect("static regex compiles")
-    })
+    RE.get_or_init(|| Regex::new(r"\b[0-9a-fA-F]{64}\b").expect("static regex compiles"))
 }
 
 /// Scan a typedef's schema bytes for embedded BLAKE3 hashes that match a
@@ -133,17 +131,29 @@ mod tests {
 
     /// Register a typedef and return its computed content hash (hex).
     async fn register(registry: &CatalogRegistry, name: &str, schema: serde_json::Value) -> String {
-        let type_def = AssetTypeDefinition::new(name.to_string(), schema.clone(), test_state_proof());
-        registry.register_type(type_def).await.expect("test: register");
+        let type_def =
+            AssetTypeDefinition::new(name.to_string(), schema.clone(), test_state_proof());
+        registry
+            .register_type(type_def)
+            .await
+            .expect("test: register");
         hex::encode(
-            blake3::hash(serde_json::to_string(&schema).expect("test: json").as_bytes()).as_bytes(),
+            blake3::hash(
+                serde_json::to_string(&schema)
+                    .expect("test: json")
+                    .as_bytes(),
+            )
+            .as_bytes(),
         )
     }
 
     #[tokio::test]
     async fn test_scan_schema_for_typedef_refs_finds_hex() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, permissive_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            permissive_policy(),
+            RegistryConfig::default(),
+        );
 
         // Register a "Target" typedef and capture its hex hash.
         let target_hex = register(&registry, "Target", json!({"type": "object", "id": "t"})).await;
@@ -162,11 +172,8 @@ mod tests {
 
         let mut bytes = [0u8; 32];
         for (i, chunk) in target_hex.as_bytes().chunks_exact(2).enumerate() {
-            bytes[i] = u8::from_str_radix(
-                std::str::from_utf8(chunk).expect("test: utf8"),
-                16,
-            )
-            .expect("test: hex");
+            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).expect("test: utf8"), 16)
+                .expect("test: hex");
         }
         let target_ch = ContentHash::from_bytes(bytes);
         assert!(refs.contains(&target_ch));
@@ -174,8 +181,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_scan_schema_for_typedef_refs_ignores_unknown() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, permissive_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            permissive_policy(),
+            RegistryConfig::default(),
+        );
 
         // 64-char hex that is NOT a registered typedef hash.
         let unknown_hex = "deadbeef".repeat(8); // 64 chars
@@ -196,8 +206,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_scan_schema_excludes_self_hash() {
-        let registry =
-            CatalogRegistry::new(PrivacyMode::PUBLIC, permissive_policy(), RegistryConfig::default());
+        let registry = CatalogRegistry::new(
+            PrivacyMode::PUBLIC,
+            permissive_policy(),
+            RegistryConfig::default(),
+        );
 
         let self_hex = register(&registry, "SelfRef", json!({"type": "object"})).await;
 
@@ -207,11 +220,8 @@ mod tests {
 
         let mut bytes = [0u8; 32];
         for (i, chunk) in self_hex.as_bytes().chunks_exact(2).enumerate() {
-            bytes[i] = u8::from_str_radix(
-                std::str::from_utf8(chunk).expect("test: utf8"),
-                16,
-            )
-            .expect("test: hex");
+            bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).expect("test: utf8"), 16)
+                .expect("test: hex");
         }
         let self_ch = ContentHash::from_bytes(bytes);
 

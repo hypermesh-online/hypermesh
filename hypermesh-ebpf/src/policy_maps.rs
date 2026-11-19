@@ -220,10 +220,7 @@ impl PolicyManager {
             // kernel map, so fail loudly rather than write bad bytes.
             let bytes = Self::serialize_policy_for_bpf(policy);
             if bytes.len() != 32 {
-                anyhow::bail!(
-                    "policy serialized to {} bytes, expected 32",
-                    bytes.len()
-                );
+                anyhow::bail!("policy serialized to {} bytes, expected 32", bytes.len());
             }
         }
         tracing::debug!(
@@ -235,7 +232,9 @@ impl PolicyManager {
 
     #[cfg(not(feature = "kernel-attach"))]
     pub fn sync_to_kernel(&self) -> anyhow::Result<()> {
-        tracing::debug!("kernel-attach not enabled; policies validated for userspace-only enforcement");
+        tracing::debug!(
+            "kernel-attach not enabled; policies validated for userspace-only enforcement"
+        );
         Ok(())
     }
 }

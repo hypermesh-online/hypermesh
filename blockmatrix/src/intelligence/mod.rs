@@ -25,11 +25,11 @@
 // Sub-modules for integration layer
 #[cfg(feature = "intelligence")]
 pub mod ebpf_feedback;
+pub mod integration;
+pub mod metrics_bridge;
 pub mod ngauge_bridge;
 #[cfg(feature = "intelligence")]
 pub mod ngauge_trust_adapter;
-pub mod integration;
-pub mod metrics_bridge;
 pub mod performance;
 pub mod types;
 pub mod validation;

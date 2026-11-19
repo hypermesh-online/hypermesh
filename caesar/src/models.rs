@@ -278,7 +278,10 @@ mod tests {
         };
 
         assert_eq!(record.settlement_id, "settle-001");
-        assert_eq!(record.egress_node, NodeId::from_public_key(b"egress-node-42"));
+        assert_eq!(
+            record.egress_node,
+            NodeId::from_public_key(b"egress-node-42")
+        );
         assert_eq!(record.finality_type, "instant");
         assert_eq!(record.fee_collected.0, Decimal::new(250, 2));
     }

@@ -66,21 +66,42 @@ mod tests {
         let bytes = policy_to_bytes(&policy);
         assert_eq!(bytes.len(), 16);
         // requires_pos = true -> 1u32 LE
-        assert_eq!(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]), 1);
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            1
+        );
         // validate_asset_hash = true -> 1u32 LE
-        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 1);
+        assert_eq!(
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            1
+        );
         // check_matrix_routing = true -> 1u32 LE
-        assert_eq!(u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 1);
+        assert_eq!(
+            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            1
+        );
         // privacy_tier = 2 -> 2u32 LE
-        assert_eq!(u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]), 2);
+        assert_eq!(
+            u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]),
+            2
+        );
     }
 
     #[test]
     fn test_permissive_policy_to_bytes_all_zero_flags() {
         let bytes = policy_to_bytes(&ValidationPolicy::permissive());
-        assert_eq!(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]), 0);
-        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 0);
-        assert_eq!(u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]), 0);
+        assert_eq!(
+            u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            0
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            0
+        );
+        assert_eq!(
+            u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
+            0
+        );
     }
 
     // -------------------------------------------------------------------
@@ -282,7 +303,7 @@ mod tests {
         assert_eq!(&b[8..16], &0x1112_1314_1516_1718u64.to_le_bytes()); // ttl @8
         assert_eq!(&b[16..20], &1u32.to_le_bytes()); // enabled @16
         assert_eq!(&b[20..24], &[0u8; 4]); // trailing padding
-        // round-trip
+                                           // round-trip
         let rt = KernelPosConfig::from_bytes(&b).expect("test: from_bytes 24B");
         assert_eq!(rt.max_timestamp_skew_ns, cfg.max_timestamp_skew_ns);
         assert_eq!(rt.validation_ttl_ns, cfg.validation_ttl_ns);

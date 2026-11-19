@@ -616,7 +616,10 @@ mod tests {
             custom_validators: vec![],
         };
 
-        engine.add_policy(custom_policy).await.expect("test: async operation");
+        engine
+            .add_policy(custom_policy)
+            .await
+            .expect("test: async operation");
 
         let policies = engine.list_policies().await;
         assert!(policies.contains(&"custom-test".to_string()));

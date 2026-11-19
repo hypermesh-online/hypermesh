@@ -33,7 +33,9 @@ pub use wal::{WalEntry, WalOperation};
 ///
 /// Hidden from rustdoc; not part of the stable public surface.
 #[doc(hidden)]
-pub fn test_deserialize(buffer: &[u8]) -> super::PersistenceResult<crate::blockchain::block::Block> {
+pub fn test_deserialize(
+    buffer: &[u8],
+) -> super::PersistenceResult<crate::blockchain::block::Block> {
     format::deserialize_block_verified(buffer)
 }
 

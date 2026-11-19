@@ -20,9 +20,20 @@ impl Harness {
         let index = Arc::new(ShardLocationIndex::new());
         let analytics = Arc::new(Mutex::new(ngauge::SwarmAnalytics::new()));
         let executor = StoqDmsExecutor::new(
-            transport.clone(), store.clone(), index.clone(), "local".into(), analytics.clone(),
+            transport.clone(),
+            store.clone(),
+            index.clone(),
+            "local".into(),
+            analytics.clone(),
         );
-        Self { remote, transport, store, index, analytics, executor }
+        Self {
+            remote,
+            transport,
+            store,
+            index,
+            analytics,
+            executor,
+        }
     }
 
     fn action(&self, hash: ContentHash) -> MirrorAction {
@@ -36,8 +47,18 @@ impl Harness {
     }
 
     async fn assert_no_provider(&self, hash: ContentHash) {
-        assert!(self.index.get_providers_in_network(DEFAULT_NETWORK, &hash).await.is_empty());
-        assert_eq!(self.analytics.lock().expect("analytics").get_replica_count(&hash), 0);
+        assert!(self
+            .index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await
+            .is_empty());
+        assert_eq!(
+            self.analytics
+                .lock()
+                .expect("analytics")
+                .get_replica_count(&hash),
+            0
+        );
         assert!(self.store.get(&hash).await.is_none());
     }
 }
@@ -46,15 +67,23 @@ async fn serve(store: &ShardStore, hash: ContentHash) -> Vec<u8> {
     let mut request = vec![0x02];
     request.extend_from_slice(&hash.0);
     handle_shard_message(&request, store, None)
-        .await.expect("serve handler").expect("serve response")
+        .await
+        .expect("serve handler")
+        .expect("serve response")
 }
 
 #[tokio::test]
 async fn rejects_wrong_bytes_without_provider() {
     let h = Harness::new();
     let hash = ContentHash(*blake3::hash(b"correct").as_bytes());
-    h.transport.insert_shard(&h.remote, &hash, b"wrong".to_vec()).await;
-    assert!(h.executor.fetch_and_register(&h.action(hash)).await.is_err());
+    h.transport
+        .insert_shard(&h.remote, &hash, b"wrong".to_vec())
+        .await;
+    assert!(h
+        .executor
+        .fetch_and_register(&h.action(hash))
+        .await
+        .is_err());
     h.assert_no_provider(hash).await;
 }
 
@@ -62,13 +91,27 @@ async fn rejects_wrong_bytes_without_provider() {
 async fn rejects_empty_malformed_and_transport_failure() {
     let h = Harness::new();
     let hash = ContentHash(*blake3::hash(b"correct").as_bytes());
-    assert!(h.executor.fetch_and_register(&h.action(hash)).await.is_err());
+    assert!(h
+        .executor
+        .fetch_and_register(&h.action(hash))
+        .await
+        .is_err());
     h.assert_no_provider(hash).await;
     h.transport.insert_shard(&h.remote, &hash, Vec::new()).await;
-    assert!(h.executor.fetch_and_register(&h.action(hash)).await.is_err());
+    assert!(h
+        .executor
+        .fetch_and_register(&h.action(hash))
+        .await
+        .is_err());
     h.assert_no_provider(hash).await;
-    h.transport.insert_shard(&h.remote, &hash, vec![0, 0, 0, 99, 1]).await;
-    assert!(h.executor.fetch_and_register(&h.action(hash)).await.is_err());
+    h.transport
+        .insert_shard(&h.remote, &hash, vec![0, 0, 0, 99, 1])
+        .await;
+    assert!(h
+        .executor
+        .fetch_and_register(&h.action(hash))
+        .await
+        .is_err());
     h.assert_no_provider(hash).await;
 }
 
@@ -77,13 +120,32 @@ async fn retains_valid_raw_shard_before_advertisement() {
     let h = Harness::new();
     let data = b"raw-mirror-shard".to_vec();
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
-    h.transport.insert_shard(&h.remote, &hash, data.clone()).await;
-    assert_eq!(h.executor.fetch_and_register(&h.action(hash)).await.expect("mirror"), 1);
+    h.transport
+        .insert_shard(&h.remote, &hash, data.clone())
+        .await;
+    assert_eq!(
+        h.executor
+            .fetch_and_register(&h.action(hash))
+            .await
+            .expect("mirror"),
+        1
+    );
     let response = serve(&h.store, hash).await;
     let (served, _) = parse_shard_response(&response, &hash);
     assert_eq!(served, data);
-    assert_eq!(h.index.get_providers_in_network(DEFAULT_NETWORK, &hash).await, vec!["local"]);
-    assert_eq!(h.analytics.lock().expect("analytics").get_replica_count(&hash), 1);
+    assert_eq!(
+        h.index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await,
+        vec!["local"]
+    );
+    assert_eq!(
+        h.analytics
+            .lock()
+            .expect("analytics")
+            .get_replica_count(&hash),
+        1
+    );
 }
 
 #[tokio::test]
@@ -93,8 +155,16 @@ async fn retains_valid_enveloped_shard_before_advertisement() {
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     let source_store = ShardStore::new();
     source_store.store(hash, data.clone()).await;
-    h.transport.insert_shard(&h.remote, &hash, serve(&source_store, hash).await).await;
-    assert_eq!(h.executor.fetch_and_register(&h.action(hash)).await.expect("mirror"), 1);
+    h.transport
+        .insert_shard(&h.remote, &hash, serve(&source_store, hash).await)
+        .await;
+    assert_eq!(
+        h.executor
+            .fetch_and_register(&h.action(hash))
+            .await
+            .expect("mirror"),
+        1
+    );
     let (served, _) = parse_shard_response(&serve(&h.store, hash).await, &hash);
     assert_eq!(served, data);
     assert_eq!(h.store.ref_count(&hash).await, Some(1));
@@ -108,13 +178,23 @@ async fn duplicate_and_concurrent_retry_do_not_inflate_reference_or_count() {
     h.transport.insert_shard(&h.remote, &hash, data).await;
     let action = h.action(hash);
     let (first, second) = tokio::join!(
-        h.executor.fetch_and_register(&action), h.executor.fetch_and_register(&action)
+        h.executor.fetch_and_register(&action),
+        h.executor.fetch_and_register(&action)
     );
     assert_eq!(first.expect("first mirror"), 1);
     assert_eq!(second.expect("second mirror"), 1);
-    assert_eq!(h.executor.fetch_and_register(&action).await.expect("retry"), 1);
+    assert_eq!(
+        h.executor.fetch_and_register(&action).await.expect("retry"),
+        1
+    );
     assert_eq!(h.store.ref_count(&hash).await, Some(1));
-    assert_eq!(h.analytics.lock().expect("analytics").get_replica_count(&hash), 1);
+    assert_eq!(
+        h.analytics
+            .lock()
+            .expect("analytics")
+            .get_replica_count(&hash),
+        1
+    );
 }
 
 #[tokio::test]
@@ -123,12 +203,25 @@ async fn owner_release_does_not_strand_active_mirror_hint() {
     let data = b"borrowed-owner-shard".to_vec();
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     h.store.store(hash, data.clone()).await;
-    h.transport.insert_shard(&h.remote, &hash, data.clone()).await;
-    assert_eq!(h.executor.fetch_and_register(&h.action(hash)).await.expect("mirror"), 1);
+    h.transport
+        .insert_shard(&h.remote, &hash, data.clone())
+        .await;
+    assert_eq!(
+        h.executor
+            .fetch_and_register(&h.action(hash))
+            .await
+            .expect("mirror"),
+        1
+    );
     assert_eq!(h.store.release(&hash).await, Some(1));
     let (served, _) = parse_shard_response(&serve(&h.store, hash).await, &hash);
     assert_eq!(served, data);
-    assert_eq!(h.index.get_providers_in_network(DEFAULT_NETWORK, &hash).await, vec!["local"]);
+    assert_eq!(
+        h.index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await,
+        vec!["local"]
+    );
 }
 
 #[tokio::test]
@@ -137,19 +230,34 @@ async fn explicit_owner_remove_does_not_strand_active_mirror_hint() {
     let data = b"removed-owner-shard".to_vec();
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     h.store.store(hash, data.clone()).await;
-    h.transport.insert_shard(&h.remote, &hash, data.clone()).await;
-    assert_eq!(h.executor.fetch_and_register(&h.action(hash)).await.expect("mirror"), 1);
+    h.transport
+        .insert_shard(&h.remote, &hash, data.clone())
+        .await;
+    assert_eq!(
+        h.executor
+            .fetch_and_register(&h.action(hash))
+            .await
+            .expect("mirror"),
+        1
+    );
     h.store.remove(&hash).await;
     let (served, _) = parse_shard_response(&serve(&h.store, hash).await, &hash);
     assert_eq!(served, data);
-    assert_eq!(h.index.get_providers_in_network(DEFAULT_NETWORK, &hash).await, vec!["local"]);
+    assert_eq!(
+        h.index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await,
+        vec!["local"]
+    );
 }
 
 mod provider_regression_tests {
     use super::*;
     use crate::network::swarm_provider::build_shard_announce_payload;
 
-    fn hash(seed: u8) -> ContentHash { ContentHash([seed; 32]) }
+    fn hash(seed: u8) -> ContentHash {
+        ContentHash([seed; 32])
+    }
 
     #[tokio::test]
     async fn test_swarm_provider_register_and_get() {
@@ -208,7 +316,9 @@ mod provider_regression_tests {
         let index = ShardLocationIndex::new();
         assert_eq!(index.shard_count().await, 0);
 
-        index.register_provider("n1", &[hash(1), hash(2), hash(3)]).await;
+        index
+            .register_provider("n1", &[hash(1), hash(2), hash(3)])
+            .await;
         assert_eq!(index.shard_count().await, 3);
     }
 
@@ -321,7 +431,10 @@ mod provider_regression_tests {
         let payload = build_shard_announce_payload(&[]);
         assert_eq!(payload.len(), 5);
         assert_eq!(payload[0], 0x04); // TAG_SHARD_ANNOUNCE
-        assert_eq!(u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]), 0);
+        assert_eq!(
+            u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]),
+            0
+        );
     }
 
     #[test]
@@ -333,7 +446,10 @@ mod provider_regression_tests {
         // tag(1) + count(4) + 2*hash(32) = 69
         assert_eq!(payload.len(), 69);
         assert_eq!(payload[0], 0x04);
-        assert_eq!(u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]), 2);
+        assert_eq!(
+            u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]),
+            2
+        );
 
         // First hash
         assert_eq!(&payload[5..37], &[0xAA; 32]);
@@ -358,7 +474,6 @@ mod provider_regression_tests {
             assert_eq!(ContentHash(h), shards[i]);
         }
     }
-
 }
 
 #[tokio::test]
@@ -368,8 +483,16 @@ async fn owner_remove_before_registration_still_requires_new_verified_bytes() {
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     h.store.store(hash, data.clone()).await;
     h.store.remove(&hash).await;
-    h.transport.insert_shard(&h.remote, &hash, data.clone()).await;
-    assert_eq!(h.executor.fetch_and_register(&h.action(hash)).await.expect("mirror"), 1);
+    h.transport
+        .insert_shard(&h.remote, &hash, data.clone())
+        .await;
+    assert_eq!(
+        h.executor
+            .fetch_and_register(&h.action(hash))
+            .await
+            .expect("mirror"),
+        1
+    );
     let (served, _) = parse_shard_response(&serve(&h.store, hash).await, &hash);
     assert_eq!(served, data);
     h.index.remove_provider("local").await;
@@ -383,10 +506,20 @@ async fn owner_release_during_registration_keeps_bytes_until_withdrawal() {
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     h.store.store(hash, data.clone()).await;
     let store_for_hook = h.store.clone();
-    assert!(h.index.register_mirror_with_hook(
-        DEFAULT_NETWORK, "local", hash, h.store.clone(), &data,
-        move || { assert_eq!(store_for_hook.release_owner_now(&hash), Some(0)); },
-    ).await);
+    assert!(
+        h.index
+            .register_mirror_with_hook(
+                DEFAULT_NETWORK,
+                "local",
+                hash,
+                h.store.clone(),
+                &data,
+                move || {
+                    assert_eq!(store_for_hook.release_owner_now(&hash), Some(0));
+                },
+            )
+            .await
+    );
     assert_eq!(h.store.get(&hash).await, Some(data));
     h.index.remove_provider("local").await;
     assert_eq!(h.store.get(&hash).await, None);
@@ -399,12 +532,22 @@ async fn owner_remove_during_registration_keeps_bytes_until_expiry() {
     let hash = ContentHash(*blake3::hash(&data).as_bytes());
     h.store.store(hash, data.clone()).await;
     let store_for_hook = h.store.clone();
-    assert!(h.index.register_mirror_with_hook(
-        DEFAULT_NETWORK, "local", hash, h.store.clone(), &data,
-        move || store_for_hook.remove_owner_now(&hash),
-    ).await);
+    assert!(
+        h.index
+            .register_mirror_with_hook(
+                DEFAULT_NETWORK,
+                "local",
+                hash,
+                h.store.clone(),
+                &data,
+                move || store_for_hook.remove_owner_now(&hash),
+            )
+            .await
+    );
     assert_eq!(h.store.get(&hash).await, Some(data));
-    h.index.expire_provider_for_test(DEFAULT_NETWORK, "local", hash).await;
+    h.index
+        .expire_provider_for_test(DEFAULT_NETWORK, "local", hash)
+        .await;
     assert_eq!(h.index.cleanup_expired().await, 1);
     assert_eq!(h.store.get(&hash).await, None);
 }
@@ -422,18 +565,36 @@ async fn failed_claims_do_not_leave_empty_buckets() {
     }
     let before_store = store.count().await;
     for (hash, _) in &known {
-        assert!(!index.register_mirror_provider_in_network(
-            DEFAULT_NETWORK, "local", *hash, store.clone(), b"wrong-bytes",
-        ).await);
+        assert!(
+            !index
+                .register_mirror_provider_in_network(
+                    DEFAULT_NETWORK,
+                    "local",
+                    *hash,
+                    store.clone(),
+                    b"wrong-bytes",
+                )
+                .await
+        );
     }
     assert_eq!(index.shard_count().await, 0);
     assert_eq!(index.provider_count().await, 0);
     assert_eq!(store.count().await, before_store);
-    for (hash, _) in &known { assert_eq!(store.ref_count(hash).await, Some(1)); }
+    for (hash, _) in &known {
+        assert_eq!(store.ref_count(hash).await, Some(1));
+    }
     let (hash, data) = &known[0];
-    assert!(index.register_mirror_provider_in_network(
-        DEFAULT_NETWORK, "local", *hash, store.clone(), data,
-    ).await);
+    assert!(
+        index
+            .register_mirror_provider_in_network(
+                DEFAULT_NETWORK,
+                "local",
+                *hash,
+                store.clone(),
+                data,
+            )
+            .await
+    );
     assert_eq!(index.shard_count().await, 1);
     assert_eq!(index.provider_count().await, 1);
     assert_eq!(store.ref_count(hash).await, Some(2));

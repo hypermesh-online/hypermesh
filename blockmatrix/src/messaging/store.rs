@@ -16,9 +16,7 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use super::message::DirectMessage;
-use crate::assets::core::asset_id::{
-    AssetCategory, AssetData, NetworkScope,
-};
+use crate::assets::core::asset_id::{AssetCategory, AssetData, NetworkScope};
 use crate::assets::core::AssetRegistration;
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::blockchain::chain::NodeBlockchain;
@@ -98,11 +96,7 @@ impl MessageStore {
 
     /// Return messages exchanged between `our_id` and `peer_id`, sorted
     /// by `created_at` ascending (oldest first, like a chat log).
-    pub async fn history_with_peer(
-        &self,
-        our_id: &str,
-        peer_id: &str,
-    ) -> Vec<DirectMessage> {
+    pub async fn history_with_peer(&self, our_id: &str, peer_id: &str) -> Vec<DirectMessage> {
         let map = self.messages.read().await;
         let mut items: Vec<DirectMessage> = map
             .values()

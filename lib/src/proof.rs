@@ -601,7 +601,12 @@ impl StateProof {
 
     /// All four proof types present in this system.
     pub fn proof_types() -> &'static [ProofType] {
-        &[ProofType::Space, ProofType::Stake, ProofType::Work, ProofType::Time]
+        &[
+            ProofType::Space,
+            ProofType::Stake,
+            ProofType::Work,
+            ProofType::Time,
+        ]
     }
 
     /// List of proof types present (always all four for a valid `StateProof`).
@@ -644,9 +649,7 @@ impl StateProof {
     /// Serialize for network transmission.
     pub fn to_bytes(&self) -> Result<Vec<u8>, crate::error::HypermeshError> {
         bincode::serialize(self).map_err(|e| {
-            crate::error::HypermeshError::StateProof(format!(
-                "Failed to serialize StateProof: {e}"
-            ))
+            crate::error::HypermeshError::StateProof(format!("Failed to serialize StateProof: {e}"))
         })
     }
 
@@ -732,19 +735,25 @@ pub struct StateRequirements {
 
 impl Default for StateRequirements {
     fn default() -> Self {
-        Self { max_time_offset: Duration::from_secs(60) }
+        Self {
+            max_time_offset: Duration::from_secs(60),
+        }
     }
 }
 
 impl StateRequirements {
     /// Production bound: 30s clock freshness.
     pub fn production() -> Self {
-        Self { max_time_offset: Duration::from_secs(30) }
+        Self {
+            max_time_offset: Duration::from_secs(30),
+        }
     }
 
     /// Relaxed bound for localhost testing: 300s clock freshness.
     pub fn localhost_testing() -> Self {
-        Self { max_time_offset: Duration::from_secs(300) }
+        Self {
+            max_time_offset: Duration::from_secs(300),
+        }
     }
 }
 
@@ -995,7 +1004,10 @@ mod tests {
         let bytes = pos.to_bytes().expect("test: to_bytes");
         let back = StateProof::from_bytes(&bytes).expect("test: from_bytes");
         assert_eq!(pos, back);
-        assert_eq!(pos.hash().expect("test: hash"), back.hash().expect("test: hash"));
+        assert_eq!(
+            pos.hash().expect("test: hash"),
+            back.hash().expect("test: hash")
+        );
     }
 
     #[test]

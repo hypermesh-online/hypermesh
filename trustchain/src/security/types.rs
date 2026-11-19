@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 
-use crate::proof_of_state::{StateProof, StateRequirements, StateProofResult};
+use crate::proof_of_state::{StateProof, StateProofResult, StateRequirements};
 
 /// Security configuration
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -139,10 +139,7 @@ impl std::fmt::Debug for SecurityMetrics {
                 &self.validations_successful.load(Relaxed),
             )
             .field("validations_failed", &self.validations_failed.load(Relaxed))
-            .field(
-                "state_validations",
-                &self.state_validations.load(Relaxed),
-            )
+            .field("state_validations", &self.state_validations.load(Relaxed))
             .field(
                 "byzantine_detections",
                 &self.byzantine_detections.load(Relaxed),
@@ -178,10 +175,7 @@ impl Serialize for SecurityMetrics {
             &self.validations_successful.load(Relaxed),
         )?;
         state.serialize_field("validations_failed", &self.validations_failed.load(Relaxed))?;
-        state.serialize_field(
-            "state_validations",
-            &self.state_validations.load(Relaxed),
-        )?;
+        state.serialize_field("state_validations", &self.state_validations.load(Relaxed))?;
         state.serialize_field(
             "byzantine_detections",
             &self.byzantine_detections.load(Relaxed),

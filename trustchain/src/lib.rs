@@ -12,15 +12,15 @@ pub mod api;
 pub mod ca;
 pub mod config;
 pub mod crypto; // NEW: Post-quantum cryptography (FALCON-1024 + Kyber)
-pub mod identity; // FALCON-1024 node identity (implements NodeSigner trait from lib)
-pub mod proof_of_state;
 pub mod ct;
 pub mod deployment; // NEW: Quality gates and deployment validation
 pub mod dns;
 pub mod ephemeral;
 pub mod errors;
 pub mod http3; // NEW: HTTP/3 server infrastructure
+pub mod identity; // FALCON-1024 node identity (implements NodeSigner trait from lib)
 pub mod monitoring; // NEW: Native monitoring system without external dependencies
+pub mod proof_of_state;
 pub mod security; // NEW: Security monitoring and Byzantine detection
 pub mod stoq_client;
 pub mod trust;
@@ -30,10 +30,10 @@ pub mod validation; // Ephemeral self-signed certs for anonymous QUIC handshakes
 pub use ca::security_integration::{SecurityIntegratedCA, SecurityIntegrationConfig};
 pub use ca::{CAConfig, CertificateRequest, IssuedCertificate, TrustChainCA};
 pub use config::{DnsConfig, TrustChainConfig};
-pub use proof_of_state::{StateProof, StateProofContext, StateRequirements};
 pub use crypto::{FalconKeyPair, FalconSignature, KyberKeyPair, PQCAlgorithm, PostQuantumCrypto};
-pub use identity::FalconIdentity;
 pub use errors::{Result, TrustChainError};
+pub use identity::FalconIdentity;
+pub use proof_of_state::{StateProof, StateProofContext, StateRequirements};
 pub use security::{SecurityDashboard, SecurityMonitor, SecurityValidationResult};
 pub use stoq_client::{ServiceEndpoint, ServiceType, TrustChainStoqClient, TrustChainStoqConfig};
 
@@ -418,7 +418,7 @@ impl TrustChain {
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::localhost_testing(),
             security_config: SecurityIntegrationConfig {
-                mandatory_state_proof: false,          // Reduced for testing
+                mandatory_state_proof: false,        // Reduced for testing
                 mandatory_security_validation: true, // Keep basic validation
                 block_on_security_failure: false,    // Don't block for testing
                 log_all_operations: true,
@@ -438,7 +438,7 @@ impl TrustChain {
         let security_config = TrustChainSecurityConfig {
             base_config: TrustChainConfig::production(),
             security_config: SecurityIntegrationConfig {
-                mandatory_state_proof: true,           // MANDATORY for production
+                mandatory_state_proof: true,         // MANDATORY for production
                 mandatory_security_validation: true, // MANDATORY for production
                 block_on_security_failure: true,     // MANDATORY for production
                 log_all_operations: true,
@@ -462,16 +462,23 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_trustchain_security_initialization() {
-        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+        let trustchain = TrustChain::new_for_testing()
+            .await
+            .expect("test: async operation");
 
-        let ca_cert = trustchain.get_ca_certificate().await.expect("test: async operation");
+        let ca_cert = trustchain
+            .get_ca_certificate()
+            .await
+            .expect("test: async operation");
         assert!(!ca_cert.is_empty());
     }
 
     #[tokio::test]
     #[serial]
     async fn test_secure_certificate_issuance() -> anyhow::Result<()> {
-        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+        let trustchain = TrustChain::new_for_testing()
+            .await
+            .expect("test: async operation");
 
         let request = CertificateRequest {
             common_name: "test.secure.com".to_string(),
@@ -484,7 +491,10 @@ mod tests {
             subject_type: None,
         };
 
-        let cert = trustchain.issue_certificate_secure(request).await.expect("test: async operation");
+        let cert = trustchain
+            .issue_certificate_secure(request)
+            .await
+            .expect("test: async operation");
         assert_eq!(cert.common_name, "test.secure.com");
         assert!(!cert.serial_number.is_empty());
         Ok(())
@@ -493,9 +503,14 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_security_dashboard() {
-        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+        let trustchain = TrustChain::new_for_testing()
+            .await
+            .expect("test: async operation");
 
-        let dashboard = trustchain.get_security_dashboard().await.expect("test: async operation");
+        let dashboard = trustchain
+            .get_security_dashboard()
+            .await
+            .expect("test: async operation");
 
         // Should have valid dashboard data
         // Specific assertions depend on the implementation
@@ -505,7 +520,9 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_state_validation() -> anyhow::Result<()> {
-        let trustchain = TrustChain::new_for_testing().await.expect("test: async operation");
+        let trustchain = TrustChain::new_for_testing()
+            .await
+            .expect("test: async operation");
 
         let state_proof = StateProof::new_for_testing();
         let result = trustchain

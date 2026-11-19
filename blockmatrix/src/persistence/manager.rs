@@ -682,13 +682,22 @@ mod tests {
 
         let coord = MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate");
         let mut state = MatrixState::new(coord);
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"));
+        state.add_neighbor(
+            "node1".to_string(),
+            MatrixCoordinate::new(4, 5, 6).expect("test: valid coordinate"),
+        );
 
         // Save
-        manager.save_matrix_state(&state).await.expect("test: async operation");
+        manager
+            .save_matrix_state(&state)
+            .await
+            .expect("test: async operation");
 
         // Load
-        let loaded = manager.load_matrix_state().await.expect("test: async operation");
+        let loaded = manager
+            .load_matrix_state()
+            .await
+            .expect("test: async operation");
         assert!(loaded.is_some());
 
         let loaded_state = loaded.expect("test: expected success");
@@ -709,7 +718,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let snapshot_id = manager.create_snapshot().await.expect("test: async operation");
+        let snapshot_id = manager
+            .create_snapshot()
+            .await
+            .expect("test: async operation");
         assert!(!snapshot_id.is_empty());
 
         // Refresh stats after snapshot creation (cached stats are stale)
@@ -732,9 +744,13 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let mut txn = manager.begin_transaction().await.expect("test: async operation");
+        let mut txn = manager
+            .begin_transaction()
+            .await
+            .expect("test: async operation");
 
-        let state = MatrixState::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let state =
+            MatrixState::new(MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
         txn.add_operation(PersistenceOperation::SaveMatrixState(state));
 
         txn.commit().await.expect("test: async operation");
@@ -773,7 +789,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let valid = manager.verify_integrity().await.expect("test: async operation");
+        let valid = manager
+            .verify_integrity()
+            .await
+            .expect("test: async operation");
         assert!(valid);
     }
 

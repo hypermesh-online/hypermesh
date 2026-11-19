@@ -53,7 +53,12 @@ pub struct MigrationPlan {
 
 impl MigrationPlan {
     /// Create a new pending migration plan.
-    pub fn new(shard_id: ContentHash, source: NodeId, destination: NodeId, reason: impl Into<String>) -> Self {
+    pub fn new(
+        shard_id: ContentHash,
+        source: NodeId,
+        destination: NodeId,
+        reason: impl Into<String>,
+    ) -> Self {
         Self {
             shard_id,
             source,
@@ -100,7 +105,11 @@ impl<T: ShardTransport> MigrationExecutor<T> {
         // Phase 1: Copy.
         plan.status = MigrationStatus::Copying;
 
-        let data = match self.transport.fetch_shard(&plan.source, &plan.shard_id).await {
+        let data = match self
+            .transport
+            .fetch_shard(&plan.source, &plan.shard_id)
+            .await
+        {
             Ok(d) => d,
             Err(_) => {
                 plan.status = MigrationStatus::Failed;
@@ -232,12 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_migration_plan_initial_state() {
-        let plan = MigrationPlan::new(
-            shard_id(1),
-            node(1),
-            node(2),
-            "unit test",
-        );
+        let plan = MigrationPlan::new(shard_id(1), node(1), node(2), "unit test");
         assert_eq!(plan.status, MigrationStatus::Pending);
         assert_eq!(plan.reason, "unit test");
     }

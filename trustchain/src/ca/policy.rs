@@ -20,9 +20,7 @@ pub struct PolicyEngine {
 impl PolicyEngine {
     /// Create new policy engine
     pub fn new(state_requirements: StateRequirements) -> Self {
-        Self {
-            state_requirements,
-        }
+        Self { state_requirements }
     }
 
     /// Validate certificate request against policy

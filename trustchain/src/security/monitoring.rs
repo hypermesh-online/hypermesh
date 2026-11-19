@@ -14,8 +14,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 use super::SecuritySeverity;
-use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::StateProof;
 
 /// Real-time security monitoring dashboard
 pub struct SecurityMonitoringDashboard {
@@ -514,16 +514,23 @@ mod tests {
     #[tokio::test]
     async fn test_dashboard_creation() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+        let dashboard = SecurityMonitoringDashboard::new(config)
+            .await
+            .expect("test: async operation");
 
-        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
+        let data = dashboard
+            .get_dashboard_data()
+            .await
+            .expect("test: async operation");
         assert!(matches!(data.security_status, SecurityStatus::Secure));
     }
 
     #[tokio::test]
     async fn test_monitoring_session() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+        let dashboard = SecurityMonitoringDashboard::new(config)
+            .await
+            .expect("test: async operation");
 
         let session_config = SessionConfig::default();
         let session_id = dashboard
@@ -543,7 +550,9 @@ mod tests {
     #[tokio::test]
     async fn test_certificate_operation_tracking() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+        let dashboard = SecurityMonitoringDashboard::new(config)
+            .await
+            .expect("test: async operation");
 
         let operation = LiveCertificateOperation {
             operation_id: "test_op_001".to_string(),
@@ -561,7 +570,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
+        let data = dashboard
+            .get_dashboard_data()
+            .await
+            .expect("test: async operation");
         assert_eq!(data.live_certificate_operations.len(), 1);
         assert_eq!(
             data.live_certificate_operations[0].operation_id,
@@ -572,7 +584,9 @@ mod tests {
     #[tokio::test]
     async fn test_security_alert_handling() {
         let config = SecurityMonitoringConfig::default();
-        let dashboard = SecurityMonitoringDashboard::new(config).await.expect("test: async operation");
+        let dashboard = SecurityMonitoringDashboard::new(config)
+            .await
+            .expect("test: async operation");
 
         let alert = ActiveSecurityAlert {
             alert_id: "alert_001".to_string(),
@@ -585,9 +599,15 @@ mod tests {
             state_proof: None,
         };
 
-        dashboard.add_security_alert(alert).await.expect("test: async operation");
+        dashboard
+            .add_security_alert(alert)
+            .await
+            .expect("test: async operation");
 
-        let data = dashboard.get_dashboard_data().await.expect("test: async operation");
+        let data = dashboard
+            .get_dashboard_data()
+            .await
+            .expect("test: async operation");
         assert_eq!(data.active_alerts.len(), 1);
         assert!(matches!(
             data.security_status,

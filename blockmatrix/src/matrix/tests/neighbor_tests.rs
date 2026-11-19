@@ -138,7 +138,10 @@ fn test_find_k_nearest_single() {
     assert_eq!(nearest.len(), 1);
 
     // Should be (1,1,1) as it's closest
-    assert_eq!(nearest[0].0, MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
+    assert_eq!(
+        nearest[0].0,
+        MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")
+    );
 }
 
 #[test]
@@ -341,9 +344,9 @@ fn test_k_nearest_with_equal_distances() {
 
     // Create points at equal distances
     let candidates = vec![
-        MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"),  // distance = 1
-        MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"),  // distance = 1
-        MatrixCoordinate::new(0, 0, 1).expect("test: valid coordinate"),  // distance = 1
+        MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"), // distance = 1
+        MatrixCoordinate::new(0, 1, 0).expect("test: valid coordinate"), // distance = 1
+        MatrixCoordinate::new(0, 0, 1).expect("test: valid coordinate"), // distance = 1
         MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"), // distance = 10
     ];
 
@@ -362,7 +365,7 @@ fn test_cubic_boundary_cases() {
 
     let candidates = vec![
         MatrixCoordinate::new(11, 10, 10).expect("test: valid coordinate"), // On boundary (radius 1)
-        MatrixCoordinate::new(9, 10, 10).expect("test: valid coordinate"),  // On boundary (radius 1)
+        MatrixCoordinate::new(9, 10, 10).expect("test: valid coordinate"), // On boundary (radius 1)
         MatrixCoordinate::new(10, 11, 10).expect("test: valid coordinate"), // On boundary (radius 1)
         MatrixCoordinate::new(12, 10, 10).expect("test: valid coordinate"), // Outside (radius 2)
     ];

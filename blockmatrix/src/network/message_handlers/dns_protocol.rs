@@ -118,12 +118,7 @@ mod tests {
     use std::net::Ipv6Addr;
     use std::time::SystemTime;
 
-    fn mk_response(
-        ts: u64,
-        height: u64,
-        grant: bool,
-        records: usize,
-    ) -> DistributedDnsResponse {
+    fn mk_response(ts: u64, height: u64, grant: bool, records: usize) -> DistributedDnsResponse {
         let recs = (0..records)
             .map(|i| DnsRecord {
                 domain: "test".into(),
@@ -169,7 +164,10 @@ mod tests {
     fn higher_chain_height_wins_when_timestamps_equal() {
         let lower_height = mk_response(100, 5, false, 1);
         let higher_height = mk_response(100, 50, false, 1);
-        assert_eq!(higher_height.canonical_cmp(&lower_height), Ordering::Greater);
+        assert_eq!(
+            higher_height.canonical_cmp(&lower_height),
+            Ordering::Greater
+        );
     }
 
     #[test]

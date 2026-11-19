@@ -80,11 +80,9 @@ async fn deploy_dashboard(
     }
     let toml_str = std::fs::read_to_string(&manifest_path)
         .with_context(|| format!("Failed to read {}", manifest_path.display()))?;
-    let manifest = blockmatrix::dashboard::parse_manifest(&toml_str)
-        .map_err(|e| anyhow::anyhow!(e))?;
-    if let Err(errors) =
-        blockmatrix::dashboard::validate_manifest(&manifest, path)
-    {
+    let manifest =
+        blockmatrix::dashboard::parse_manifest(&toml_str).map_err(|e| anyhow::anyhow!(e))?;
+    if let Err(errors) = blockmatrix::dashboard::validate_manifest(&manifest, path) {
         for e in &errors {
             eprintln!("Validation error: {e}");
         }
@@ -96,11 +94,8 @@ async fn deploy_dashboard(
     );
     info!("Domain: {}", manifest.dashboard.domain);
 
-    let files = blockmatrix::dashboard::deploy::collect_dashboard_files(
-        path,
-        &manifest.access,
-    )
-    .with_context(|| "failed to collect dashboard files")?;
+    let files = blockmatrix::dashboard::deploy::collect_dashboard_files(path, &manifest.access)
+        .with_context(|| "failed to collect dashboard files")?;
 
     if files.is_empty() {
         eprintln!("No files found in dashboard scope directories");
@@ -133,9 +128,7 @@ async fn deploy_via_daemon(
         .map(|(k, v)| {
             (
                 k.clone(),
-                serde_json::Value::String(
-                    base64::engine::general_purpose::STANDARD.encode(v),
-                ),
+                serde_json::Value::String(base64::engine::general_purpose::STANDARD.encode(v)),
             )
         })
         .collect::<serde_json::Map<String, serde_json::Value>>()
@@ -179,8 +172,7 @@ async fn deploy_standalone(
     use blockmatrix::StateProof;
 
     let asset_data = AssetData {
-        config: format!("DASHBOARD:DEPLOY:{}", manifest.dashboard.name)
-            .into_bytes(),
+        config: format!("DASHBOARD:DEPLOY:{}", manifest.dashboard.name).into_bytes(),
         definition: bundle.to_vec(),
         metadata: toml_str.as_bytes().to_vec(),
     };
@@ -228,8 +220,7 @@ fn init_dashboard(name: Option<String>) -> Result<()> {
     std::fs::create_dir_all(dir.join("dist/public"))?;
     std::fs::create_dir_all(dir.join("dist/private"))?;
 
-    let manifest_toml =
-        blockmatrix::dashboard::scaffold_manifest(&project_name);
+    let manifest_toml = blockmatrix::dashboard::scaffold_manifest(&project_name);
     std::fs::write(dir.join("dashboard.toml"), &manifest_toml)?;
 
     std::fs::write(
@@ -245,8 +236,6 @@ fn init_dashboard(name: Option<String>) -> Result<()> {
     println!("  dashboard.toml");
     println!("  dist/public/index.html");
     println!("  dist/private/index.html");
-    println!(
-        "\nDeploy with: hypermesh dashboard deploy ./{project_name}/"
-    );
+    println!("\nDeploy with: hypermesh dashboard deploy ./{project_name}/");
     Ok(())
 }

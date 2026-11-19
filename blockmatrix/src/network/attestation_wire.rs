@@ -108,7 +108,10 @@ impl std::fmt::Display for AttestationWireError {
                 f,
                 "attestation payload declares {declared} bytes, limit is {limit}"
             ),
-            Self::LengthMismatch { declared, available } => write!(
+            Self::LengthMismatch {
+                declared,
+                available,
+            } => write!(
                 f,
                 "attestation payload declares {declared} bytes but {available} are present"
             ),
@@ -150,10 +153,12 @@ pub fn encode_mirror_attestation(
 /// `verify_attestation`, itself the full audit gate — is the only accept gate,
 /// and this function deliberately does not duplicate any part of it.
 pub fn decode_mirror_attestation(data: &[u8]) -> Result<MirrorAttestation, AttestationWireError> {
-    let header = data.get(..HEADER_LEN).ok_or(AttestationWireError::Truncated {
-        got: data.len(),
-        need: HEADER_LEN,
-    })?;
+    let header = data
+        .get(..HEADER_LEN)
+        .ok_or(AttestationWireError::Truncated {
+            got: data.len(),
+            need: HEADER_LEN,
+        })?;
 
     if header[0] != MIRROR_ATTEST_TAG {
         return Err(AttestationWireError::WrongTag { got: header[0] });

@@ -14,9 +14,9 @@
 use crate::blockchain::{
     Block, BlockPropagator, ChainStateManager, NodeBlockchain, PropagationStrategy,
 };
-use crate::proof_of_state::StateProof;
 use crate::matrix::{CoordinateError, MatrixCoordinate};
 use crate::persistence::{PersistenceConfig, PersistenceManager, RecoveryManager};
+use crate::proof_of_state::StateProof;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::PathBuf;

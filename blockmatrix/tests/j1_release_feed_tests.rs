@@ -34,14 +34,8 @@ fn signed_entry(
     channel: ReleaseChannel,
 ) -> ReleaseFeedEntry {
     let mut hashes = HashMap::new();
-    hashes.insert(
-        "x86_64-unknown-linux-musl".to_string(),
-        "ab".repeat(32),
-    );
-    hashes.insert(
-        "aarch64-apple-darwin".to_string(),
-        "cd".repeat(32),
-    );
+    hashes.insert("x86_64-unknown-linux-musl".to_string(), "ab".repeat(32));
+    hashes.insert("aarch64-apple-darwin".to_string(), "cd".repeat(32));
     let mut entry = ReleaseFeedEntry {
         version: version.to_string(),
         channel,
@@ -66,8 +60,7 @@ fn test_release_feed_entry_round_trip() {
     let foundation = FalconIdentity::generate();
     let entry = signed_entry(&foundation, "0.1.0", ReleaseChannel::Stable);
     let json = serde_json::to_string(&entry).expect("test: serialize");
-    let back: ReleaseFeedEntry =
-        serde_json::from_str(&json).expect("test: deserialize");
+    let back: ReleaseFeedEntry = serde_json::from_str(&json).expect("test: deserialize");
     assert_eq!(back.version, entry.version);
     assert_eq!(back.channel, entry.channel);
     assert_eq!(back.binary_hashes, entry.binary_hashes);
@@ -184,9 +177,7 @@ mod system_ipc {
     use blockmatrix::ipc::protocol::RpcRequest;
     use blockmatrix::ipc::state::DaemonState;
 
-    async fn make_state(
-        subscriber: Option<Arc<ReleaseFeedSubscriber>>,
-    ) -> Arc<DaemonState> {
+    async fn make_state(subscriber: Option<Arc<ReleaseFeedSubscriber>>) -> Arc<DaemonState> {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let bc = Arc::new(NodeBlockchain::new(coord));
         let config = PersistenceConfig {
@@ -282,9 +273,7 @@ mod system_ipc {
 fn test_block_format_v2_magic_recognized() {
     use blockmatrix::blockchain::block::Block;
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
-    use blockmatrix::persistence::blockchain_storage::{
-        test_deserialize, test_serialize_v2,
-    };
+    use blockmatrix::persistence::blockchain_storage::{test_deserialize, test_serialize_v2};
 
     let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
     let block = Block::genesis(coord);
@@ -301,9 +290,7 @@ fn test_block_format_v2_magic_recognized() {
 fn test_block_format_v1_still_works() {
     use blockmatrix::blockchain::block::Block;
     use blockmatrix::matrix::coordinate::MatrixCoordinate;
-    use blockmatrix::persistence::blockchain_storage::{
-        test_deserialize, test_serialize_v1,
-    };
+    use blockmatrix::persistence::blockchain_storage::{test_deserialize, test_serialize_v1};
 
     let coord = MatrixCoordinate::new(1, 2, 3).expect("test: coord");
     let block = Block::genesis(coord);
@@ -369,8 +356,8 @@ async fn test_protocol_version_mismatch_rejected() {
     }
 
     // Determine a mismatched major version (different from current).
-    let current_major = blockmatrix::ipc::protocol::major_version(IPC_PROTOCOL_VERSION)
-        .unwrap_or(0);
+    let current_major =
+        blockmatrix::ipc::protocol::major_version(IPC_PROTOCOL_VERSION).unwrap_or(0);
     let mismatched_major = current_major + 5; // far away
     let mismatched_version = format!("{}.0.0", mismatched_major);
 
@@ -401,9 +388,7 @@ async fn test_protocol_version_mismatch_rejected() {
 #[tokio::test]
 async fn test_protocol_version_minor_mismatch_accepted() {
     use blockmatrix::ipc::handler::RequestHandler;
-    use blockmatrix::ipc::protocol::{
-        RpcRequest, RpcResponse, IPC_PROTOCOL_VERSION,
-    };
+    use blockmatrix::ipc::protocol::{RpcRequest, RpcResponse, IPC_PROTOCOL_VERSION};
     use blockmatrix::ipc::server::IpcServer;
     use std::sync::Arc;
     use tempfile::TempDir;
@@ -431,8 +416,8 @@ async fn test_protocol_version_minor_mismatch_accepted() {
     }
 
     // Same major, different minor.
-    let current_major = blockmatrix::ipc::protocol::major_version(IPC_PROTOCOL_VERSION)
-        .unwrap_or(0);
+    let current_major =
+        blockmatrix::ipc::protocol::major_version(IPC_PROTOCOL_VERSION).unwrap_or(0);
     let minor_diff_version = format!("{}.99.0", current_major);
 
     let mut req = RpcRequest::new("ping", serde_json::json!(null));
@@ -452,7 +437,10 @@ async fn test_protocol_version_minor_mismatch_accepted() {
         "minor-version mismatch should be accepted; got: {:?}",
         resp.error
     );
-    assert_eq!(resp.result.expect("test: result"), serde_json::json!("pong"));
+    assert_eq!(
+        resp.result.expect("test: result"),
+        serde_json::json!("pong")
+    );
 
     server.shutdown();
     let _ = task.await;

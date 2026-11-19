@@ -170,8 +170,7 @@ mod tests {
 
         let cs = unsafe { std::ffi::CStr::from_ptr(ptr) };
         let parsed: serde_json::Value =
-            serde_json::from_str(cs.to_str().expect("test: UTF-8"))
-                .expect("test: parse JSON");
+            serde_json::from_str(cs.to_str().expect("test: UTF-8")).expect("test: parse JSON");
         assert_eq!(parsed["height"], 42);
 
         unsafe { hypermesh_free_string(ptr) };
@@ -198,9 +197,8 @@ mod tests {
         error_state::clear_last_error();
         let method = CString::new("test").expect("test: CString");
         let params = CString::new("{}").expect("test: CString");
-        let result = unsafe {
-            hypermesh_call(std::ptr::null_mut(), method.as_ptr(), params.as_ptr())
-        };
+        let result =
+            unsafe { hypermesh_call(std::ptr::null_mut(), method.as_ptr(), params.as_ptr()) };
         assert!(result.is_null());
     }
 

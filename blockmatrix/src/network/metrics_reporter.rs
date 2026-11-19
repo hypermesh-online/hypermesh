@@ -172,7 +172,13 @@ impl MetricsReporter {
         ebpf: &HyperMeshMetrics,
     ) -> Vec<Vec<u8>> {
         vec![
-            self.build_capacity_frame(chain_height, peer_count, shard_count, cpu_usage, memory_usage),
+            self.build_capacity_frame(
+                chain_height,
+                peer_count,
+                shard_count,
+                cpu_usage,
+                memory_usage,
+            ),
             self.build_congestion_frame(ebpf),
             self.build_routing_frame(ebpf),
         ]
@@ -207,7 +213,10 @@ impl MetricsReporter {
         }
 
         if !any_success {
-            debug!("Metrics push failed to all peers (backoff {} cycles)", BACKOFF_CYCLES);
+            debug!(
+                "Metrics push failed to all peers (backoff {} cycles)",
+                BACKOFF_CYCLES
+            );
             self.backoff_remaining = BACKOFF_CYCLES;
         }
     }
@@ -239,7 +248,11 @@ async fn send_metrics_to_peer(node: &NetworkNode, frame_bytes: &[u8]) -> bool {
                 debug!("Metrics stream finish to {} failed: {}", short_id, e);
                 return false;
             }
-            debug!("Pushed {} metrics bytes to peer {}", frame_bytes.len(), short_id);
+            debug!(
+                "Pushed {} metrics bytes to peer {}",
+                frame_bytes.len(),
+                short_id
+            );
             true
         }
         Err(e) => {
@@ -258,8 +271,7 @@ mod tests {
         let mut reporter = MetricsReporter::new("test-node-001".to_string());
         let bytes = reporter.build_capacity_frame(42, 3, 100, 55.5, 70.2);
 
-        let parsed: serde_json::Value =
-            serde_json::from_slice(&bytes).expect("test: valid JSON");
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes).expect("test: valid JSON");
 
         assert_eq!(parsed["source_node"], "test-node-001");
         assert_eq!(parsed["sequence"], 1);
@@ -317,8 +329,7 @@ mod tests {
         let mut reporter = MetricsReporter::new("ebpf-cong-node".to_string());
         let bytes = reporter.build_congestion_frame(&test_ebpf_metrics());
 
-        let parsed: serde_json::Value =
-            serde_json::from_slice(&bytes).expect("test: valid JSON");
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes).expect("test: valid JSON");
 
         assert_eq!(parsed["source_node"], "ebpf-cong-node");
         assert_eq!(parsed["payload"]["Congestion"]["dropped_packets_epoch"], 25);
@@ -330,13 +341,15 @@ mod tests {
         let mut reporter = MetricsReporter::new("ebpf-route-node".to_string());
         let bytes = reporter.build_routing_frame(&test_ebpf_metrics());
 
-        let parsed: serde_json::Value =
-            serde_json::from_slice(&bytes).expect("test: valid JSON");
+        let parsed: serde_json::Value = serde_json::from_slice(&bytes).expect("test: valid JSON");
 
         assert_eq!(parsed["source_node"], "ebpf-route-node");
         assert_eq!(parsed["payload"]["Routing"]["avg_latency_us"], 1_500);
         // 31_250_000 * 8 = 250_000_000
-        assert_eq!(parsed["payload"]["Routing"]["throughput_bps"], 250_000_000u64);
+        assert_eq!(
+            parsed["payload"]["Routing"]["throughput_bps"],
+            250_000_000u64
+        );
         assert_eq!(parsed["payload"]["Routing"]["path_count"], 95);
     }
 
@@ -348,9 +361,21 @@ mod tests {
         let routing = reporter.build_routing_frame(&test_ebpf_metrics());
 
         // Frames should be well under 1 KB
-        assert!(capacity.len() < 1024, "capacity frame {} bytes", capacity.len());
-        assert!(congestion.len() < 1024, "congestion frame {} bytes", congestion.len());
-        assert!(routing.len() < 1024, "routing frame {} bytes", routing.len());
+        assert!(
+            capacity.len() < 1024,
+            "capacity frame {} bytes",
+            capacity.len()
+        );
+        assert!(
+            congestion.len() < 1024,
+            "congestion frame {} bytes",
+            congestion.len()
+        );
+        assert!(
+            routing.len() < 1024,
+            "routing frame {} bytes",
+            routing.len()
+        );
     }
 
     #[test]
@@ -360,10 +385,8 @@ mod tests {
         let congestion = reporter.build_congestion_frame(&test_ebpf_metrics()); // seq 2
         let routing = reporter.build_routing_frame(&test_ebpf_metrics()); // seq 3
 
-        let c: serde_json::Value =
-            serde_json::from_slice(&congestion).expect("test: valid JSON");
-        let r: serde_json::Value =
-            serde_json::from_slice(&routing).expect("test: valid JSON");
+        let c: serde_json::Value = serde_json::from_slice(&congestion).expect("test: valid JSON");
+        let r: serde_json::Value = serde_json::from_slice(&routing).expect("test: valid JSON");
 
         assert_eq!(c["sequence"], 2);
         assert_eq!(r["sequence"], 3);

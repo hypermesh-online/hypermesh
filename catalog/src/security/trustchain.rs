@@ -287,7 +287,10 @@ impl TrustChainIntegration {
                     valid = false;
                 }
                 if now > not_after {
-                    errors.push(format!("Certificate has expired (not_after: {})", not_after));
+                    errors.push(format!(
+                        "Certificate has expired (not_after: {})",
+                        not_after
+                    ));
                     valid = false;
                 }
 

@@ -205,8 +205,9 @@ impl Compressor {
 
     /// Decompress using Zstd
     fn decompress_zstd(&self, data: &[u8]) -> PipelineResult<Vec<u8>> {
-        zstd::decode_all(std::io::Cursor::new(data))
-            .map_err(|e| PipelineError::CompressionFailed(format!("zstd decompression failed: {e}")))
+        zstd::decode_all(std::io::Cursor::new(data)).map_err(|e| {
+            PipelineError::CompressionFailed(format!("zstd decompression failed: {e}"))
+        })
     }
 
     /// Select the best compression algorithm based on content type and size.
@@ -316,8 +317,8 @@ impl Compressor {
                 })?;
                 total_read = input_buffer.len();
 
-                let compressed =
-                    zstd::encode_all(std::io::Cursor::new(&input_buffer), level).map_err(|e| {
+                let compressed = zstd::encode_all(std::io::Cursor::new(&input_buffer), level)
+                    .map_err(|e| {
                         PipelineError::CompressionFailed(format!(
                             "zstd stream compression failed: {e}"
                         ))
@@ -336,8 +337,7 @@ impl Compressor {
                 })?;
                 total_read = input_buffer.len();
 
-                let algo =
-                    self.select_algorithm("application/octet-stream", input_buffer.len());
+                let algo = self.select_algorithm("application/octet-stream", input_buffer.len());
                 let mut temp_config = self.config.clone();
                 temp_config.algorithm = algo;
                 let temp = Compressor::new(temp_config);
@@ -373,11 +373,15 @@ mod tests {
         let compressor = Compressor::default();
         let data = vec![0u8; 10000]; // Highly compressible data
 
-        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
+        let (compressed, stats) = compressor
+            .compress(&data)
+            .expect("test: compression operation");
         assert!(compressed.len() < data.len());
         assert!(stats.ratio < 1.0);
 
-        let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
+        let decompressed = compressor
+            .decompress(&compressed)
+            .expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 
@@ -391,11 +395,15 @@ mod tests {
         let compressor = Compressor::new(config);
         let data = b"Hello, World! ".repeat(1000);
 
-        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
+        let (compressed, stats) = compressor
+            .compress(&data)
+            .expect("test: compression operation");
         assert!(compressed.len() < data.len());
         assert!(stats.ratio < 0.1); // Brotli excels at text compression
 
-        let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
+        let decompressed = compressor
+            .decompress(&compressed)
+            .expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 
@@ -408,7 +416,9 @@ mod tests {
         let compressor = Compressor::new(config);
         let data = vec![1, 2, 3, 4, 5];
 
-        let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
+        let (compressed, stats) = compressor
+            .compress(&data)
+            .expect("test: compression operation");
         assert_eq!(compressed, data);
         assert_eq!(stats.ratio, 1.0);
     }
@@ -418,7 +428,9 @@ mod tests {
         let compressor = Compressor::default();
         let data = vec![0u8; 100000];
 
-        let (_, stats) = compressor.compress(&data).expect("test: compression operation");
+        let (_, stats) = compressor
+            .compress(&data)
+            .expect("test: compression operation");
         assert_eq!(stats.original_size, 100000);
         assert!(stats.compressed_size < stats.original_size);
         assert!(stats.ratio < 1.0);
@@ -437,8 +449,12 @@ mod tests {
             };
             let compressor = Compressor::new(config);
 
-            let (compressed, stats) = compressor.compress(&data).expect("test: compression operation");
-            let decompressed = compressor.decompress(&compressed).expect("test: compression operation");
+            let (compressed, stats) = compressor
+                .compress(&data)
+                .expect("test: compression operation");
+            let decompressed = compressor
+                .decompress(&compressed)
+                .expect("test: compression operation");
             assert_eq!(decompressed, data);
             assert!(stats.ratio < 1.0);
 
@@ -477,7 +493,9 @@ mod tests {
         assert!(stats.ratio < 1.0);
 
         // Verify we can decompress
-        let decompressed = compressor.decompress(&output).expect("test: compression operation");
+        let decompressed = compressor
+            .decompress(&output)
+            .expect("test: compression operation");
         assert_eq!(decompressed, data);
     }
 
@@ -495,7 +513,9 @@ mod tests {
         assert!(compressed.len() < data.len(), "test: zstd should compress");
         assert!(stats.ratio < 1.0);
 
-        let decompressed = compressor.decompress(&compressed).expect("test: decompress");
+        let decompressed = compressor
+            .decompress(&compressed)
+            .expect("test: decompress");
         assert_eq!(decompressed, data);
     }
 
@@ -508,7 +528,9 @@ mod tests {
             ..CompressionConfig::default()
         });
         let (compressed, _) = compressor.compress(&data).expect("test: compress 1MB");
-        let decompressed = compressor.decompress(&compressed).expect("test: decompress 1MB");
+        let decompressed = compressor
+            .decompress(&compressed)
+            .expect("test: decompress 1MB");
         assert_eq!(decompressed, data);
     }
 

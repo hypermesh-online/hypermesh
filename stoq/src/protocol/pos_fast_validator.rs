@@ -136,7 +136,9 @@ impl PosFastValidator {
         }
 
         // 4. Timestamp checks
-        if let Some(reason) = self.check_timestamp(&token.proof.time_proof.time_verification_timestamp) {
+        if let Some(reason) =
+            self.check_timestamp(&token.proof.time_proof.time_verification_timestamp)
+        {
             self.rejection_count.fetch_add(1, Ordering::Relaxed);
             return FastValidationResult::Rejected(reason);
         }
@@ -223,7 +225,8 @@ impl PosFastValidator {
             if token.proof.time_proof.time_verification_timestamp > now + max_skew {
                 errors.push("Timestamp is in the future".to_string());
             }
-            if let Ok(age) = now.duration_since(token.proof.time_proof.time_verification_timestamp) {
+            if let Ok(age) = now.duration_since(token.proof.time_proof.time_verification_timestamp)
+            {
                 if age > max_age {
                     errors.push("Timestamp is too old".to_string());
                 }
@@ -404,7 +407,8 @@ mod tests {
         let v = make_validator();
         let mut token = create_valid_token();
         // 5 minutes in the future, beyond 60s max skew
-        token.proof.time_proof.time_verification_timestamp = SystemTime::now() + Duration::from_secs(300);
+        token.proof.time_proof.time_verification_timestamp =
+            SystemTime::now() + Duration::from_secs(300);
         let result = v.fast_validate(&token);
         assert!(
             matches!(result, FastValidationResult::Rejected(ref r) if r.contains("future")),
@@ -417,7 +421,8 @@ mod tests {
         let v = make_validator();
         let mut token = create_valid_token();
         // 2 days old, beyond 24h max age
-        token.proof.time_proof.time_verification_timestamp = SystemTime::now() - Duration::from_secs(172_800);
+        token.proof.time_proof.time_verification_timestamp =
+            SystemTime::now() - Duration::from_secs(172_800);
         let result = v.fast_validate(&token);
         assert!(
             matches!(result, FastValidationResult::Rejected(ref r) if r.contains("old")),

@@ -86,24 +86,14 @@ impl BlockchainCrl {
     }
 
     /// Store a full CRL snapshot as a new block.
-    pub async fn store_full_crl(
-        &self,
-        entries: Vec<CrlBlockEntry>,
-    ) -> TrustChainResult<CrlBlock> {
+    pub async fn store_full_crl(&self, entries: Vec<CrlBlockEntry>) -> TrustChainResult<CrlBlock> {
         let blocks = self.blocks.read().await;
-        let previous_hash = blocks
-            .last()
-            .map(|b| b.block_hash)
-            .unwrap_or([0u8; 32]);
+        let previous_hash = blocks.last().map(|b| b.block_hash).unwrap_or([0u8; 32]);
         let sequence = blocks.len() as u64;
         drop(blocks);
 
-        let block_hash = Self::compute_block_hash(
-            sequence,
-            &CrlBlockType::Full,
-            &entries,
-            &previous_hash,
-        );
+        let block_hash =
+            Self::compute_block_hash(sequence, &CrlBlockType::Full, &entries, &previous_hash);
 
         let block = CrlBlock {
             sequence,
@@ -145,20 +135,13 @@ impl BlockchainCrl {
         let base_sequence = *self.last_full_sequence.read().await;
 
         let blocks = self.blocks.read().await;
-        let previous_hash = blocks
-            .last()
-            .map(|b| b.block_hash)
-            .unwrap_or([0u8; 32]);
+        let previous_hash = blocks.last().map(|b| b.block_hash).unwrap_or([0u8; 32]);
         let sequence = blocks.len() as u64;
         drop(blocks);
 
         let block_type = CrlBlockType::Delta { base_sequence };
-        let block_hash = Self::compute_block_hash(
-            sequence,
-            &block_type,
-            &new_entries,
-            &previous_hash,
-        );
+        let block_hash =
+            Self::compute_block_hash(sequence, &block_type, &new_entries, &previous_hash);
 
         let block = CrlBlock {
             sequence,
@@ -191,20 +174,12 @@ impl BlockchainCrl {
 
     /// Get the complete CRL state by replaying all blocks.
     pub async fn get_full_state(&self) -> Vec<CrlBlockEntry> {
-        self.full_state
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect()
+        self.full_state.read().await.values().cloned().collect()
     }
 
     /// Check if a certificate serial is revoked in the current CRL state.
     pub async fn is_revoked(&self, serial_number: &str) -> bool {
-        self.full_state
-            .read()
-            .await
-            .contains_key(serial_number)
+        self.full_state.read().await.contains_key(serial_number)
     }
 
     /// Get a specific CRL block by sequence number.

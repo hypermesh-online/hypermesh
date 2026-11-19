@@ -245,7 +245,8 @@ impl GatewayRouter {
                     .body(Bytes::from(served.content))
                     .map_err(|e| anyhow!("failed to build dashboard response: {e}"))?,
                 None => {
-                    let body = json!({"error": "Not found", "message": "Dashboard content not available"});
+                    let body =
+                        json!({"error": "Not found", "message": "Dashboard content not available"});
                     Response::builder()
                         .status(StatusCode::NOT_FOUND)
                         .header("content-type", "application/json")
@@ -343,11 +344,7 @@ impl GatewayRouter {
                 "/api/v1/catalog",
             ))
         } else if path.starts_with("/api/v1/ngauge") {
-            Ok((
-                &self.ngauge_proxy,
-                &self.ngauge_breaker,
-                "/api/v1/ngauge",
-            ))
+            Ok((&self.ngauge_proxy, &self.ngauge_breaker, "/api/v1/ngauge"))
         } else {
             Err(anyhow!("No backend found for path: {path}"))
         }

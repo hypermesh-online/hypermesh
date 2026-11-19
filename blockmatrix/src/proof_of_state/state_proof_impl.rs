@@ -7,7 +7,7 @@
 //! Provides bilateral binary authentication. Each proof is pass/fail.
 //! No leader election, no voting, no quorum.
 
-use crate::proof_of_state::{StateProofConfig, StateProofError, StateProof};
+use crate::proof_of_state::{StateProof, StateProofConfig, StateProofError};
 use crate::transport::PeerIdentity;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -70,9 +70,7 @@ impl AsyncStateProof for DefaultStateProof {
     ) -> StateProofOpResult<StateProof> {
         StateProof::generate_from_network(&self.node_id)
             .await
-            .map_err(|e| StateProofError::ValidationFailed(
-                format!("PoS generation failed: {e}")
-            ))
+            .map_err(|e| StateProofError::ValidationFailed(format!("PoS generation failed: {e}")))
     }
 
     async fn validate_state_proof(&self, proof: &StateProof) -> StateProofOpResult<bool> {

@@ -10,7 +10,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-use super::{StateProof, ProofValidation};
+use super::{ProofValidation, StateProof};
 
 /// Asset proof requirements (mirrors BlockMatrix AssetId proof_scope)
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -207,7 +207,9 @@ mod tests {
             AssetProofRequirements::all(),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(validation.all_valid);
         assert_eq!(validation.proofs_passed(), 4);
     }
@@ -222,7 +224,9 @@ mod tests {
             AssetProofRequirements::custom(true, true, false, false),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(validation.all_valid);
     }
 
@@ -237,7 +241,9 @@ mod tests {
             AssetProofRequirements::all(),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(validation.all_valid);
         assert!(validation.stake_valid);
     }
@@ -253,7 +259,9 @@ mod tests {
             AssetProofRequirements::all(),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(!validation.all_valid);
         assert!(!validation.stake_valid);
     }
@@ -271,7 +279,9 @@ mod tests {
             AssetProofRequirements::minimal(),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         // Should still pass because work and time aren't required
         assert!(validation.all_valid);
     }
@@ -289,7 +299,9 @@ mod tests {
             AssetProofRequirements::all(),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(validation.all_valid);
     }
 
@@ -306,7 +318,9 @@ mod tests {
             AssetProofRequirements::custom(true, false, false, false),
         );
 
-        let validation = proof.validate_for_asset(&context).expect("test: validation");
+        let validation = proof
+            .validate_for_asset(&context)
+            .expect("test: validation");
         assert!(!validation.space_valid);
         assert!(!validation.all_valid);
     }

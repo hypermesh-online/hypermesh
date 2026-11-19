@@ -427,10 +427,14 @@ mod tests {
         let data = b"this is a test packet that will be sharded into multiple pieces";
         let max_shard_size = 10;
 
-        let shards = extensions.shard_packet(data, max_shard_size).expect("test: shard operation");
+        let shards = extensions
+            .shard_packet(data, max_shard_size)
+            .expect("test: shard operation");
         assert!(shards.len() > 1);
 
-        let reassembled = extensions.reassemble_shards(shards).expect("test: reassembly");
+        let reassembled = extensions
+            .reassemble_shards(shards)
+            .expect("test: reassembly");
         assert_eq!(reassembled.as_ref(), data);
     }
 
@@ -446,7 +450,9 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        extensions.add_hop_info(&mut packet, hop).expect("test: insertion");
+        extensions
+            .add_hop_info(&mut packet, hop)
+            .expect("test: insertion");
         assert_eq!(packet.hops.len(), 1);
     }
 

@@ -24,7 +24,9 @@ use crate::bootstrap::PrivacyMode;
 use hypermesh_lib::{BlockchainScope, NetworkId};
 
 // Re-export extracted types so the public API is unchanged.
-pub use super::sync_protocol::{NodeBlockchainBlockProvider, PropagationStrategyConfig, SyncMessage};
+pub use super::sync_protocol::{
+    NodeBlockchainBlockProvider, PropagationStrategyConfig, SyncMessage,
+};
 
 /// Provides block data to the SyncManager for responding to sync requests.
 ///
@@ -213,10 +215,7 @@ impl SyncManager {
     /// carrying [`super::block::BlockHeader`] structs.
     pub fn set_prefer_headers_mode(&mut self, enabled: bool) {
         self.prefer_headers_mode = enabled;
-        info!(
-            prefer_headers = enabled,
-            "Header-only sync mode toggled"
-        );
+        info!(prefer_headers = enabled, "Header-only sync mode toggled");
     }
 
     /// Read the current header-only sync flag.
@@ -357,7 +356,8 @@ impl SyncManager {
 
     /// The verified genesis block recorded for `network_id`, if any.
     pub fn network_genesis(&self, network_id: &str) -> Option<&super::block::Block> {
-        self.network_genesis.get(&NetworkId::from_wire_str(network_id))
+        self.network_genesis
+            .get(&NetworkId::from_wire_str(network_id))
     }
 
     /// Leave a Network scope chain
@@ -534,8 +534,7 @@ impl SyncManager {
         );
 
         let key = NetworkId::from_wire_str(network_id);
-        if let Some(SyncState::Synchronized { last_block_height }) = self.sync_states.get(&key)
-        {
+        if let Some(SyncState::Synchronized { last_block_height }) = self.sync_states.get(&key) {
             if block_height > last_block_height + self.config.max_block_lag {
                 self.sync_states.insert(
                     key,
@@ -606,7 +605,9 @@ impl SyncManager {
             return None;
         }
 
-        let state = self.sync_states.get(&NetworkId::from_wire_str(network_id))?;
+        let state = self
+            .sync_states
+            .get(&NetworkId::from_wire_str(network_id))?;
 
         match state {
             SyncState::Discovering | SyncState::Syncing { .. } => {

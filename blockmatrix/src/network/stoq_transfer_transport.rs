@@ -48,8 +48,8 @@ use tracing::{debug, warn};
 
 use crate::gateway::transfer_coordinator::{TransferCoordinator, TransferTransport};
 use crate::gateway::transfer_protocol::{
-    PeerCertFingerprint, TransferLockMessage, TransferRegisterAck,
-    TransferRegisterRequest, TransferRelease, TransferRollback,
+    PeerCertFingerprint, TransferLockMessage, TransferRegisterAck, TransferRegisterRequest,
+    TransferRelease, TransferRollback,
 };
 use crate::gateway::GatewayError;
 use crate::network::NetworkManager;
@@ -88,7 +88,10 @@ impl StoqTransferTransport {
     /// });
     /// ```
     pub fn new(network: Arc<NetworkManager>, coordinator: Weak<TransferCoordinator>) -> Self {
-        Self { network, coordinator }
+        Self {
+            network,
+            coordinator,
+        }
     }
 
     /// Helper: produce the tag-prefixed payload bytes used on the wire.
@@ -176,9 +179,7 @@ impl TransferTransport for StoqTransferTransport {
         // 1. Register a oneshot waiter BEFORE writing to the wire so we
         //    cannot race with an ack arriving on another stream.
         let (tx, rx) = oneshot::channel();
-        coord
-            .register_ack_waiter(req.transfer_id.clone(), tx)
-            .await;
+        coord.register_ack_waiter(req.transfer_id.clone(), tx).await;
 
         // 2. Locate the target peer's connection by node_id.
         let nodes = self.network.get_connected_nodes().await;
@@ -207,12 +208,13 @@ impl TransferTransport for StoqTransferTransport {
         })?;
         let payload = Self::tagged(TAG_TRANSFER_REGISTER_REQ, &body);
 
-        let mut stream = conn.open_stream().await.map_err(|e| {
-            GatewayError::TransportFailure {
+        let mut stream = conn
+            .open_stream()
+            .await
+            .map_err(|e| GatewayError::TransportFailure {
                 transfer_id: req.transfer_id.clone(),
                 detail: format!("open_stream to {peer}: {e}"),
-            }
-        })?;
+            })?;
         stream
             .send(&payload)
             .await

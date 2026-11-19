@@ -40,8 +40,7 @@ fn test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
     let mut proof = StateProof::new_for_testing();
     proof.stake_proof.stake_holder_id = author.node_id().to_string();
-    let mut entry =
-        BlockAssetEntry::new_bound(content_hash, &proof, StoragePointer::Genesis, reg);
+    let mut entry = BlockAssetEntry::new_bound(content_hash, &proof, StoragePointer::Genesis, reg);
     entry.sign_proof(&author).expect("test: FALCON sign");
     entry
 }
@@ -134,10 +133,7 @@ async fn test_genesis_adoption_and_header_sync() {
             .expect("test: header should exist");
         assert_eq!(header.index, idx);
         // Header hash should match the original block
-        let original = chain_a
-            .get_block(idx)
-            .await
-            .expect("test: original block");
+        let original = chain_a.get_block(idx).await.expect("test: original block");
         assert_eq!(header.hash, original.hash);
     }
 
@@ -253,7 +249,9 @@ async fn test_consumer_becomes_provider() {
 
     // Step 7: Verify ShardLocationIndex has "test-node-1" as provider for all 3 hashes
     for hash in [hash_a, hash_b, hash_c] {
-        let providers = shard_location_index.get_providers_in_network(DEFAULT_NETWORK, &hash).await;
+        let providers = shard_location_index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await;
         assert!(
             providers.contains(&"test-node-1".to_string()),
             "test-node-1 should be a provider for hash {}",
@@ -354,7 +352,10 @@ async fn test_swarm_analytics_popularity_detection() {
             fetch_rate,
             ..
         } => {
-            assert_eq!(*shard_hash, shard_b, "shard B should be first (highest rate)");
+            assert_eq!(
+                *shard_hash, shard_b,
+                "shard B should be first (highest rate)"
+            );
             assert_eq!(*fetch_rate, 20);
         }
         other => unreachable!(
@@ -373,9 +374,6 @@ async fn test_swarm_analytics_popularity_detection() {
             assert_eq!(*shard_hash, shard_a, "shard A should be second");
             assert_eq!(*fetch_rate, 7);
         }
-        other => unreachable!(
-            "test: expected Replicate for shard A, got {:?}",
-            other
-        ),
+        other => unreachable!("test: expected Replicate for shard A, got {:?}", other),
     }
 }

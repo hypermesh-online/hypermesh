@@ -159,11 +159,7 @@ impl MisbehaviorDetector {
     }
 
     /// Detect potential misbehavior from a node whose proofs fail
-    pub fn detect_misbehavior(
-        &mut self,
-        node_id: &str,
-        violation: SecurityViolationType,
-    ) -> bool {
+    pub fn detect_misbehavior(&mut self, node_id: &str, violation: SecurityViolationType) -> bool {
         let activity = self
             .suspicious_activity
             .entry(node_id.to_string())
@@ -481,10 +477,7 @@ impl ProofOfSpaceValidator {
             },
         );
 
-        info!(
-            "Space proof validation PASSED for node: {}",
-            proof.node_id
-        );
+        info!("Space proof validation PASSED for node: {}", proof.node_id);
         Ok(true)
     }
 }

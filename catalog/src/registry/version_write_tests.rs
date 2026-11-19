@@ -201,7 +201,10 @@ async fn test_branch_from_specific_version() {
         .await
         .expect("test: bar v2");
 
-    let parent_hash = registry.asset_hash_for_name("bar").await.expect("test: bar");
+    let parent_hash = registry
+        .asset_hash_for_name("bar")
+        .await
+        .expect("test: bar");
     let versions = registry.list_versions(&parent_hash).await;
     let v1 = &versions[0];
 
@@ -236,7 +239,9 @@ async fn test_standalone_unchanged_without_chain() {
         .register_type(type_def("solo", "v1", "1.0.0"))
         .await
         .expect("test: first registration succeeds");
-    let repeat = registry.register_type(type_def("solo", "v2", "2.0.0")).await;
+    let repeat = registry
+        .register_type(type_def("solo", "v2", "2.0.0"))
+        .await;
     assert!(repeat.is_err(), "standalone: repeat name still rejects");
     assert!(repeat
         .unwrap_err()
@@ -296,7 +301,11 @@ async fn test_with_signer_version_carries_valid_falcon_proof() {
     // EVERY entry on the asset chain carries a verifiable FALCON envelope.
     let lineage = chain.asset_lineage(&asset_hash).await;
     let expected_signer = signer.public_key_bytes().to_vec();
-    assert_eq!(lineage.sequence(), vec![0, 1], "genesis + successor present");
+    assert_eq!(
+        lineage.sequence(),
+        vec![0, 1],
+        "genesis + successor present"
+    );
     for entry in &lineage.entries {
         let pubkey = entry
             .verify_signed_proof()

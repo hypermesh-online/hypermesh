@@ -11,8 +11,8 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use super::super::{
-    CaesarRewardConfig, StateProofRequirementConfig, PrivacyAllocationResult,
-    ResourceAllocationConfig,
+    CaesarRewardConfig, PrivacyAllocationResult, ResourceAllocationConfig,
+    StateProofRequirementConfig,
 };
 use crate::assets::core::PrivacyMode;
 use crate::assets::proxy::RemoteProxyManager;

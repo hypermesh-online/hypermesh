@@ -60,11 +60,7 @@ impl CapabilityContext {
     /// Returns `Ok(())` when the token is signed by the daemon, not
     /// expired, not revoked, and grants `required`. Returns
     /// [`CAPABILITY_DENIED`] [`RpcError`] on any failure.
-    pub async fn validate(
-        &self,
-        token_b64: &str,
-        required: Capability,
-    ) -> Result<(), RpcError> {
+    pub async fn validate(&self, token_b64: &str, required: Capability) -> Result<(), RpcError> {
         // Decode base64 → JSON bytes → CapabilityToken.
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(token_b64)
@@ -73,12 +69,11 @@ impl CapabilityContext {
                 message: format!("capability_token base64 decode failed: {e}"),
                 data: None,
             })?;
-        let token: CapabilityToken =
-            serde_json::from_slice(&bytes).map_err(|e| RpcError {
-                code: CAPABILITY_DENIED,
-                message: format!("capability_token JSON decode failed: {e}"),
-                data: None,
-            })?;
+        let token: CapabilityToken = serde_json::from_slice(&bytes).map_err(|e| RpcError {
+            code: CAPABILITY_DENIED,
+            message: format!("capability_token JSON decode failed: {e}"),
+            data: None,
+        })?;
 
         // Signature.
         if !token.verify(&self.daemon_pubkey) {
@@ -138,10 +133,7 @@ impl std::fmt::Debug for RequestHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RequestHandler")
             .field("methods", &self.handlers.keys().collect::<Vec<_>>())
-            .field(
-                "capability_enforcement",
-                &self.capability_context.is_some(),
-            )
+            .field("capability_enforcement", &self.capability_context.is_some())
             .finish()
     }
 }
@@ -246,9 +238,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         handler.register(
             "ping",
-            Arc::new(|_params| {
-                Box::pin(async { Ok(serde_json::json!("pong")) })
-            }),
+            Arc::new(|_params| Box::pin(async { Ok(serde_json::json!("pong")) })),
         );
 
         let req = RpcRequest::new("ping", serde_json::json!(null));

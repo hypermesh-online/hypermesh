@@ -437,7 +437,10 @@ impl OsAbstraction for WindowsAbstraction {
             // Get CPU usage
             let cpu_usage_percent = {
                 let current_sample = self.get_cpu_sample()?;
-                let mut prev_guard = self._previous_cpu_sample.lock().expect("mutex should not be poisoned");
+                let mut prev_guard = self
+                    ._previous_cpu_sample
+                    .lock()
+                    .expect("mutex should not be poisoned");
 
                 let usage = if let Some(ref prev_sample) = *prev_guard {
                     self.calculate_cpu_usage(prev_sample, &current_sample)
@@ -456,7 +459,10 @@ impl OsAbstraction for WindowsAbstraction {
             // Get network I/O rates
             let (network_rx_bytes_per_sec, network_tx_bytes_per_sec) = {
                 let current_stats = self.get_network_stats()?;
-                let mut prev_guard = self._previous_network_stats.lock().expect("mutex should not be poisoned");
+                let mut prev_guard = self
+                    ._previous_network_stats
+                    .lock()
+                    .expect("mutex should not be poisoned");
 
                 let (rx_rate, tx_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);
@@ -488,7 +494,10 @@ impl OsAbstraction for WindowsAbstraction {
             // Get disk I/O rates
             let (disk_read_bytes_per_sec, disk_write_bytes_per_sec) = {
                 let current_stats = self.get_disk_stats()?;
-                let mut prev_guard = self._previous_disk_stats.lock().expect("mutex should not be poisoned");
+                let mut prev_guard = self
+                    ._previous_disk_stats
+                    .lock()
+                    .expect("mutex should not be poisoned");
 
                 let (read_rate, write_rate) = if let Some(ref prev_stats) = *prev_guard {
                     let time_delta = current_stats.timestamp.duration_since(prev_stats.timestamp);

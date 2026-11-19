@@ -6,11 +6,11 @@
 //!
 //! Sprint 3.3: Test scenarios for Nike (mixed), Bank (portal+private), Gov (fully federated)
 
+use blockmatrix::dns::*;
 use blockmatrix::proof_of_state::proof_of_state_integration::{
     SpaceProof, StakeProof, TimeProof, WorkProof,
 };
 use blockmatrix::proof_of_state::StateProof;
-use blockmatrix::dns::*;
 use std::net::Ipv6Addr;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};

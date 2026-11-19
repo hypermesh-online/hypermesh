@@ -112,7 +112,8 @@ fn test_coordinate_serialization() {
     assert!(json.contains("30"));
 
     // Deserialize from JSON
-    let deserialized: MatrixCoordinate = serde_json::from_str(&json).expect("test: deserialization");
+    let deserialized: MatrixCoordinate =
+        serde_json::from_str(&json).expect("test: deserialization");
     assert_eq!(coord, deserialized);
 }
 
@@ -163,8 +164,10 @@ fn test_extreme_coordinates() {
     let max_coord = i64::MAX / 4;
     let min_coord = i64::MIN / 4;
 
-    let max_point = MatrixCoordinate::new(max_coord, max_coord, max_coord).expect("test: valid coordinate");
-    let min_point = MatrixCoordinate::new(min_coord, min_coord, min_coord).expect("test: valid coordinate");
+    let max_point =
+        MatrixCoordinate::new(max_coord, max_coord, max_coord).expect("test: valid coordinate");
+    let min_point =
+        MatrixCoordinate::new(min_coord, min_coord, min_coord).expect("test: valid coordinate");
 
     // Should not panic
     let _distance = max_point.euclidean_distance(&min_point);

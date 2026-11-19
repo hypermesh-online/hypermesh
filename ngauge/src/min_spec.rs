@@ -176,7 +176,7 @@ mod tests {
         let usage = ResourceUsage {
             memory_bytes: 100 * 1024 * 1024, // 100 MB
             cpu_fraction: 0.02,              // 2%
-            bandwidth_bps: 40_000,            // 5 KB/s
+            bandwidth_bps: 40_000,           // 5 KB/s
             duration: Duration::from_millis(20),
             operation: "test_op".to_string(),
         };

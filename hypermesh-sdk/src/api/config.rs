@@ -34,7 +34,10 @@ impl<'a> ConfigApi<'a> {
         value: serde_json::Value,
     ) -> Result<serde_json::Value, SdkError> {
         self.client
-            .raw_call("config.set", serde_json::json!({"key": key, "value": value}))
+            .raw_call(
+                "config.set",
+                serde_json::json!({"key": key, "value": value}),
+            )
             .await
     }
 }

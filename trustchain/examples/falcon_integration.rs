@@ -12,8 +12,8 @@ use tracing::{info, Level};
 
 use trustchain::proof_of_state::StateProofOps;
 use trustchain::{
-    CAConfig, CertificateRequest, StateProof, PQCAlgorithm, PostQuantumCrypto,
-    SecurityIntegratedCA, SecurityIntegrationConfig,
+    CAConfig, CertificateRequest, PQCAlgorithm, PostQuantumCrypto, SecurityIntegratedCA,
+    SecurityIntegrationConfig, StateProof,
 };
 
 #[tokio::main]

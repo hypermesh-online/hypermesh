@@ -396,7 +396,9 @@ mod tests {
     #[tokio::test]
     async fn test_monitoring_system_creation() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
+        let monitoring = MonitoringSystem::new(config)
+            .await
+            .expect("test: async operation");
 
         let health = monitoring.get_health().await;
         assert!(health.is_healthy);
@@ -405,7 +407,9 @@ mod tests {
     #[tokio::test]
     async fn test_metrics_recording() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
+        let monitoring = MonitoringSystem::new(config)
+            .await
+            .expect("test: async operation");
 
         // Record some metrics
         monitoring.record_cert_issuance(35, true).await;
@@ -421,7 +425,9 @@ mod tests {
     #[tokio::test]
     async fn test_system_info() {
         let config = MonitoringConfig::default();
-        let monitoring = MonitoringSystem::new(config).await.expect("test: async operation");
+        let monitoring = MonitoringSystem::new(config)
+            .await
+            .expect("test: async operation");
 
         let info = monitoring.get_system_info().await;
         assert!(!info.version.is_empty());

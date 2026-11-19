@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn validate_bandwidth_within_budget() {
-        assert!(validate_bandwidth_budget(500_000));  // 500 Kbps < 1 Mbps
+        assert!(validate_bandwidth_budget(500_000)); // 500 Kbps < 1 Mbps
         assert!(validate_bandwidth_budget(1_000_000)); // exactly 1 Mbps
     }
 
