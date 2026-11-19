@@ -198,7 +198,10 @@ fn s3_5_asset_chain_wire_survives_a_real_fuzz_pass() {
     let author = FalconIdentity::generate();
     let good =
         encode_presented_asset_chain(&presented_chain(&author, [0x5Au8; 32], 2)).expect("test");
-    assert!(good.len() > 2000, "the fuzz corpus must be realistically sized");
+    assert!(
+        good.len() > 2000,
+        "the fuzz corpus must be realistically sized"
+    );
 
     let mut refused = 0usize;
     let mut decoded_ok = 0usize;
@@ -210,79 +213,12 @@ fn s3_5_asset_chain_wire_survives_a_real_fuzz_pass() {
         }
     };
 
-    // (1) Every truncation; only the full message may decode.
-    let mut truncations_decoded = 0usize;
-    for cut in 0..=good.len() {
-        let ok = decode_presented_asset_chain(&good[..cut]).is_ok();
-        if ok {
-            truncations_decoded += 1;
-            assert_eq!(cut, good.len(), "a truncated message decoded at {cut} bytes");
-        }
-        note(ok);
-    }
-    assert_eq!(truncations_decoded, 1);
-
-    // (2) Every possible tag byte on an otherwise valid message.
-    for tag in 0..=u8::MAX {
-        let mut framed = good.clone();
-        framed[0] = tag;
-        let out = decode_presented_asset_chain(&framed);
-        if tag == ASSET_CHAIN_TAG {
-            assert!(out.is_ok(), "the real tag must still decode");
-        } else {
-            assert_eq!(out, Err(AssetChainWireError::WrongTag { got: tag }));
-        }
-        note(out.is_ok());
-    }
-
-    // (3) Lying lengths: extremes, cap boundary, every power of two.
-    let mut lengths: Vec<u32> = vec![
-        0,
-        1,
-        u32::MAX,
-        u32::MAX - 1,
-        MAX_ASSET_CHAIN_WIRE_BYTES as u32,
-        (MAX_ASSET_CHAIN_WIRE_BYTES as u32).wrapping_add(1),
-        (MAX_ASSET_CHAIN_WIRE_BYTES as u32).wrapping_sub(1),
-        good.len() as u32,
-        (good.len() as u32).wrapping_sub(5),
-        i32::MAX as u32,
-    ];
-    lengths.extend((0..32).map(|shift| 1u32 << shift));
-    for declared in lengths {
-        let mut framed = good.clone();
-        framed[1..5].copy_from_slice(&declared.to_le_bytes());
-        note(decode_presented_asset_chain(&framed).is_ok());
-        for body in [0usize, 1, 4, 37] {
-            let mut short = vec![ASSET_CHAIN_TAG];
-            short.extend_from_slice(&declared.to_le_bytes());
-            short.extend(std::iter::repeat(0xABu8).take(body));
-            note(decode_presented_asset_chain(&short).is_ok());
-        }
-    }
-
-    // (4) Single-bit flips across the whole valid message.
+    fuzz_cases::every_truncation(&good, &mut note);
+    fuzz_cases::every_tag(&good, &mut note);
+    fuzz_cases::lying_lengths(&good, &mut note);
     let mut prng = Prng(0x5EED_D3D3_ABCD_0001);
-    for _ in 0..20_000 {
-        let mut framed = good.clone();
-        let at = prng.below(framed.len());
-        framed[at] ^= 1u8 << (prng.byte() % 8);
-        note(decode_presented_asset_chain(&framed).is_ok());
-    }
-
-    // (5) Bulk random payloads, framed and unframed.
-    for _ in 0..RANDOM_CASES {
-        let len = prng.below(96);
-        let mut noise: Vec<u8> = (0..len).map(|_| prng.byte()).collect();
-        note(decode_presented_asset_chain(&noise).is_ok());
-
-        let body_len = prng.below(64);
-        noise.clear();
-        noise.push(ASSET_CHAIN_TAG);
-        noise.extend_from_slice(&(body_len as u32).to_le_bytes());
-        noise.extend((0..body_len).map(|_| prng.byte()));
-        note(decode_presented_asset_chain(&noise).is_ok());
-    }
+    fuzz_cases::single_bit_flips(&good, &mut prng, &mut note);
+    fuzz_cases::random_payloads(RANDOM_CASES, &mut prng, &mut note);
 
     // Reaching here IS the result: zero panics, zero aborts. The decoder does NO
     // verification, so a bit flipped inside a JSON string may still decode — what
@@ -337,7 +273,10 @@ async fn s3_5_valid_presented_chain_round_trips_and_is_adopted_without_moving_th
     // THE INVARIANT: the node's own block chain did not move. A wire-received
     // asset chain became an off-spine received title, never a spine block.
     assert_eq!(chain.get_height().await, height_before);
-    assert_eq!(chain.get_head().await.expect("test: head").hash, head_before);
+    assert_eq!(
+        chain.get_head().await.expect("test: head").hash,
+        head_before
+    );
     assert_eq!(chain.get_stats().await.total_blocks, blocks_before);
     assert_eq!(chain.indexed_asset_count().await, indexed_before);
 
@@ -395,7 +334,10 @@ async fn s3_5_impostor_signed_chain_is_rejected_through_the_wire_path() {
     );
     entry.set_asset_lineage(Some(chain_p.entries[0].lineage_id()), 1);
     entry.sign_proof(&impostor).expect("test: FALCON sign");
-    assert!(entry.verify_signed_proof().is_ok(), "the signature itself is valid");
+    assert!(
+        entry.verify_signed_proof().is_ok(),
+        "the signature itself is valid"
+    );
     chain_p.entries[1] = entry;
 
     assert_eq!(
@@ -450,7 +392,7 @@ async fn s3_5_an_unauthenticated_peer_fails_the_gate_that_guards_the_accept_path
     // empty authenticated-peers map is exactly an unauthenticated connection.
     let peers = new_authenticated_peers();
     assert!(
-        !verify_peer_access(&peers, "an-unauthenticated-peer", "net").await,
+        !verify_peer_access(&peers, "an-unauthenticated-peer", "session-current", "net").await,
         "an unauthenticated peer must fail the gate, so it never reaches accept_asset_chain"
     );
 
@@ -458,3 +400,6 @@ async fn s3_5_an_unauthenticated_peer_fails_the_gate_that_guards_the_accept_path
     // before the handler. The two facts together are the refusal.
     assert!(message_requires_auth(ASSET_CHAIN_TAG));
 }
+
+#[path = "s3_5_asset_chain_wire/fuzz_cases.rs"]
+mod fuzz_cases;

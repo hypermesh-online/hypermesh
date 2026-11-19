@@ -20,11 +20,7 @@ use hypermesh_lib::BlockchainScope;
 
 /// Handle a received block announcement (tag 0x03).
 /// Dispatches to scope-specific handlers based on `PeerContext::blockchain_scope`.
-pub(super) async fn handle_block_announce(
-    data: &[u8],
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
+pub(super) async fn handle_block_announce(data: &[u8], peer_node_id: &str, ctx: &PeerContext) {
     let block = match parse_and_verify_block(data, peer_node_id) {
         Some(b) => b,
         None => return,
@@ -35,11 +31,7 @@ pub(super) async fn handle_block_announce(
             handle_block_device_scope(&block, peer_node_id, ctx).await;
         }
         BlockchainScope::Network => {
-            if let Some(ref assigner) = ctx.spatial_bucket_assigner {
-                handle_block_public_scope(&block, peer_node_id, ctx, assigner).await;
-            } else {
-                handle_block_network_scope(&block, peer_node_id, ctx).await;
-            }
+            handle_network_block(&block, peer_node_id, ctx).await;
         }
     }
 }
@@ -52,9 +44,7 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
         return None;
     }
 
-    let block_json_len = u64::from_le_bytes(
-        data[1..9].try_into().unwrap_or([0u8; 8]),
-    ) as usize;
+    let block_json_len = u64::from_le_bytes(data[1..9].try_into().unwrap_or([0u8; 8])) as usize;
 
     if data.len() < 9 + block_json_len {
         warn!(
@@ -86,40 +76,7 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
     // serialization used by `bind_proof_to_asset` at production time — recompute
     // with the SAME serializer here or locally-valid blocks would be rejected.
     for (i, entry) in block.entries.iter().enumerate() {
-        let proof_bytes = match entry.state_proof.to_bytes() {
-            Ok(b) => b,
-            Err(e) => {
-                warn!(
-                    "Block {} entry {} proof serialization failed from {}: {}",
-                    block.index, i, short_id, e,
-                );
-                return None;
-            }
-        };
-        let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
-        if computed_hash != entry.proof_hash {
-            warn!(
-                "Block {} entry {} proof_hash mismatch from peer {}",
-                block.index, i, short_id,
-            );
-            return None;
-        }
-        // Signed-to-content (mirror invariant, P1): the proof MUST be bound to
-        // this entry's asset_hash (SpaceProof.file_hash == hex(asset_hash)).
-        // Rejects a valid proof detached from asset A and replayed for asset B.
-        if !entry.content_binding_ok() {
-            warn!(
-                "Block {} entry {} proof not bound to its asset_hash from peer {} \
-                 (signed-to-content violation)",
-                block.index, i, short_id,
-            );
-            return None;
-        }
-        if !entry.state_proof.validate() {
-            warn!(
-                "Block {} entry {} state proof validation failed from peer {}",
-                block.index, i, short_id,
-            );
+        if !verify_announced_entry(entry, block.index, i, short_id) {
             return None;
         }
     }
@@ -128,11 +85,7 @@ fn parse_and_verify_block(data: &[u8], peer_node_id: &str) -> Option<Block> {
 }
 
 /// Device scope: independent chains. Accept only if newer than our height.
-async fn handle_block_device_scope(
-    block: &Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
+async fn handle_block_device_scope(block: &Block, peer_node_id: &str, ctx: &PeerContext) {
     let our_height = ctx.blockchain.get_height().await;
     if block.index <= our_height {
         debug!(
@@ -147,11 +100,7 @@ async fn handle_block_device_scope(
 
 /// Network scope (Private): shared chain. Deduplicate by hash, not index.
 /// Re-propagate to other peers after successful insertion.
-async fn handle_block_network_scope(
-    block: &Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
+async fn handle_block_network_scope(block: &Block, peer_node_id: &str, ctx: &PeerContext) {
     if ctx.blockchain.has_block(&block.hash).await {
         debug!(
             "Network scope: already have block {} by hash, skipping",
@@ -197,15 +146,14 @@ async fn handle_block_public_scope(
 }
 
 /// Insert a block into our chain. Returns `true` on success.
-async fn insert_block(
-    block: &Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) -> bool {
+async fn insert_block(block: &Block, peer_node_id: &str, ctx: &PeerContext) -> bool {
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
     match ctx.blockchain.insert_received_block(block.clone()).await {
         Ok(()) => {
-            info!("Received and stored block #{} from peer {}", block.index, short_id);
+            info!(
+                "Received and stored block #{} from peer {}",
+                block.index, short_id
+            );
             extract_dns_entries_from_block(block, ctx).await;
             true
         }
@@ -233,49 +181,13 @@ async fn extract_dns_entries_from_block(block: &Block, ctx: &PeerContext) {
     };
 
     for entry in &block.entries {
-        let is_dns = matches!(
-            entry.registration.category,
-            AssetCategory::BaseSystem(BaseSystemType::Dns)
-        );
-        if !is_dns {
+        let Some(dns_entry) = parse_dns_block_entry(entry, block.index) else {
             continue;
-        }
-
-        // DNS data is stored as JSON in StoragePointer::Local { path }
-        let dns_json = match &entry.storage_pointer {
-            crate::blockchain::block::StoragePointer::Local { path } => path.as_str(),
-            _ => {
-                debug!(
-                    "Block #{} DNS entry has no local storage data, skipping",
-                    block.index,
-                );
-                continue;
-            }
-        };
-
-        let dns_entry: DnsBlockEntry = match serde_json::from_str(dns_json) {
-            Ok(e) => e,
-            Err(e) => {
-                debug!(
-                    "Block #{} DNS entry parse failed: {}",
-                    block.index, e,
-                );
-                continue;
-            }
         };
 
         // Extract IP address from the DNS record data
-        let ip_addr = match &dns_entry.record_data {
-            crate::dns::DnsRecordData::AAAA(addr) => {
-                std::net::IpAddr::V6(*addr)
-            }
-            _ => {
-                debug!(
-                    "Block #{} DNS entry '{}' is not AAAA, skipping resolver insert",
-                    block.index, dns_entry.domain_name,
-                );
-                continue;
-            }
+        let Some(ip_addr) = dns_entry_ip(&dns_entry, block.index) else {
+            continue;
         };
 
         info!(
@@ -287,12 +199,9 @@ async fn extract_dns_entries_from_block(block: &Block, ctx: &PeerContext) {
 }
 
 /// Re-propagate a block to peers via the block propagator.
-async fn repropagate_block(
-    block: &Block,
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) {
-    let coords = ctx.connected_peer_coords.read().await;
+async fn repropagate_block(block: &Block, peer_node_id: &str, ctx: &PeerContext) {
+    let coords =
+        crate::network::connected_peer_routes::coordinate_snapshot(&ctx.connected_routes).await;
     if coords.is_empty() {
         debug!("No connected peers, skipping block re-propagation");
         return;
@@ -303,7 +212,113 @@ async fn repropagate_block(
         let short_id = &peer_node_id[..8.min(peer_node_id.len())];
         debug!(
             "Re-propagation of block {} from {}: {} reached, {} failed",
-            block.index, short_id, result.reached_nodes.len(), result.failed_nodes.len(),
+            block.index,
+            short_id,
+            result.reached_nodes.len(),
+            result.failed_nodes.len(),
         );
+    }
+}
+
+fn verify_announced_entry(
+    entry: &crate::blockchain::block::BlockAssetEntry,
+    block_index: u64,
+    i: usize,
+    short_id: &str,
+) -> bool {
+    let proof_bytes = match entry.state_proof.to_bytes() {
+        Ok(b) => b,
+        Err(e) => {
+            warn!(
+                "Block {} entry {} proof serialization failed from {}: {}",
+                block_index, i, short_id, e,
+            );
+            return false;
+        }
+    };
+    let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
+    if computed_hash != entry.proof_hash {
+        warn!(
+            "Block {} entry {} proof_hash mismatch from peer {}",
+            block_index, i, short_id,
+        );
+        return false;
+    }
+    // Signed-to-content (mirror invariant, P1): the proof MUST be bound to
+    // this entry's asset_hash (SpaceProof.file_hash == hex(asset_hash)).
+    // Rejects a valid proof detached from asset A and replayed for asset B.
+    if !entry.content_binding_ok() {
+        warn!(
+            "Block {} entry {} proof not bound to its asset_hash from peer {} \
+                 (signed-to-content violation)",
+            block_index, i, short_id,
+        );
+        return false;
+    }
+    if !entry.state_proof.validate() {
+        warn!(
+            "Block {} entry {} state proof validation failed from peer {}",
+            block_index, i, short_id,
+        );
+        return false;
+    }
+    true
+}
+
+fn parse_dns_block_entry(
+    entry: &crate::blockchain::block::BlockAssetEntry,
+    block_index: u64,
+) -> Option<DnsBlockEntry> {
+    let is_dns = matches!(
+        entry.registration.category,
+        AssetCategory::BaseSystem(BaseSystemType::Dns)
+    );
+    if !is_dns {
+        return None;
+    }
+
+    // DNS data is stored as JSON in StoragePointer::Local { path }
+    let dns_json = match &entry.storage_pointer {
+        crate::blockchain::block::StoragePointer::Local { path } => path.as_str(),
+        _ => {
+            debug!(
+                "Block #{} DNS entry has no local storage data, skipping",
+                block_index,
+            );
+            return None;
+        }
+    };
+
+    let dns_entry: DnsBlockEntry = match serde_json::from_str(dns_json) {
+        Ok(e) => e,
+        Err(e) => {
+            debug!("Block #{} DNS entry parse failed: {}", block_index, e,);
+            return None;
+        }
+    };
+
+    Some(dns_entry)
+}
+
+fn dns_entry_ip(dns_entry: &DnsBlockEntry, block_index: u64) -> Option<std::net::IpAddr> {
+    let ip_addr = match &dns_entry.record_data {
+        crate::dns::DnsRecordData::AAAA(addr) => std::net::IpAddr::V6(*addr),
+        _ => {
+            debug!(
+                "Block #{} DNS entry '{}' is not AAAA, skipping resolver insert",
+                block_index, dns_entry.domain_name,
+            );
+            return None;
+        }
+    };
+
+    Some(ip_addr)
+}
+
+async fn handle_network_block(block: &Block, peer_node_id: &str, ctx: &PeerContext) {
+    if let Some(ref assigner) = ctx.spatial_bucket_assigner {
+        handle_block_public_scope(block, peer_node_id, ctx, assigner).await;
+    } else {
+        handle_block_network_scope(block, peer_node_id, ctx).await;
     }
 }

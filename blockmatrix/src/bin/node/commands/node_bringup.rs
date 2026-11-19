@@ -143,7 +143,13 @@ async fn run_network(input: NetworkStartInput<'_>) -> Result<NetworkStartResult>
         manager,
         blocks,
     } = prepare_base(&input).await?;
-    let core = PeerCore::new(input.cli, input.coord, input.nid, input.privacy_mode);
+    let core = PeerCore::new(
+        input.cli,
+        input.coord,
+        input.nid,
+        input.privacy_mode,
+        manager.connected_routes(),
+    );
     let shards = shard_base.with_provider(input.nid, &input.cli.network_id);
     let acceleration = Acceleration::new(node_kernel_acceleration_allowed(input.cli));
     let ctx = make_peer_context(&input, &manager, &blocks, &shards, &core, &acceleration);
@@ -277,7 +283,8 @@ impl PeerContextBuild<'_> {
                 hypermesh_lib::BlockchainScope::Device
             },
             spatial_bucket_assigner: None,
-            connected_peer_coords: self.core.connected_coords.clone(),
+            connected_routes: self.core.connected_coords.clone(),
+            connected_nodes: self.manager.connected_nodes(),
             dns_resolver: Some(self.bootstrap.dns().clone()),
             authenticated_peers: self.manager.authenticated_peers(),
             gossip_protocol: Some(self.core.gossip.clone()),
