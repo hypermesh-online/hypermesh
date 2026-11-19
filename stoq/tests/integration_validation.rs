@@ -2,43 +2,98 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Integration validation test for STOQ transport with PoS validation
+//! Local mock-routing, structural token, and loopback transport fixtures.
+//! These tests do not establish genuine authority, PoS, or deployment success.
 
 use anyhow::Result;
-use std::net::Ipv6Addr;
-use std::time::{Duration, SystemTime};
-use stoq::api::service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata};
-use stoq::protocol::pos_validator::{PosToken, PosTokenValidator};
 use hypermesh_lib::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
+use hypermesh_lib::NetworkId;
+use std::net::Ipv6Addr;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use stoq::api::service_discovery::{
+    DiscoveryContext, DnsBinding, ServiceDiscovery, ServiceEndpoint, ServiceMetadata,
+    TrustChainDnsClient,
+};
+use stoq::protocol::pos_validator::{PosToken, PosTokenValidator};
 use stoq::transport::{Endpoint, StoqTransport, TransportConfig};
 
+/// Local routing/structural fixture, not genuine authority, proof, or deployment validation.
 #[tokio::test]
 async fn test_full_integration() -> Result<()> {
-    // Test 1: Service Discovery
-    let discovery = ServiceDiscovery::new(Duration::from_secs(300));
+    let (discovery, resolver) = dns_fixture()?;
+    let endpoint = discovery.resolve("caesar")?;
+    assert_eq!(endpoint.port, 8001);
+    assert_eq!(endpoint.address, Ipv6Addr::LOCALHOST);
+    assert_eq!(endpoint.server_name.as_deref(), Some("caesar.local"));
+    assert_eq!(resolver.calls.load(Ordering::SeqCst), 1);
+    validate_mock_token()?;
+    create_loopback_transport().await?;
+    let endpoint = Endpoint {
+        address: Ipv6Addr::LOCALHOST,
+        port: 9292,
+        server_name: None,
+    };
+    assert_eq!(endpoint.address, Ipv6Addr::LOCALHOST);
+    assert_eq!(endpoint.port, 9292);
+    assert!(endpoint.server_name.is_none());
+    Ok(())
+}
 
-    // Add hardcoded endpoint
-    discovery.add_hardcoded_endpoint(ServiceEndpoint {
+#[test]
+fn test_unconfigured_hardcoded_metadata_denied() {
+    let discovery = ServiceDiscovery::new(Duration::from_secs(300));
+    discovery.add_hardcoded_endpoint(caesar_endpoint());
+    assert_eq!(
+        discovery.list_hardcoded_services(),
+        vec!["caesar".to_string()]
+    );
+    assert!(discovery.resolve("caesar").is_err());
+    assert!(discovery.list_cached_services().is_empty());
+    assert_eq!(discovery.get_metrics().fallback_resolutions, 0);
+}
+
+#[derive(Default)]
+struct MockDns {
+    calls: AtomicUsize,
+}
+
+impl TrustChainDnsClient for MockDns {
+    fn resolve(&self, name: &str) -> Result<Vec<ServiceEndpoint>> {
+        assert_eq!(name, "caesar");
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Ok(vec![caesar_endpoint()])
+    }
+    fn is_available(&self) -> bool {
+        true
+    }
+}
+
+fn dns_fixture() -> Result<(ServiceDiscovery, Arc<MockDns>)> {
+    let resolver = Arc::new(MockDns::default());
+    let context = DiscoveryContext::new("stoq", NetworkId([1; 16]), "[::1]:5353".parse()?)?;
+    let binding = DnsBinding::new(context, resolver.clone());
+    Ok((
+        ServiceDiscovery::with_dns(Duration::from_secs(300), binding),
+        resolver,
+    ))
+}
+
+fn caesar_endpoint() -> ServiceEndpoint {
+    ServiceEndpoint {
         name: "caesar".to_string(),
         address: Ipv6Addr::LOCALHOST,
         port: 8001,
         server_name: Some("caesar.local".to_string()),
         metadata: ServiceMetadata::default(),
         expires_at: SystemTime::now() + Duration::from_secs(3600),
-    });
+    }
+}
 
-    // Resolve service
-    let endpoint = discovery.resolve("caesar")?;
-    assert_eq!(endpoint.port, 8001);
-    println!(
-        "✅ Service discovery working: resolved to {}:{}",
-        endpoint.address, endpoint.port
-    );
-
-    // Test 2: PoS Token Validation
+fn validate_mock_token() -> Result<()> {
     let validator = PosTokenValidator::new(Duration::from_secs(300));
-
-    // Create test token with all four proofs
+    // Mock identity/signature bytes exercise a structural/error path, not genuine PoS.
     let token = PosToken::for_identity(
         vec![1, 2, 3, 4],
         vec![5, 6, 7, 8],
@@ -48,43 +103,24 @@ async fn test_full_integration() -> Result<()> {
         vec![7, 0, 0, 0],
         Duration::from_secs(3600),
     );
-
-    // Validate token
     let result = validator.validate_token(&token)?;
-    assert!(result.is_valid || !result.errors.is_empty()); // May fail due to mock crypto
-
-    // Check metrics
+    assert!(result.is_valid || !result.errors.is_empty());
     let metrics = validator.get_metrics();
     assert_eq!(metrics.total_validations, 1);
-    assert!(metrics.avg_validation_time_us < 10000); // Should be reasonably fast
-    println!("✅ PoS token validation working");
+    assert!(metrics.avg_validation_time_us < 10000);
+    Ok(())
+}
 
-    // Test 3: Transport Creation with Config
+async fn create_loopback_transport() -> Result<()> {
     let config = TransportConfig {
         bind_address: Ipv6Addr::LOCALHOST,
-        port: 0, // Let OS assign port
+        port: 0,
+        enable_kernel_acceleration: false,
         ..Default::default()
     };
-
-    let _transport = StoqTransport::new(config.clone()).await?;
-    println!("✅ Transport creation working");
-
-    // Test 4: Endpoint Creation
-    let _endpoint = Endpoint {
-        address: Ipv6Addr::LOCALHOST,
-        port: 9292,
-        server_name: None,
-    };
-
-    // The endpoint should be created successfully
-    // Note: We can't test actual connections without a full server setup
-
-    println!("✅ All integration tests passed!");
-    println!("  - Service discovery: working");
-    println!("  - PoS token validation: working");
-    println!("  - Transport creation: working");
-    println!("  - Endpoint creation: working");
-
+    // The runner supplies a fresh disposable HOME under the private runtime;
+    // localhost certificates never touch a real HOME or a live CA/service.
+    let _transport = StoqTransport::new(config).await?;
     Ok(())
 }
 
@@ -116,7 +152,7 @@ fn test_pos_validation_overhead() {
     assert!(per_validation < Duration::from_millis(10));
 }
 
-/// Build a canonical four-proof set for tests.
+/// Build a structural four-proof fixture; mock identity bytes are not genuine PoS.
 ///
 /// CANONICAL MODEL: authorization (WHO) is an identity binding with NO amount;
 /// WHAT is the BLAKE3 hash of the work performed; WHERE is a location (capacity
