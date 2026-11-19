@@ -34,6 +34,7 @@ use blockmatrix::network::peer_auth::{
 fn peer_in_network(node_id: &str, network: &str) -> AuthenticatedPeer {
     AuthenticatedPeer {
         node_id: node_id.to_string(),
+        connection_id: "session-current".into(),
         pubkey: vec![0xAB; 32],
         coordinate: (0, 0, 0),
         // Ingress boundary: the peer's wire network label → canonical NetworkId,
@@ -57,13 +58,13 @@ async fn network_a_peer_rejected_for_network_b_shard_allowed_for_network_a() {
     // Serving node is in network B: the shard's asset lives on B's chain, so the
     // network-A peer is NOT authenticated for the asset's network → REJECTED.
     assert!(
-        !verify_shard_proof_binding(&peers, "peer-a", "network-B").await,
+        !verify_shard_proof_binding(&peers, "peer-a", "session-current", "network-B").await,
         "a network-A peer must be REFUSED a shard served by a network-B node",
     );
 
     // Serving node is in network A: same network as the peer → ALLOWED.
     assert!(
-        verify_shard_proof_binding(&peers, "peer-a", "network-A").await,
+        verify_shard_proof_binding(&peers, "peer-a", "session-current", "network-A").await,
         "a same-network (A) peer must be ALLOWED to fetch the shard",
     );
 }
@@ -74,11 +75,9 @@ async fn single_network_gate_is_a_no_op() {
     // NetworkId, so the gate always admits an authenticated peer — the STEP 6
     // enforcement is provably inert until a second network exists.
     let peers = new_authenticated_peers();
+    assert!(register_authenticated_peer(&peers, peer_in_network("peer-x", "trustnet-test")).await,);
     assert!(
-        register_authenticated_peer(&peers, peer_in_network("peer-x", "trustnet-test")).await,
-    );
-    assert!(
-        verify_shard_proof_binding(&peers, "peer-x", "trustnet-test").await,
+        verify_shard_proof_binding(&peers, "peer-x", "session-current", "trustnet-test").await,
         "the only joined network must always admit its own authenticated peer",
     );
 }
@@ -88,7 +87,7 @@ async fn unregistered_peer_is_refused_regardless_of_network() {
     // Defense-in-depth: a peer that never handshook is refused for any network.
     let peers = new_authenticated_peers();
     assert!(
-        !verify_shard_proof_binding(&peers, "ghost", "network-A").await,
+        !verify_shard_proof_binding(&peers, "ghost", "session-current", "network-A").await,
         "an unauthenticated peer must never pass the shard-serve gate",
     );
 }

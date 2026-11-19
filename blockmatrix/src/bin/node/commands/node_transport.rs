@@ -234,19 +234,24 @@ pub(super) struct ShardServices {
 
 pub(super) struct PeerCore {
     pub(super) gossip: Arc<blockmatrix::network::gossip::GossipProtocol>,
-    pub(super) connected_coords: Arc<tokio::sync::RwLock<Vec<MatrixCoordinate>>>,
+    pub(super) connected_coords: blockmatrix::network::connected_peer_routes::ConnectedPeerRoutes,
     pub(super) demand_tracker: Arc<blockmatrix::network::SwarmDemandTracker>,
 }
 
 impl PeerCore {
-    pub(super) fn new(cli: &Cli, coord: MatrixCoordinate, nid: &str, privacy: PrivacyMode) -> Self {
+    pub(super) fn new(
+        cli: &Cli,
+        coord: MatrixCoordinate,
+        nid: &str,
+        privacy: PrivacyMode,
+        connected_coords: blockmatrix::network::connected_peer_routes::ConnectedPeerRoutes,
+    ) -> Self {
         let gossip = Arc::new(blockmatrix::network::gossip::GossipProtocol::new(
             nid.to_string(),
             coord,
             cli.stoq_port,
             format!("{:?}", privacy),
         ));
-        let connected_coords = Arc::new(tokio::sync::RwLock::new(Vec::new()));
         let demand_tracker = Arc::new(blockmatrix::network::SwarmDemandTracker::new());
         Self {
             gossip,

@@ -22,6 +22,7 @@ pub mod blockchain_integration;
 pub mod ca_enrollment;
 pub mod chunk;
 pub mod cluster;
+pub mod connected_peer_routes;
 pub mod consumer_provider;
 pub mod discovery;
 pub mod gossip;
@@ -30,6 +31,7 @@ pub mod locality;
 pub mod message_handlers;
 pub mod metrics_reporter;
 pub mod peer_auth;
+mod peer_connection_setup;
 mod peer_discovery;
 pub mod placement;
 pub mod reflector_pool;
@@ -140,6 +142,7 @@ impl NetworkManager {
             local_coordinate,
             transport,
             nodes: Arc::new(RwLock::new(HashMap::new())),
+            connected_routes: connected_peer_routes::new_connected_routes(),
             bootstrap_nodes,
             privacy_mode: Arc::new(RwLock::new(privacy_mode)),
             stoq_integration,
@@ -176,99 +179,18 @@ impl NetworkManager {
         peer_ctx: Option<Arc<PeerContext>>,
     ) -> Result<String> {
         info!("Connecting to peer at {}", addr);
-
-        // Always use the NetworkManager handshake path (flat JSON).
-        // MatrixStoqIntegration::connect_to_node sends MatrixMessage::Announcement
-        // which is incompatible with handle_incoming_handshake on the accept side.
-        let ipv6 = match addr {
-            SocketAddr::V6(v6) => *v6.ip(),
-            SocketAddr::V4(v4) => v4.ip().to_ipv6_mapped(),
-        };
-
-        // WAN address validation: reject loopback when WAN mode is active
-        let wan_enabled = self.transport.wan_enabled();
-        if wan_enabled && !is_valid_wan_address(&ipv6) {
-            return Err(anyhow!(
-                "Cannot connect to loopback address {} in WAN mode",
-                ipv6
-            ));
-        }
-
-        // Warn about link-local addresses over WAN — they may not route
-        if wan_enabled && (ipv6.segments()[0] & 0xffc0) == 0xfe80 {
-            warn!(
-                "Connecting to link-local address {} over WAN — may not route across subnets",
-                ipv6
-            );
-        }
-        let endpoint = stoq::Endpoint::new(ipv6, addr.port());
-
-        // Connect via STOQ
+        let endpoint = self.peer_endpoint(addr)?;
         let connection = self.transport.connect(&endpoint).await?;
-
-        // Exchange node information via bilateral PoS handshake (R11)
         let our_network_id = peer_ctx
             .as_ref()
             .map(|c| c.network_id.as_str())
             .unwrap_or(self.network_id.as_str());
         let handshake = self.exchange_node_info(&connection, our_network_id).await?;
-        let node_info = handshake.node;
-
-        // Store the connected node
-        let mut nodes = self.nodes.write().await;
-        nodes.insert(node_info.node_id.clone(), node_info.clone());
-        drop(nodes);
-
-        info!(
-            "Successfully connected to node {} at ({},{},{}) — bilateral PoS verified (proof={} bytes, pubkey={} bytes)",
-            node_info.node_id,
-            node_info.coordinate.x,
-            node_info.coordinate.y,
-            node_info.coordinate.z,
-            handshake.peer_proof.len(),
-            handshake.peer_pubkey.len(),
-        );
-
-        // Register as authenticated peer — proof_bytes and pubkey come from
-        // the bilateral handshake result. register_authenticated_peer will
-        // reject if either is empty (enforcing R11 bilateral verification).
-        // Use the network_id received from the peer during metadata exchange,
-        // NOT our own network_id.
-        let registered = peer_auth::register_authenticated_peer(
-            &self.authenticated_peers,
-            peer_auth::AuthenticatedPeer {
-                node_id: node_info.node_id.clone(),
-                pubkey: handshake.peer_pubkey,
-                coordinate: (
-                    node_info.coordinate.x as i32,
-                    node_info.coordinate.y as i32,
-                    node_info.coordinate.z as i32,
-                ),
-                network_id: handshake.peer_network_id,
-                authenticated_at: std::time::Instant::now(),
-                proof_bytes: handshake.peer_proof,
-            },
-        )
-        .await;
-
-        if !registered {
-            // Peer failed authentication validation — disconnect
-            warn!(
-                "Peer {} failed authentication registration — disconnecting",
-                &node_info.node_id[..8.min(node_info.node_id.len())]
-            );
-            // Remove from nodes map since auth failed
-            self.nodes.write().await.remove(&node_info.node_id);
-            return Err(anyhow!(
-                "Peer {} bilateral PoS verification incomplete — proof or pubkey missing",
-                node_info.node_id
-            ));
-        }
-
-        // Request CA certificate in background (Phase 2 bootstrap)
+        let node_info = handshake.node.clone();
+        self.store_connected_peer(&node_info, &handshake).await;
+        self.register_connected_peer(&node_info, handshake, &connection)
+            .await?;
         self.spawn_ca_enrollment_if_needed();
-
-        // Spawn persistent message loop if context is available
         if let Some(ctx) = peer_ctx {
             let peer_node_id = node_info.node_id.clone();
             let peer_coord = node_info.coordinate;
@@ -276,100 +198,7 @@ impl NetworkManager {
                 run_peer_message_loop(connection, peer_node_id, peer_coord, ctx).await;
             });
         }
-
         Ok(node_info.node_id)
-    }
-
-    /// Perform bilateral handshake via STOQ protocol layer.
-    ///
-    /// Opens a stream, writes a `CONN_TYPE_HANDSHAKE` discriminator byte,
-    /// then delegates to `stoq::initiate_handshake_on_stream()` which
-    /// implements the 3-message challenge-response protocol (R11) using
-    /// NodeSigner and StateProofProvider traits.
-    ///
-    /// After the STOQ crypto handshake, exchanges a blockmatrix-level
-    /// metadata message carrying `network_id` (for multi-node sync).
-    ///
-    /// Returns both the `NetworkNode` and the raw proof/pubkey data so
-    /// the caller can register a fully-verified `AuthenticatedPeer`.
-    async fn exchange_node_info(
-        &self,
-        connection: &Arc<stoq::Connection>,
-        our_network_id: &str,
-    ) -> Result<HandshakeData> {
-        let coord = self.local_coordinate;
-        let local_coord = (coord.x, coord.y, coord.z);
-
-        // Open stream and write connection-type discriminator before handshake
-        let mut stream = connection.open_stream().await?;
-        stream.write_discriminator(CONN_TYPE_HANDSHAKE).await?;
-
-        let result = stoq::initiate_handshake_on_stream(
-            &mut stream,
-            self.signer.as_ref(),
-            self.proof_provider.as_ref(),
-            local_coord,
-        )
-        .await?;
-
-        // Post-handshake metadata exchange (blockmatrix layer).
-        // Initiator sends metadata first, then reads peer's metadata.
-        let our_meta = HandshakeMetadata {
-            network_id: our_network_id.to_string(),
-        };
-        let meta_bytes = serde_json::to_vec(&our_meta)
-            .map_err(|e| anyhow!("Failed to serialize handshake metadata: {e}"))?;
-        stream.write_msg(&meta_bytes).await?;
-
-        // Read peer's metadata (with timeout tolerance for old nodes).
-        let peer_network_id = match tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            stream.read_msg(),
-        )
-        .await
-        {
-            Ok(Ok(peer_meta_bytes)) => {
-                let peer_meta: HandshakeMetadata =
-                    serde_json::from_slice(&peer_meta_bytes).unwrap_or_default();
-                info!(
-                    "Received peer network_id from metadata: '{}'",
-                    peer_meta.network_id
-                );
-                peer_meta.network_id
-            }
-            Ok(Err(e)) => {
-                warn!("Peer did not send handshake metadata: {e}");
-                String::new()
-            }
-            Err(_) => {
-                warn!("Timeout waiting for peer handshake metadata — assuming old node");
-                String::new()
-            }
-        };
-
-        let _ = stream.finish_send();
-
-        let coordinate = MatrixCoordinate::new(
-            result.peer_coordinate.0,
-            result.peer_coordinate.1,
-            result.peer_coordinate.2,
-        )
-        .map_err(|e| anyhow!("Invalid peer coordinate: {e}"))?;
-
-        Ok(HandshakeData {
-            node: NetworkNode {
-                coordinate,
-                address: connection.endpoint().to_socket_addr(),
-                node_id: result.peer_node_id,
-                privacy_mode: PrivacyMode::PUBLIC, // Will be negotiated later
-                connection: Some(connection.clone()),
-            },
-            peer_pubkey: result.peer_pubkey,
-            peer_proof: result.peer_proof,
-            // Ingress boundary: the peer's advertised wire string becomes its
-            // canonical NetworkId here (and only here on this path).
-            peer_network_id: NetworkId::from_wire_str(&peer_network_id),
-        })
     }
 
     // mDNS and gossip methods are in peer_discovery.rs.

@@ -51,6 +51,7 @@ impl NetworkManager {
         peer_ctx: Option<Arc<PeerContext>>,
     ) {
         let nodes = self.nodes.clone();
+        let connected_routes = self.connected_routes.clone();
         let local_coord = self.local_coordinate;
         let signer = self.signer.clone();
         let proof_provider = self.proof_provider.clone();
@@ -66,6 +67,7 @@ impl NetworkManager {
                 cert_manager,
                 peer_ctx,
                 auth_peers,
+                connected_routes,
             )
             .await
             {
