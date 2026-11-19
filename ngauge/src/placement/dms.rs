@@ -24,7 +24,7 @@
 //! [`MirrorExecutor`] / [`ReflectExecutor`] traits (defined here, lib types
 //! only — ngauge never gains a blockmatrix dependency).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use async_trait::async_trait;
 use hypermesh_lib::{ContentHash, MatrixPosition, NetworkId, NodeId};
@@ -141,37 +141,16 @@ impl DmsDriver {
         let urgency_by_shard: HashMap<ContentHash, f64> =
             signals.iter().map(|s| (s.shard_id, s.urgency)).collect();
 
-        let advisor = DispersionAdvisor::new();
-        let mut mirror = Vec::new();
-
-        for bundle in candidates {
-            // Gate on the trigger's urgency for this shard (old > 0.5 filter).
-            let urgency = match urgency_by_shard.get(&bundle.shard_id) {
-                Some(u) if *u > urgency_floor as f64 => *u,
-                _ => continue,
-            };
-            if bundle.all_ids.is_empty() {
-                continue;
-            }
-
-            // (2) Where does the swarm want new replicas? (k-means over demand.)
-            let recommendations = advisor.recommend_placement_in_network(
-                network,
-                &bundle.shard_id,
-                analytics,
-                bundle.all_ids.len().max(1),
-            );
-
-            // (3) Which source to pull from + how hard to fall back.
-            let source_id = select_source(&bundle.positioned, &bundle.all_ids, &recommendations);
-            mirror.push(MirrorAction {
-                network,
-                shard_id: bundle.shard_id,
-                source: NodeId::from_public_key(source_id.as_bytes()),
-                urgency: urgency as f32,
-                fallback: recommend_fallback(&bundle.positioned),
-            });
-        }
+        let mirror = candidates
+            .iter()
+            .filter_map(|bundle| {
+                let urgency = *urgency_by_shard.get(&bundle.shard_id)?;
+                if !(urgency > urgency_floor as f64) {
+                    return None;
+                }
+                plan_mirror(analytics, network, bundle, urgency)
+            })
+            .collect();
 
         // Reflect is driven by the head-observer (Phase 4); the replication
         // poll loop emits none, so behaviour is preserved exactly.
@@ -180,6 +159,61 @@ impl DmsDriver {
             reflect: Vec::new(),
         }
     }
+}
+
+/// Parse the index's canonical identity; text is never hashed into another ID.
+fn parse_provider_id(id: &str) -> Option<NodeId> {
+    if id.len() != 64
+        || !id
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+    {
+        return None;
+    }
+    let mut bytes = [0; 32];
+    hex::decode_to_slice(id, &mut bytes).ok()?;
+    let node = NodeId::from_bytes(bytes);
+    node.validate().ok()?;
+    Some(node)
+}
+
+/// Discard invalid identities before geometry or deterministic selection.
+fn plan_mirror(
+    analytics: &SwarmAnalytics,
+    network: NetworkId,
+    bundle: &ShardCandidates,
+    urgency: f64,
+) -> Option<MirrorAction> {
+    let all_ids: Vec<String> = bundle
+        .all_ids
+        .iter()
+        .filter(|id| parse_provider_id(id).is_some())
+        .cloned()
+        .collect();
+    if all_ids.is_empty() {
+        return None;
+    }
+    let indexed: HashSet<&str> = all_ids.iter().map(String::as_str).collect();
+    let positioned: Vec<ReplicaCandidate> = bundle
+        .positioned
+        .iter()
+        .filter(|candidate| indexed.contains(candidate.id.as_str()))
+        .cloned()
+        .collect();
+    let recommendations = DispersionAdvisor::new().recommend_placement_in_network(
+        network,
+        &bundle.shard_id,
+        analytics,
+        all_ids.len(),
+    );
+    let source = parse_provider_id(&select_source(&positioned, &all_ids, &recommendations))?;
+    Some(MirrorAction {
+        network,
+        shard_id: bundle.shard_id,
+        source,
+        urgency: urgency as f32,
+        fallback: recommend_fallback(&positioned),
+    })
 }
 
 /// Port of the old `poll.rs::select_dispersion_source` (the W1 duplicate), now
@@ -326,8 +360,8 @@ mod tests {
 
         let candidates = vec![ShardCandidates {
             shard_id: shard,
-            positioned: vec![cand("provider-1", 1.0, 1.0)],
-            all_ids: vec!["provider-1".to_string()],
+            positioned: vec![cand(&NodeId::from_bytes([1; 32]).to_hex(), 1.0, 1.0)],
+            all_ids: vec![NodeId::from_bytes([1; 32]).to_hex()],
         }];
         let plan = DmsDriver::plan(&analytics, DEFAULT_NETWORK, &candidates, 0.5);
         assert_eq!(plan.mirror.len(), 1);
@@ -335,9 +369,6 @@ mod tests {
         assert_eq!(action.shard_id, shard);
         assert_eq!(action.network, DEFAULT_NETWORK);
         assert!(action.urgency > 0.5);
-        assert_eq!(
-            action.source,
-            NodeId::from_public_key("provider-1".as_bytes())
-        );
+        assert_eq!(action.source, NodeId::from_bytes([1; 32]));
     }
 }
