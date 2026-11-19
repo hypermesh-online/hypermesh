@@ -186,7 +186,7 @@ impl SwarmDemandTracker {
 /// Passed to the per-connection message loop so that incoming blocks,
 /// shards, and sync messages can reach the appropriate subsystems.
 pub struct PeerContext {
-    /// The node's blockchain (for inserting received blocks).
+    /// The node's BlockMatrix storage container (for indexing received blocks and entries).
     pub blockchain: Arc<NodeBlockchain>,
     /// Shard store (for shard send/fetch operations).
     pub shard_store: Arc<ShardStore>,
