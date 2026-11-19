@@ -165,17 +165,9 @@ fn mathematical_integer_schema_is_not_typed_representation_validation() {
 }
 
 #[test]
-fn remaining_seven_are_explicitly_not_yet_defined() {
+fn remaining_three_are_explicitly_not_yet_defined() {
     use SystemAssetKind::*;
-    for kind in [
-        Container,
-        Economic,
-        Blockchain,
-        Dns,
-        Dashboard,
-        Identity,
-        KeyRotation,
-    ] {
+    for kind in [Container, Economic, Blockchain] {
         assert!(
             matches!(definition(kind), Err(SystemPayloadError::NotYetDefined { kind: actual }) if actual == kind)
         );

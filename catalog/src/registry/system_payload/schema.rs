@@ -36,6 +36,10 @@ pub(super) fn for_kind(kind: SystemAssetKind) -> Result<Value, SystemPayloadErro
         ],
         Invitation | Message => return super::messaging::schema(kind),
         Transmission => return Ok(super::transmission::schema()),
+        Dashboard => return Ok(super::dashboard::schema()),
+        Dns => return Ok(super::dns::schema()),
+        Identity => return Ok(super::identity::schema()),
+        KeyRotation => return Ok(super::key_rotation::schema()),
         _ => return Err(SystemPayloadError::NotYetDefined { kind }),
     };
     Ok(object(kind, fields, &[]))
@@ -68,4 +72,15 @@ pub(super) fn object(
         "required": required,
         "additionalProperties": true
     })
+}
+
+pub(super) fn bytes() -> Value {
+    json!({"type": "array", "items": {"type": "integer", "minimum": 0, "maximum": u8::MAX}})
+}
+
+pub(super) fn fixed_bytes(len: usize) -> Value {
+    let mut schema = bytes();
+    schema["minItems"] = json!(len);
+    schema["maxItems"] = json!(len);
+    schema
 }

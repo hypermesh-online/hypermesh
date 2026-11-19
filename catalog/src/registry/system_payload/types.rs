@@ -1,9 +1,14 @@
 use super::TransmissionPayload;
-use blockmatrix::{messaging::message::DirectMessage, sharing::invite::ShareInvite};
-use hypermesh_lib::{
-    CpuCapabilities, GpuCapabilities, MemoryCapabilities, NetworkCapabilities, StorageCapabilities,
-    SystemAssetKind,
+use blockmatrix::{
+    dashboard::DashboardManifest, dns::DnsBlockEntry, messaging::message::DirectMessage,
+    sharing::invite::ShareInvite,
 };
+use hypermesh_lib::{
+    CpuCapabilities, GpuCapabilities, IdentityAssetRecord, MemoryCapabilities, NetworkCapabilities,
+    StorageCapabilities, SystemAssetKind,
+};
+
+use trustchain::identity::KeyRotationEntry;
 
 /// Successfully deserialized canonical data, bound to its requested system kind.
 /// No hardware, ownership, signature, proof-of-state or admission claim is made.
@@ -17,6 +22,10 @@ pub enum ValidatedSystemPayload {
     Invitation(ShareInvite),
     Message(DirectMessage),
     Transmission(TransmissionPayload),
+    Dashboard(DashboardManifest),
+    Dns(DnsBlockEntry),
+    Identity(IdentityAssetRecord),
+    KeyRotation(KeyRotationEntry),
 }
 
 impl ValidatedSystemPayload {
@@ -30,6 +39,10 @@ impl ValidatedSystemPayload {
             Self::Invitation(_) => SystemAssetKind::Invitation,
             Self::Message(_) => SystemAssetKind::Message,
             Self::Transmission(_) => SystemAssetKind::Transmission,
+            Self::Dashboard(_) => SystemAssetKind::Dashboard,
+            Self::Dns(_) => SystemAssetKind::Dns,
+            Self::Identity(_) => SystemAssetKind::Identity,
+            Self::KeyRotation(_) => SystemAssetKind::KeyRotation,
         }
     }
 }
@@ -45,6 +58,10 @@ impl PartialEq for ValidatedSystemPayload {
             (Self::Invitation(a), Self::Invitation(b)) => invite_eq(a, b),
             (Self::Message(a), Self::Message(b)) => message_eq(a, b),
             (Self::Transmission(a), Self::Transmission(b)) => a == b,
+            (Self::Dashboard(a), Self::Dashboard(b)) => a == b,
+            (Self::Dns(a), Self::Dns(b)) => super::dns::equal(a, b),
+            (Self::Identity(a), Self::Identity(b)) => super::identity::equal(a, b),
+            (Self::KeyRotation(a), Self::KeyRotation(b)) => super::key_rotation::equal(a, b),
             _ => false,
         }
     }

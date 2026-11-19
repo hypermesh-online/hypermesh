@@ -14,6 +14,8 @@ hypermesh-lib = { workspace = true }
 
 # HyperMesh integration for state proof validation and asset management
 blockmatrix = { path = "../blockmatrix" }
+# Canonical KeyRotationEntry; its identity module has no feature gate.
+trustchain = { path = "../trustchain", default-features = false }
 
 # STOQ transport layer for P2P communication
 stoq = { path = "../stoq" }
@@ -126,7 +128,7 @@ hypermesh-lib = { workspace = true, features = ["test-utils"] }
 # Phase 4 with_signer coverage: a catalog-written version must carry a valid
 # FALCON WireSignedProof. The test attaches a real FALCON signer
 # (`trustchain::identity::FalconIdentity`, which impls `hypermesh_lib::NodeSigner`)
-# to the chain; dev-dep scope keeps trustchain out of catalog's runtime graph.
+# to the chain; keep the existing test feature set, including defaults.
 trustchain = { path = "../trustchain" }
 # Phase 4 DMS handoff E2E: the test drives NGauge's DmsDriver/SwarmAnalytics and
 # the RS Sharder directly to prove the new-version → mirror → reflect path.

@@ -1,10 +1,14 @@
-//! Structural payload definitions for seven canonical kinds and declared relay capacity.
+//! Structural payload definitions for eleven canonical kinds and declared relay capacity.
 //!
 //! These definitions do not establish ownership, physical capability, proof of
 //! state, or network admission. In particular, `ipv6_native` proves no routability.
-//! Application schemas and the remaining seven system kinds are not defined here.
+//! Application schemas and the remaining three system kinds are not defined here.
 
+mod dashboard;
+mod dns;
 mod hardware;
+mod identity;
+mod key_rotation;
 mod messaging;
 mod schema;
 mod transmission;
@@ -46,8 +50,8 @@ impl SystemPayloadDefinition {
     /// JSON Schema treats `1.0` as an integer; canonical serde rejects a floating
     /// representation for unsigned Rust fields. Use `validate` for typed parity,
     /// not a schema engine alone. Unknown object fields are accepted, as by serde.
-    /// The schema describes serialized objects only; canonical serde additionally
-    /// accepts positional arrays in declaration-field order. `validate` preserves
+    /// The schema describes the object form only; canonical serde additionally
+    /// accepts positional struct arrays in declaration-field order. `validate` preserves
     /// that sequence behavior, which this object schema does not describe.
     /// Messaging byte fields serialize as arrays; canonical serde also accepts
     /// UTF-8 strings as raw bytes (not hex/base64). Both appear in their schemas.
@@ -59,15 +63,33 @@ impl SystemPayloadDefinition {
     /// Transmission uses the new Catalog DTO, not a preexisting canonical lib DTO.
     /// This is not object-schema validation and does not attest any resource.
     pub fn validate(&self, value: &Value) -> Result<ValidatedSystemPayload, SystemPayloadError> {
-        if self.kind == SystemAssetKind::Transmission {
-            return transmission::validate(value);
+        match self.kind {
+            SystemAssetKind::Transmission => transmission::validate(value),
+            SystemAssetKind::Dashboard => {
+                decode(self.kind, value, ValidatedSystemPayload::Dashboard)
+            }
+            SystemAssetKind::Dns => decode(self.kind, value, ValidatedSystemPayload::Dns),
+            SystemAssetKind::Identity => decode(self.kind, value, ValidatedSystemPayload::Identity),
+            SystemAssetKind::KeyRotation => {
+                decode(self.kind, value, ValidatedSystemPayload::KeyRotation)
+            }
+            _ => hardware::validate(self.kind, value),
         }
-        hardware::validate(self.kind, value)
     }
 }
 
-/// Obtain a definition for seven canonical kinds or declared Transmission capacity.
+/// Obtain a definition for eleven canonical kinds or declared Transmission capacity.
 pub fn definition(kind: SystemAssetKind) -> Result<SystemPayloadDefinition, SystemPayloadError> {
     let json_schema = schema::for_kind(kind)?;
     Ok(SystemPayloadDefinition { kind, json_schema })
+}
+
+fn decode<T: serde::de::DeserializeOwned>(
+    kind: SystemAssetKind,
+    value: &Value,
+    wrap: fn(T) -> ValidatedSystemPayload,
+) -> Result<ValidatedSystemPayload, SystemPayloadError> {
+    serde_json::from_value(value.clone())
+        .map(wrap)
+        .map_err(|source| SystemPayloadError::InvalidPayload { kind, source })
 }
