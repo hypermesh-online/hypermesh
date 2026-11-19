@@ -2,11 +2,11 @@
 
 **Planning baseline plus bounded executed units; not a ratified protocol, complete native backlog, blanket future implementation lease or user acceptance.** Parent: [core plan](../PLAN.md). Scope evidence: [README.md](README.md). Native roadmap identity `6ad9d99dec368e17fa2f9166cc2345f782f8499fec1884f0525148a7ce2b5edc` is a reference, not a populated backlog. Coordinator `/root/coordinator_stoq` owns transport work; F1/listener integration is historical completed source work, not the next integration gate.
 
-## Current work and next gates — observed 2026-11-18
+## Current work and next gates — observed 2026-11-19 at `4913bb92`
 
-- Do not reopen the integrated F1/listener unit. Next security work is genuine authenticated session/context association, channel binding, semantic four-proof evidence and replay denial, not a transport-configuration inference.
-- Routing/demand correction `fc8a69ae5cc92b842d84496c0a78f8c08a1d5df0639d027f74acd0666f423d29` remains REVIEW evidence; independent focused controls are not private authenticated network E2E. Review remaining authorization/transport gates and obtain explicit bounded ownership before new code.
-- Installer and DNS integrations are uncommitted source units with scoped mock/fixture evidence, not STOQ private join, PQ, PoS or hardware validation. Feature → PR → main is the owner exception; no master creation, push or release is authorized here.
+- F1/listener source is already integrated; retain the historical bounded loopback controls below. The next security gate is genuine authenticated session/context association, channel binding, semantic four-proof evidence and replay denial.
+- Network-scoped DNS is committed in `52d037f3`; original-source DNS controls and two integration fixtures passed independently. Historical installer mock packaging (`01017579`) and routing/demand focused controls (`fc8a69ae5cc92b842d84496c0a78f8c08a1d5df0639d027f74acd0666f423d29`) do not establish authenticated private join, real-network E2E, PQ, PoS or hardware validation.
+- The broader all-features workspace check is still blocked, including example API drift in two QUIC examples (see the [core plan](../PLAN.md)). Repair examples separately; a compile pass would not establish channel authentication or readiness. Feature → PR → main remains the owner exception, not permission here to merge or release.
 
 ## Scope and current gap
 
