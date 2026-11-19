@@ -15,6 +15,7 @@
 pub mod asset_type;
 pub mod catalog_registry;
 pub mod schema_scanner;
+pub mod system_payload;
 pub mod version_view;
 pub mod version_write;
 
