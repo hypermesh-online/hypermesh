@@ -2,7 +2,13 @@
 
 # Installing HyperMesh
 
-This guide covers installing and running a HyperMesh node on Linux.
+The bounded packaging path below uses `scripts/install/hypermesh-install.sh`.
+It requires Linux and GNU utilities, including `mv -T`, `stat -c`, `mktemp`,
+and `sha256sum`; POSIX shell syntax is not a cross-platform support claim.
+It installs one local artifact without starting it. The platform, service and
+network reference sections later in this guide are not validated by that path;
+Linux/systemd/eBPF prerequisites there are not prerequisites for this offline
+packaging fixture. Startup and platform support remain unverified here.
 
 ## Prerequisites
 
@@ -23,35 +29,85 @@ uname -r
 # Must be >= 5.15
 ```
 
-## Quick Install
+## Private Offline Install
 
-Run the one-line installer:
+The installer defaults to **private** privacy. `public` is selected only through
+an explicit `HYPERMESH_PRIVACY=public`; offline installation rejects public mode.
+The supported offline packaging combination requires all of these explicitly:
+`HYPERMESH_OFFLINE=1`, `HYPERMESH_NO_START=1`, a readable prebuilt artifact,
+its expected SHA-256, and absolute install/data directories. Invalid flags,
+privacy, or incomplete/conflicting inputs fail before preparation.
+Each offline root is checked independently for an absolute path; colons in
+otherwise valid absolute roots are allowed, not treated as separators.
 
-```bash
-curl -sSf https://raw.githubusercontent.com/hypermesh-online/core/main/scripts/install.sh | bash
+Example from the repository root, using caller-owned directories (replace the
+artifact path and set `EXPECTED_SHA256` to the expected 64-hex digest):
+
+```sh
+: "${EXPECTED_SHA256:?set the expected 64-hex SHA-256 before installing}"
+umask 077
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/hypermesh"
+HYPERMESH_PREBUILT_BINARY=/absolute/path/to/hypermesh \
+HYPERMESH_PREBUILT_SHA256="$EXPECTED_SHA256" \
+HYPERMESH_INSTALL_DIR="$HOME/.local/bin" \
+HYPERMESH_DATA_DIR="$HOME/.local/share/hypermesh" \
+HYPERMESH_PRIVACY=private \
+HYPERMESH_OFFLINE=1 \
+HYPERMESH_NO_START=1 \
+sh scripts/install/hypermesh-install.sh
 ```
 
-This downloads the latest release, installs binaries, creates configuration files, and sets up systemd units. Skip to [Verifying the Installation](#verifying-the-installation) once it completes.
+| Environment variable | Implemented behavior |
+|----------------------|----------------------|
+| `HYPERMESH_PREBUILT_BINARY` | Local readable artifact; mandatory offline. Without it, the non-offline path builds with Cargo. |
+| `HYPERMESH_PREBUILT_SHA256` | Mandatory 64-hex expected SHA-256 for **every** prebuilt install, including non-offline installs; rejected without an artifact. |
+| `HYPERMESH_INSTALL_DIR` | Destination for `hypermesh`; default `/usr/local/bin`, but must be explicit and absolute offline. |
+| `HYPERMESH_DATA_DIR` | Caller-owned state directory; default `$HOME/.blockmatrix`, but must be explicit and absolute offline. |
+| `HYPERMESH_PRIVACY` | `private` by default; accepts `private`, `public`, or `anonymous`; offline requires `private`. |
+| `HYPERMESH_OFFLINE` | `0` by default; accepts only `0` or `1`. `1` requires the complete offline combination above. |
+| `HYPERMESH_NO_START` | `0` by default; accepts only `0` or `1`. `1` never executes the artifact, including connect/status/version. |
+| `HYPERMESH_TARGET` | Non-offline build target; defaults to `x86_64-unknown-linux-musl`. |
+| `HYPERMESH_STOQ_PORT`, `HYPERMESH_NETWORK_ID` | Startup parameters only; defaults `9292` and `trustnet`. |
 
-## Manual Install
+Offline mode never builds, downloads, or executes the artifact; it does not
+invoke Cargo, rustup, sudo, services, or key generation. The installer prepares
+the data directory without rewriting existing identity, assets, or configuration.
+It copies into private collision-safe staging on the destination filesystem,
+checks the **staged bytes**, sets executable mode, then atomically renames them.
+The hash is read from staged content through standard input, so backslashes
+or newlines in directory names do not change the parsed digest.
+Both commit and rollback use GNU `mv -fT --` (no-target-directory semantics);
+unsupported utilities fail closed, with no fallback to plain `mv`. A directory
+substituted at the destination is not treated as a container for the artifact
+or deleted to force restoration. If it blocks restoration, the old binary's
+backup is retained and its location reported for recovery.
+Handled staging failures/interruption preserve the previous installed binary;
+handled postreplacement failures attempt to restore it. Failed rollback is an
+error with the backup location retained. SIGKILL, power loss, persistent
+filesystem errors, hostile parent-directory rewrites, and an all-powerful
+same-UID actor are not recovery guarantees. The deterministic destination-
+directory substitution fixture verifies refusal without deleting unrelated
+directory contents or node state; it does not establish general race immunity.
 
-### 1. Download the release
+An expected SHA-256 verifies byte integrity, **not** authenticated release
+provenance, post-quantum certificates, or Proof of State. Hermetic mock-artifact
+packaging tests are not evidence of a real node, a private-network join, or
+platform support. Genuine private-node end-to-end testing and authority/crypto
+adapter validation remain separate gates; no one-click authentication, DNS, or
+IPv6 runtime operation is established here.
 
-Download the latest tarball from GitHub Releases:
+## Release Contents and Other Install Paths
 
-```bash
-VERSION="0.1.0"
-curl -LO "https://github.com/hypermesh-online/core/releases/download/v${VERSION}/hypermesh-v${VERSION}-linux-x86_64.tar.gz"
-```
+The current `.github/workflows/release.yml` packaging steps (lines 237–256)
+bundle **one `hypermesh` artifact** (`hypermesh.exe` on Windows); the Unix step
+also attempts to copy `scripts/install.sh` as install metadata. They do not
+supply the previously assumed five-service `bin/`, `systemd/`, or `config/`
+layout. Do not copy nonexistent binaries, units, or configuration from that
+release archive. The separate `scripts/install.sh` quick-install/startup path
+is not validated by the offline packaging tests above.
 
-### 2. Extract and install binaries
-
-```bash
-tar xzf hypermesh-v${VERSION}-linux-x86_64.tar.gz
-sudo cp hypermesh-v${VERSION}/bin/* /usr/local/bin/
-```
-
-The tarball contains five binaries:
+The component names below are reference roles, **not** a list of delivered
+release binaries:
 
 | Binary | Purpose |
 |--------|---------|
@@ -61,19 +117,10 @@ The tarball contains five binaries:
 | `catalog-server` | Asset registry — package distribution over STOQ |
 | `ngauge-server` | Analytics — engagement metrics and routing intelligence |
 
-### 3. Install systemd units
-
-```bash
-sudo cp hypermesh-v${VERSION}/systemd/*.service /etc/systemd/system/
-sudo systemctl daemon-reload
-```
-
-### 4. Create configuration directory
-
-```bash
-sudo mkdir -p /etc/hypermesh
-sudo cp hypermesh-v${VERSION}/config/*.toml /etc/hypermesh/
-```
+The following multi-service configuration/startup/network sections apply only
+where those components, configuration and units have been supplied separately.
+They are reference deployment guidance, not outcomes of the single-artifact
+release or the private offline installer, and were not exercised here.
 
 ## Configuration
 
