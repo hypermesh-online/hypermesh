@@ -20,9 +20,10 @@
 #   workstation.
 #
 # Usage: scripts/check-build-size.sh [--quiet]
-# Exit:  0 = within budget, 1 = over budget (or disk critically low).
+# Exit:  0 = within budget, 1 = budget violation, 2 = inventory/measurement error.
 
 set -uo pipefail
+export LC_ALL=C
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
@@ -46,21 +47,65 @@ gb() { echo $(( ${1:-0} / 1048576 )); }   # du -k output -> GiB
 # Collect every target tree: the main one plus any under .claude/worktrees/.
 # Worktrees are the silent multiplier — each carries a full duplicate.
 # ---------------------------------------------------------------------------
+fatal() { printf 'FATAL: %s\n' "$*" >&2; exit 2; }
+
+valid_kib() {
+  local value="$1"
+  [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]] || return 1
+  [ "${#value}" -lt 19 ] || {
+    [ "${#value}" -eq 19 ] && [[ "$value" < 9223372036854775808 ]]
+  }
+}
+
+measure_target() {
+  local output value
+  output=$(du -sk "$1") || fatal "du failed for $1"
+  value=${output%%$'\t'*}
+  [[ "$output" == "$value"$'\t'"$1" ]] && valid_kib "$value" ||
+    fatal "invalid or missing du measurement for $1"
+  printf '%s\n' "$value"
+}
+
+available_kib() {
+  local output header value
+  output=$(df -k --output=avail "$REPO_ROOT") || fatal "df failed"
+  [[ "$output" == *$'\n'* ]] || fatal "missing df measurement"
+  header=${output%%$'\n'*}
+  value=${output#*$'\n'}
+  [[ "$header" =~ ^[[:blank:]]*Avail[[:blank:]]*$ ]] || fatal "invalid df measurement header"
+  [[ "$value" =~ ^[[:blank:]]*([0-9]+)[[:blank:]]*$ ]] || fatal "invalid df measurement"
+  value=${BASH_REMATCH[1]}
+  valid_kib "$value" || fatal "invalid df measurement"
+  printf '%s\n' "$value"
+}
+
+collect_sizes() {
+  local pid d kb
+  local -a inventory=()
+  mapfile -d '' -t inventory < <(find . -maxdepth 4 -type d -name target \
+    \( -path './target' -o -path './.claude/worktrees/*/target' \) -print0) ||
+    fatal "cannot read build inventory"
+  # Process-substitution failure is separate from mapfile success.
+  pid=$!
+  wait "$pid" || fatal "cannot enumerate build inventory"
+  for d in "${inventory[@]}"; do
+    [ -d "$d" ] || fatal "build inventory path disappeared: $d"
+    kb=$(measure_target "$d") || exit 2
+    [ "$kb" -le "$((9223372036854775807 - TOTAL_KB))" ] || fatal "total measurement overflow"
+    NAMES+=("$d")
+    SIZES+=("$kb")
+    TOTAL_KB=$((TOTAL_KB + kb))
+  done
+}
+
 declare -a NAMES=() SIZES=() OVER=()
 TOTAL_KB=0
-
-while IFS= read -r d; do
-  [ -d "$d" ] || continue
-  kb=$(du -sk "$d" 2>/dev/null | awk '{print $1}')
-  [ -z "$kb" ] && continue
-  NAMES+=("$d")
-  SIZES+=("$kb")
-  TOTAL_KB=$((TOTAL_KB + kb))
-done < <(find . -maxdepth 4 -type d -name target \
-           \( -path './target' -o -path './.claude/worktrees/*/target' \) 2>/dev/null)
-
-FREE_GB=$(df -BG --output=avail "$REPO_ROOT" 2>/dev/null | tail -1 | tr -dc '0-9')
-FREE_GB=${FREE_GB:-0}
+collect_sizes
+FREE_KB=$(available_kib) || exit 2
+FREE_GB=$(gb "$FREE_KB")
+TARGET_BUDGET_KB=$((TARGET_BUDGET_GB * 1048576))
+TOTAL_BUDGET_KB=$((TOTAL_BUDGET_GB * 1048576))
+MIN_FREE_KB=$((MIN_FREE_GB * 1048576))
 
 say "== build size guard =="
 if [ "${#NAMES[@]}" -eq 0 ]; then
@@ -68,9 +113,9 @@ if [ "${#NAMES[@]}" -eq 0 ]; then
 else
   for i in "${!NAMES[@]}"; do
     sz=$(gb "${SIZES[$i]}")
-    if [ "$sz" -gt "$TARGET_BUDGET_GB" ]; then
+    if [ "${SIZES[$i]}" -gt "$TARGET_BUDGET_KB" ]; then
       say "${RED}  ${NAMES[$i]}: ${sz} GiB  (budget ${TARGET_BUDGET_GB} GiB)${NC}"
-      OVER+=("${NAMES[$i]} (${sz} GiB)")
+      OVER+=("${NAMES[$i]} (${SIZES[$i]} KiB)")
     else
       say "  ${NAMES[$i]}: ${sz} GiB"
     fi
@@ -94,15 +139,15 @@ if [ "${#OVER[@]}" -gt 0 ]; then
   STATUS=1
 fi
 
-if [ "$TOTAL_GB" -gt "$TOTAL_BUDGET_GB" ]; then
-  say "${RED}FAIL: build trees total ${TOTAL_GB} GiB, over the ${TOTAL_BUDGET_GB} GiB budget.${NC}"
+if [ "$TOTAL_KB" -gt "$TOTAL_BUDGET_KB" ]; then
+  say "${RED}FAIL: build trees total ${TOTAL_KB} KiB (${TOTAL_GB} GiB), over the ${TOTAL_BUDGET_GB} GiB budget.${NC}"
   say "${YELLOW}  Reclaim:  rm -rf <tree>   (regenerable; costs one rebuild)${NC}"
   say "${YELLOW}  Worktree trees are full duplicates — clear those first.${NC}"
   STATUS=1
 fi
 
-if [ "$FREE_GB" -lt "$MIN_FREE_GB" ]; then
-  say "${RED}FAIL: only ${FREE_GB} GiB free (need ${MIN_FREE_GB} GiB to build safely).${NC}"
+if [ "$FREE_KB" -lt "$MIN_FREE_KB" ]; then
+  say "${RED}FAIL: only ${FREE_GB} GiB free (${FREE_KB} KiB; need ${MIN_FREE_GB} GiB to build safely).${NC}"
   say "${YELLOW}  Below this, a build can pin I/O and make the machine unusable.${NC}"
   STATUS=1
 fi

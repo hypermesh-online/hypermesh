@@ -8,6 +8,7 @@ No real large files, local hooks, Git operations or live disk-pressure changes.
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -49,13 +50,29 @@ class GuardFixture(unittest.TestCase):
         if code:
             self.assertNotIn("PASS:", result.stdout)
 
+    def assert_fatal(self, name, marker):
+        result = self.run_guard(name)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("PASS:", result.stdout)
+        self.assertIn(marker, result.stderr)
+
+    def fail_tool(self, name, selector="", output=""):
+        real = shlex.quote(shutil.which(name))
+        condition = f'case "$*" in *{shlex.quote(selector)}*)' if selector else ""
+        stub = f'{condition}\nprintf %s {shlex.quote(output)}\nexit 9\n'
+        if selector:
+            stub += f';; *) exec {real} "$@";; esac\n'
+        self.executable(name, stub)
+
 
 class BuildFixture(GuardFixture):
     def setUp(self):
         super().setUp()
         self.env.update(GUARD_SIZE_KB="1048576", GUARD_FREE_GB="200")
         self.executable("du", 'printf "%s\\t%s\\n" "$GUARD_SIZE_KB" "$2"\n')
-        self.executable("df", 'printf "Avail\\n%sG\\n" "$GUARD_FREE_GB"\n')
+        self.executable("df", 'if [ "$1" = -k ]; then\n'
+                        'printf "Avail\\n%s\\n" "${GUARD_FREE_KB:-$((GUARD_FREE_GB * 1048576))}"\n'
+                        'else printf "Avail\\n%sG\\n" "$GUARD_FREE_GB"; fi\n')
 
     def target(self, path="target"):
         (self.root / path).mkdir(parents=True)
@@ -172,6 +189,172 @@ class ProofFailureTests(ProofFixture):
         self.assertIn("matcher detects nothing", result.stderr)
         self.assertNotIn("PASS:", result.stdout)
         self.assertFalse(list(self.root.rglob("*selftest*")))
+
+
+class BuildExactBudgetTests(BuildFixture):
+    def test_per_tree_plus_one_kib_rejected(self):
+        self.target()
+        self.env["GUARD_SIZE_KB"] = str(80 * 1048576 + 1)
+        self.assert_result(self.run_guard("check-build-size.sh"), 1, "per-tree budget")
+
+    def test_aggregate_exact_and_plus_one_kib(self):
+        self.target()
+        self.target(".claude/worktrees/peer/target")
+        self.env["GUARD_SIZE_KB"] = str(70 * 1048576)
+        self.assert_result(self.run_guard("check-build-size.sh"), 0, "PASS:")
+        self.executable("du", 'case "$2" in ./target) n=73400320;; *) n=73400321;; esac\n'
+                        'printf "%s\\t%s\\n" "$n" "$2"\n')
+        self.assert_result(self.run_guard("check-build-size.sh"), 1, "over the 140 GiB")
+
+    def test_free_space_exact_and_one_kib_below(self):
+        self.env["GUARD_FREE_KB"] = str(60 * 1048576)
+        self.assert_result(self.run_guard("check-build-size.sh"), 0, "PASS:")
+        self.env["GUARD_FREE_KB"] = str(60 * 1048576 - 1)
+        self.assert_result(self.run_guard("check-build-size.sh"), 1, "free")
+
+    def test_target_with_spaces_and_newline(self):
+        self.target(".claude/worktrees/a b\nc/target")
+        self.assert_result(self.run_guard("check-build-size.sh"), 0, "PASS:")
+
+
+class BuildOperationalTests(BuildFixture):
+    def test_find_failure_rejected_even_with_partial_inventory(self):
+        self.target()
+        self.executable("find", 'printf "./target\\0"\nexit 9\n')
+        self.assert_fatal("check-build-size.sh", "inventory")
+
+    def test_missing_du_measurement_rejected(self):
+        self.target()
+        self.executable("du", "exit 0\n")
+        self.assert_fatal("check-build-size.sh", "measurement")
+
+    def test_du_failure_rejected_despite_numeric_output(self):
+        self.target()
+        self.executable("du", 'printf "1\\t%s\\n" "$2"\nexit 9\n')
+        self.assert_fatal("check-build-size.sh", "du")
+
+    def test_df_failure_rejected_despite_numeric_output(self):
+        self.executable("df", 'printf "Avail\\n209715200\\n"\nexit 9\n')
+        self.assert_fatal("check-build-size.sh", "df")
+
+    def test_missing_df_measurement_rejected(self):
+        self.executable("df", 'printf "Avail\\n"\n')
+        self.assert_fatal("check-build-size.sh", "measurement")
+
+
+class BuildMeasurementTests(BuildFixture):
+    def test_malformed_du_values_rejected(self):
+        self.target()
+        for value in ["-1", "1.2", "bad", "9223372036854775808", "1\n2"]:
+            with self.subTest(value=value):
+                self.env["GUARD_SIZE_KB"] = value
+                self.assert_fatal("check-build-size.sh", "measurement")
+
+    def test_malformed_df_values_rejected(self):
+        for value in ["-1", "1G", "x200", "9223372036854775808", "1\n2"]:
+            with self.subTest(value=value):
+                self.env["GUARD_FREE_KB"] = value
+                self.assert_fatal("check-build-size.sh", "measurement")
+
+    def test_du_wrong_path_rejected(self):
+        self.target()
+        self.executable("du", 'printf "1\\t./other\\n"\n')
+        self.assert_fatal("check-build-size.sh", "measurement")
+
+    def test_df_extra_row_rejected(self):
+        self.executable("df", 'printf "Avail\\n209715200\\n209715200\\n"\n')
+        self.assert_fatal("check-build-size.sh", "measurement")
+
+    def test_total_integer_overflow_rejected(self):
+        self.target()
+        self.target(".claude/worktrees/peer/target")
+        self.env["GUARD_SIZE_KB"] = "9223372036854775807"
+        self.assert_fatal("check-build-size.sh", "overflow")
+
+
+class ScannerOperationalTests(ProofFixture):
+    def test_find_failure_rejected_with_partial_inventory(self):
+        self.executable("find", 'printf "./orphan.rs\\0"\nexit 9\n')
+        self.assert_fatal("check-no-pos-magnitude.sh", "inventory")
+
+    def test_production_awk_failure_rejected(self):
+        self.fail_tool("awk", 'printf "%s:%d:%s')
+        self.assert_fatal("check-no-pos-magnitude.sh", "scan")
+
+    def test_production_xargs_failure_rejected(self):
+        self.fail_tool("xargs")
+        self.assert_fatal("check-no-pos-magnitude.sh", "scan")
+
+    def test_duplicate_grep_failure_rejected(self):
+        self.fail_tool("grep", "pub struct")
+        self.assert_fatal("check-no-pos-magnitude.sh", "duplicate")
+
+    def test_exception_filter_failure_rejected(self):
+        self.fail_tool("grep", "chain")
+        self.assert_fatal("check-no-pos-magnitude.sh", "scan")
+
+    def test_inventory_of_missing_source_rejected(self):
+        self.executable("find", 'printf "./missing.rs\\0"\n')
+        self.assert_fatal("check-no-pos-magnitude.sh", "scan")
+
+
+class ScannerScopeTests(ProofFixture):
+    def test_clean_empty_scope_passes(self):
+        (self.root / "orphan.rs").unlink()
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 0, "scanning 0 files")
+
+    def test_allowlisted_only_scope_passes(self):
+        (self.root / "orphan.rs").unlink()
+        p = self.root / "caesar/src/allowed.rs"
+        p.parent.mkdir(parents=True)
+        p.write_text("fn f() { let stake_amount = 1; }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 0, "scanning 0 files")
+
+    def test_narrow_exception_does_not_hide_other_violations(self):
+        p = self.root / "blockmatrix/src/blockchain/chain.rs"
+        p.parent.mkdir(parents=True)
+        p.write_text("fn f() { if total_size == 0 {} }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 0, "PASS:")
+        p.write_text("fn f() { let stake_amount = 1; }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "stake_amount")
+
+    def test_source_filename_spaces_and_newline_still_scanned(self):
+        (self.root / "orphan.rs").unlink()
+        (self.root / "odd name\nextra.rs").write_text("fn f() { let stake_amount = 1; }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "stake_amount")
+
+    def test_exception_extension_dot_remains_literal(self):
+        p = self.root / "blockmatrix/src/blockchain/chainXrs.c"
+        p.parent.mkdir(parents=True)
+        p.write_text("fn f() { if total_size == 0 {} }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "capacity never gates")
+
+    def test_multiline_filename_cannot_forge_a_full_exception(self):
+        p = self.root / "blockmatrix/src/blockchain/chain.rs:1:total_size\norphan.rs"
+        p.parent.mkdir(parents=True)
+        p.write_text("fn f() { let stake_amount = 1; }\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "stake_amount")
+
+    def test_duplicate_definition_detected(self):
+        (self.root / "orphan.rs").write_text("pub struct StakeProof {}\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "duplicate PoS")
+
+
+
+class ScannerBatchTests(ProofFixture):
+    def test_large_clean_inventory_and_late_duplicate(self):
+        for i in range(9500):
+            (self.root / (f"{i:05d}-" + "x" * 225 + ".rs")).touch()
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 0, "PASS:")
+        (self.root / "late.rs").write_text("pub struct StakeProof {}\n")
+        self.assert_result(self.run_guard("check-no-pos-magnitude.sh"), 1, "duplicate PoS")
+
+    def test_failed_duplicate_batch_is_not_hidden_by_clean_batches(self):
+        real = shlex.quote(shutil.which("xargs"))
+        self.executable("xargs", f'exec {real} -n 1 "$@"\n')
+        (self.root / "second.rs").touch()
+        self.fail_tool("grep", "orphan.rs")
+        self.assert_fatal("check-no-pos-magnitude.sh", "duplicate")
 
 
 if __name__ == "__main__":
