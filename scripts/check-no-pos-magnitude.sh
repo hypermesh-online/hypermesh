@@ -149,12 +149,14 @@ scan() {
 # Self-test: prove the matcher actually matches before trusting a PASS.
 # A guard that reads nothing is worse than no guard at all.
 selftest() {
-  local probe="/tmp/pos-magnitude-selftest-$$.rs"
-  printf 'fn f() {\n    if proof.space_proof.total_size == 0 {\n        let stake_amount = 5;\n    }\n}\n' > "$probe"
+  # Stream the fixture: no temporary file, TMPDIR requirement or /tmp fallback.
   local hits
-  hits="$(awk -v pat="${B_OPEN}(total_size|capacity)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]" '
-    { line=$0; if (line ~ pat) print FILENAME ":" FNR }' "$probe")"
-  rm -f "$probe"
+  if ! hits="$(printf 'fn f() {\n    if proof.space_proof.total_size == 0 {\n        let stake_amount = 5;\n    }\n}\n' |
+    awk -v pat="${B_OPEN}(total_size|capacity)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]" '
+      { line=$0; if (line ~ pat) print FILENAME ":" FNR }')"; then
+    echo -e "${RED}FATAL: guard self-test command failed; refusing to report PASS.${NC}" >&2
+    exit 2
+  fi
   if [ -z "$hits" ]; then
     echo -e "${RED}FATAL: guard self-test failed — the matcher detects nothing.${NC}" >&2
     echo -e "${RED}Refusing to report PASS. Fix the regex engine assumptions.${NC}" >&2

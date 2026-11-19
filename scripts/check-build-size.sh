@@ -46,7 +46,7 @@ gb() { echo $(( ${1:-0} / 1048576 )); }   # du -k output -> GiB
 # Collect every target tree: the main one plus any under .claude/worktrees/.
 # Worktrees are the silent multiplier — each carries a full duplicate.
 # ---------------------------------------------------------------------------
-declare -a NAMES SIZES OVER
+declare -a NAMES=() SIZES=() OVER=()
 TOTAL_KB=0
 
 while IFS= read -r d; do
