@@ -1,6 +1,8 @@
 # Portable remediation evidence index
 
-Tracked source baseline: `9f775b3b97cfcd55a238b0d64915c193a02c8149`.
+Historical source/recipe baseline: `9f775b3b97cfcd55a238b0d64915c193a02c8149`.
+For superseding dated QUIC, GNU CPU-default and CI observations, see
+[the current PLAN observations](../PLAN.md); plain-QUIC trial success is not STOQ/PQ/admission proof.
 This index replaces a link to a local-only historical report. Private raw reports
 are not published here; source and commands are entrypoints, not proof that a
 new clone has reproduced a result or that the product is accepted.
@@ -42,4 +44,6 @@ Run bounded checks only with the stated prerequisites. Hash equality is byte
 integrity, not publisher authentication. Mock/simulation/focused compilation
 results do not establish real-network operation, four-proof admission, release
 provenance, hardware behavior or readiness. [PLAN](../PLAN.md) retains the open
-security, QUIC-example, missing-BPF-object and broader workspace gates.
+security, missing-BPF-object and broader workspace gates; the earlier QUIC-example
+failures are superseded by the dated plain-QUIC outcomes in PLAN, not by a
+whole-workspace or private-admission clearance.
