@@ -40,17 +40,75 @@ privacy, or incomplete/conflicting inputs fail before preparation.
 Each offline root is checked independently for an absolute path; colons in
 otherwise valid absolute roots are allowed, not treated as separators.
 
-Example from the repository root, using caller-owned directories (replace the
-artifact path and set `EXPECTED_SHA256` to the expected 64-hex digest):
+### Observed local result and bounded reproduction
+
+On 2026-11-19, independently reproduced installation used a real locally built
+Linux x86_64 GNU development `hypermesh`, identical copied bytes and mode 0755.
+Relocated `--help` and `--version` exited 0; version was `blockmatrix-node 1.0.0`.
+No node or identity was created. This is not vendor authentication, portability
+to another host, service startup, private join, proof validation or hardware evidence.
+
+The source build used Rust 1.98.1, cached dependencies and a declared locally
+resolved `Cargo.lock`. That lock is **not tracked**: a clean clone does not
+promise a locked/offline build. Prepare and review your local lock and compatible
+cache/toolchain separately; stop if absent rather than bypass `--locked` or
+`--offline`. This public-path recipe maps the observed package/build flags and
+installer environment to caller-owned paths; the private isolation wrapper is
+not reproduced, and no new build was run to author this guide. From the core
+repository root on Linux x86_64 GNU with Rust 1.98.1 available. Set
+`BUILD_ROOT` to an absolute, caller-owned writable SSD directory; do not use the checkout on the home/HDD for build
+output. Both Cargo target and intermediate output are redirected. A fresh
+private install prefix avoids replacing an existing CLI:
 
 ```sh
+set -eu
+umask 077
+test -f Cargo.lock # separately prepared and reviewed; not supplied by the clone
+: "${BUILD_ROOT:?set an absolute caller-owned writable SSD build root}"
+case "$BUILD_ROOT" in /*) ;; *) echo 'BUILD_ROOT must be absolute' >&2; exit 1;; esac
+mkdir -p "$BUILD_ROOT"
+test -d "$BUILD_ROOT" && test -w "$BUILD_ROOT"
+# Use a fresh operation directory, not shared target/install state.
+operation=$(mktemp -d "$BUILD_ROOT/hypermesh-local.XXXXXXXX")
+export CARGO_TARGET_DIR="$operation/target"
+export CARGO_NET_OFFLINE=true CARGO_NET_RETRY=0
+cargo +1.98.1 --config "build.target-dir=\"$CARGO_TARGET_DIR\"" \
+  --config "build.build-dir=\"$operation/intermediates\"" \
+  build --offline --locked -j6 -p blockmatrix --bin hypermesh
+artifact="$CARGO_TARGET_DIR/debug/hypermesh"
+EXPECTED_SHA256=$(sha256sum < "$artifact")
+EXPECTED_SHA256=${EXPECTED_SHA256%% *}
+mkdir -p "$operation/prefix" "$operation/data"
+HYPERMESH_PREBUILT_BINARY="$artifact" \
+HYPERMESH_PREBUILT_SHA256="$EXPECTED_SHA256" \
+HYPERMESH_INSTALL_DIR="$operation/prefix" \
+HYPERMESH_DATA_DIR="$operation/data" \
+HYPERMESH_TARGET=x86_64-unknown-linux-gnu \
+HYPERMESH_PRIVACY=private HYPERMESH_OFFLINE=1 HYPERMESH_NO_START=1 \
+sh scripts/install/hypermesh-install.sh
+"$operation/prefix/hypermesh" --help
+"$operation/prefix/hypermesh" --version
+# Observed version: blockmatrix-node 1.0.0
+```
+
+A digest computed from your build verifies copy integrity, not independent
+publisher provenance. No-start mode does not execute the artifact: help/version
+above are explicit separate checks. A failed build is not an installation result.
+For an already built, reviewed artifact, the standalone invocation is:
+
+```sh
+set -eu
 : "${EXPECTED_SHA256:?set the expected 64-hex SHA-256 before installing}"
 umask 077
-mkdir -p "$HOME/.local/bin" "$HOME/.local/share/hypermesh"
+: "${INSTALL_ROOT:?set an absolute caller-owned writable parent directory}"
+case "$INSTALL_ROOT" in /*) ;; *) echo 'INSTALL_ROOT must be absolute' >&2; exit 1;; esac
+test -d "$INSTALL_ROOT" && test -w "$INSTALL_ROOT"
+offline_prefix=$(mktemp -d "$INSTALL_ROOT/hypermesh-install.XXXXXXXX")
+mkdir -p "$offline_prefix/bin" "$offline_prefix/data"
 HYPERMESH_PREBUILT_BINARY=/absolute/path/to/hypermesh \
 HYPERMESH_PREBUILT_SHA256="$EXPECTED_SHA256" \
-HYPERMESH_INSTALL_DIR="$HOME/.local/bin" \
-HYPERMESH_DATA_DIR="$HOME/.local/share/hypermesh" \
+HYPERMESH_INSTALL_DIR="$offline_prefix/bin" \
+HYPERMESH_DATA_DIR="$offline_prefix/data" \
 HYPERMESH_PRIVACY=private \
 HYPERMESH_OFFLINE=1 \
 HYPERMESH_NO_START=1 \
@@ -97,6 +155,13 @@ adapter validation remain separate gates; no one-click authentication, DNS, or
 IPv6 runtime operation is established here.
 
 ## Release Contents and Other Install Paths
+
+Observed on 2026-11-19: latest published tag `v0.1.0-alpha` has only
+`hypermesh-v0.1.0-alpha-x86_64-linux.tar.gz`. It has no expected Rust-triple-named
+archive or binary checksum manifest for the separate online installer. Verified
+online installation is not available. Do not rename archives to imply support,
+skip missing manifest/hash checks, or treat an archive digest as an authenticated
+per-binary manifest. The local no-start result above is a separate path.
 
 The current `.github/workflows/release.yml` packaging steps (lines 237–256)
 bundle **one `hypermesh` artifact** (`hypermesh.exe` on Windows); the Unix step
