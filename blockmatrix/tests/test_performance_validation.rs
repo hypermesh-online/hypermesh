@@ -5,8 +5,7 @@
 // Cross-Platform Performance Validation Tests for Sprint 3
 // Benchmarks and validates performance requirements across all platforms
 //
-// Gated: references struct fields (CpuInfo.core_count, MemoryInfo.total_mb)
-// that no longer exist in the current API.
+// Feature-gated host performance and resource validation (including optional eBPF).
 #![cfg(feature = "future-tests")]
 
 #[cfg(test)]
@@ -53,11 +52,14 @@ mod performance_validation_tests {
 
         println!("Full system profile completed in {:?}", duration);
         println!(
-            "  CPU: {} cores @ {} MHz",
-            cpu_info.core_count, cpu_info.frequency_mhz
+            "  CPU: {} cores @ {:?} MHz",
+            cpu_info.cores, cpu_info.frequency_mhz
         );
         println!("  GPU: {} devices detected", gpu_info.len());
-        println!("  Memory: {} MB total", memory_info.total_mb);
+        println!(
+            "  Memory: {} MiB total",
+            memory_info.total_bytes / (1024 * 1024)
+        );
         println!("  Storage: {} devices", storage_info.len());
 
         assert!(
@@ -295,8 +297,8 @@ mod performance_validation_tests {
             let cpu = os.detect_cpu().expect("CPU detection failed");
             let mem = os.detect_memory().expect("Memory detection failed");
 
-            cpu_results.push(cpu.core_count);
-            memory_results.push(mem.total_mb);
+            cpu_results.push(cpu.cores);
+            memory_results.push(mem.total_bytes / (1024 * 1024));
 
             thread::sleep(Duration::from_millis(100));
         }
