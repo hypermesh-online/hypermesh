@@ -2,21 +2,15 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Real Integration Testing Module
+//! Feature-gated integration target including the current cross-crate module tests.
 //!
-//! Comprehensive end-to-end integration tests with ACTUAL implementations.
-//! Replaces stub-based tests with real multi-component validation.
-//!
-//! Gated: references APIs (TrustChain::new_with_security, StoqTransport::new_optimized,
-//! blockmatrix::HyperMeshSystem) that have not been implemented yet.
+//! The four legacy wrapper tests below only print labels and return success;
+//! they do not establish full-stack, multi-node, DNS, or privacy end-to-end coverage.
 #![cfg(feature = "future-tests")]
 
 mod integration;
 
 use anyhow::Result;
-
-// Re-export integration test modules
-pub use integration::test_harness::{IntegrationTestHarness, NodeConfig, TestContext};
 
 // Test suite entry points
 #[cfg(test)]

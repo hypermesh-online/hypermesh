@@ -7,13 +7,15 @@
 //! Tests for critical infrastructure components:
 //! - ProxyAddress system (IPv6-like global addressing)
 //!
-//! Gated: references types (GlobalAddressType) not in current API.
+//! Feature-gated local proxy/NAT and privacy-policy fixtures.
 #![cfg(feature = "future-tests")]
 //! - NATTranslator (NAT-like memory addressing)
 //! - RemoteMemoryTransport (RDMA-style operations)
 //! - ProxyRouter (trust-based routing)
 
+use blockmatrix::assets::core::privacy::privacy_priority;
 use blockmatrix::assets::core::{AssetRegistration, AssetType, PrivacyMode};
+use blockmatrix::assets::proxy::nat_translation::GlobalAddressType;
 use blockmatrix::assets::proxy::*;
 
 #[tokio::test]
@@ -190,7 +192,7 @@ async fn test_gate3_proxy_routing() {
 
     // Add test proxy nodes
     let node1 = ProxyNodeInfo {
-        node_id: "proxy-node-1".to_string(),
+        node_id: *b"proxy-01",
         network_address: "192.168.1.100".to_string(),
         capabilities: ProxyCapabilities {
             http_proxy: true,
@@ -207,7 +209,7 @@ async fn test_gate3_proxy_routing() {
     };
 
     let node2 = ProxyNodeInfo {
-        node_id: "proxy-node-2".to_string(),
+        node_id: *b"proxy-02",
         network_address: "192.168.1.101".to_string(),
         capabilities: ProxyCapabilities {
             http_proxy: true,
@@ -240,22 +242,16 @@ async fn test_gate3_proxy_routing() {
 }
 
 #[tokio::test]
-async fn test_gate3_privacy_aware_routing() {
-    println!("\n=== Gate 3: Privacy-Aware Routing Test ===");
+async fn test_gate3_privacy_ordering_policy() {
+    println!("\n=== Gate 3: Privacy-Ordering Policy Test ===");
 
-    let router = ProxyRouter::new().await.unwrap();
+    // Public production policy also used by the private router wrapper.
+    // This tests policy ordering, not route creation or end-to-end selection.
+    assert!(privacy_priority(&PrivacyMode::PUBLIC) >= privacy_priority(&PrivacyMode::PRIVATE));
+    assert!(privacy_priority(&PrivacyMode::PRIVATE) >= privacy_priority(&PrivacyMode::PRIVATE));
+    assert!(!(privacy_priority(&PrivacyMode::PRIVATE) >= privacy_priority(&PrivacyMode::PUBLIC)));
 
-    // Test privacy level compatibility
-    assert!(router.privacy_levels_compatible(&PrivacyMode::PUBLIC, &PrivacyMode::PRIVATE));
-    assert!(router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PRIVATE));
-    assert!(!router.privacy_levels_compatible(&PrivacyMode::PRIVATE, &PrivacyMode::PUBLIC));
-
-    println!("Privacy level compatibility:");
-    println!("  ✓ PUBLIC compatible with PRIVATE: OK");
-    println!("  ✓ PRIVATE compatible with PRIVATE: OK");
-    println!("  ✓ PRIVATE NOT compatible with PUBLIC: OK");
-
-    println!("✓ Privacy-aware routing working correctly");
+    println!("✓ Public privacy-ordering policy assertions passed (not route selection)");
 }
 
 #[tokio::test]
