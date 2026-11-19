@@ -7,12 +7,16 @@
 //! Self-contained API server that speaks STOQ-compatible JSON over QUIC,
 //! avoiding the stoq<->ngauge cyclic dependency. Uses quinn directly.
 
+#[cfg(feature = "server")]
+use anyhow::anyhow;
 use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+#[cfg(feature = "server")]
+use tracing::warn;
 use tracing::{debug, info};
 
 use crate::organic_detection::{TrafficClassifier, TrafficPattern};
