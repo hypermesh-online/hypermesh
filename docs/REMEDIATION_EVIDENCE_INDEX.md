@@ -1,5 +1,13 @@
 # Portable remediation evidence index
 
+**2026-11-20 — independently reproduced guest STOQ/XDP transport:** a fresh
+41-byte identical echo used real STOQ/QUIC over guest `lo` through direct-libbpf
+XDP. The target map advanced after handshake (21→23), the off-port control
+payload left it unchanged (25→25), and detachment yielded ID 0. See the
+[trusted-build recipe](../tools/demo_gate/stoq_guest/README.md). This is not two
+installations, delegated STOQ/AF_XDP acceleration, or authorization; packet
+deltas may include QUIC control frames, not just application payload.
+
 Historical source/recipe baseline: `9f775b3b97cfcd55a238b0d64915c193a02c8149`.
 For superseding dated QUIC, GNU CPU-default and CI observations, see
 [the current PLAN observations](../PLAN.md); plain-QUIC trial success is not STOQ/PQ/admission proof.
