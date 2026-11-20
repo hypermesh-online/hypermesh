@@ -3,6 +3,9 @@
 
 //! Optional kernel acceleration; disabled configurations never probe the kernel.
 
+#[path = "kernel_attachment.rs"]
+mod attachment;
+
 use crate::transport::config::TransportConfig;
 use crate::transport::ebpf::{AfXdpSocket, StoqEbpfTransport};
 use parking_lot::RwLock;
@@ -71,9 +74,19 @@ pub(super) fn initialize(config: &TransportConfig) -> Acceleration {
     info!("eBPF interface resolved to: {}", interface);
     match StoqEbpfTransport::new() {
         Ok(mut ebpf) if ebpf.is_available() => {
-            info!("eBPF transport acceleration available");
-            let socket = attach_and_create_socket(&mut ebpf, &interface);
-            (Some(Arc::new(RwLock::new(ebpf))), socket)
+            info!("eBPF capability available; attempting XDP attachment");
+            match attach_and_create_socket(&mut ebpf, &interface) {
+                Ok(socket) => {
+                    if socket.is_some() {
+                        info!("Kernel-backed AF_XDP socket ready; traffic use unverified");
+                    }
+                    (Some(Arc::new(RwLock::new(ebpf))), socket)
+                }
+                Err(error) => {
+                    warn!("XDP attachment failed; using standard transport: {}", error);
+                    (None, None)
+                }
+            }
         }
         Ok(_) => {
             info!("eBPF not available, using standard transport");
@@ -89,19 +102,29 @@ pub(super) fn initialize(config: &TransportConfig) -> Acceleration {
 fn attach_and_create_socket(
     ebpf: &mut StoqEbpfTransport,
     interface: &str,
-) -> Option<Arc<AfXdpSocket>> {
-    if let Err(e) = ebpf.attach_xdp(interface) {
-        warn!("Failed to attach XDP to {}: {}", interface, e);
+) -> Result<Option<Arc<AfXdpSocket>>, String> {
+    attachment::attach_then_socket(ebpf, interface)
+}
+
+impl attachment::AttachmentOps for StoqEbpfTransport {
+    type Socket = Arc<AfXdpSocket>;
+
+    fn attach(&mut self, interface: &str) -> Result<(), String> {
+        self.attach_xdp(interface)
+            .map_err(|error| error.to_string())
     }
-    match ebpf.create_af_xdp_socket(interface, 0) {
-        Ok(s) => {
-            info!("AF_XDP zero-copy socket created for {}:0", interface);
-            Some(Arc::new(s))
-        }
-        Err(e) => {
-            debug!("AF_XDP socket not available (will use standard I/O): {}", e);
-            None
-        }
+
+    fn create_socket(&mut self, interface: &str) -> Result<Self::Socket, String> {
+        self.create_af_xdp_socket(interface, 0)
+            .map(Arc::new)
+            .map_err(|error| {
+                debug!("AF_XDP unavailable; using standard I/O: {}", error);
+                error.to_string()
+            })
+    }
+
+    fn kernel_backed(socket: &Self::Socket) -> bool {
+        socket.is_kernel_backed()
     }
 }
 

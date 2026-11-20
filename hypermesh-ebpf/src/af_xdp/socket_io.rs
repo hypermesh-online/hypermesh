@@ -38,11 +38,8 @@ impl AfXdpSocket {
     /// descriptor to the TX ring, and kicks the kernel via sendto(). When
     /// in fallback mode, returns an error indicating the caller should use
     /// standard socket I/O.
-    pub async fn send(&self, data: &[u8]) -> Result<()> {
+    pub async fn send(&self, _data: &[u8]) -> Result<()> {
         if !self.kernel_backed {
-            let mut stats = self.stats.write();
-            stats.packets_sent += 1;
-            stats.bytes_sent += data.len() as u64;
             return Err(anyhow!(
                 "AF_XDP not kernel-backed on {}:{}: use standard I/O",
                 self.interface,
@@ -52,7 +49,7 @@ impl AfXdpSocket {
 
         #[cfg(feature = "kernel-attach")]
         {
-            self.send_kernel(data)?;
+            self.send_kernel(_data)?;
             return Ok(());
         }
 
@@ -374,5 +371,31 @@ impl Clone for AfXdpSocket {
             #[cfg(feature = "kernel-attach")]
             kernel_state: self.kernel_state.clone(),
         }
+    }
+}
+
+#[cfg(test)]
+mod rejected_send_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn rejected_non_kernel_send_preserves_transmitted_counters() {
+        let socket = AfXdpSocket {
+            interface: "no-kernel-unit-fixture".to_string(),
+            queue_id: 0,
+            stats: Arc::new(parking_lot::RwLock::new(AfXdpStats {
+                packets_sent: 7,
+                bytes_sent: 11,
+                ..AfXdpStats::default()
+            })),
+            kernel_backed: false,
+            #[cfg(feature = "kernel-attach")]
+            kernel_state: None,
+        };
+        assert!(socket.send(b"not transmitted").await.is_err());
+        let stats = socket.get_stats();
+        assert_eq!(stats.packets_sent, 7);
+        assert_eq!(stats.bytes_sent, 11);
     }
 }

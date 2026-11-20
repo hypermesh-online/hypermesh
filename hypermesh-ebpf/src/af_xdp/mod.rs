@@ -172,17 +172,25 @@ mod tests {
         assert_eq!(manager.socket_count(), 0);
     }
 
+    fn fallback_socket() -> AfXdpSocket {
+        AfXdpSocket {
+            interface: "no-kernel-fallback-unit".into(),
+            queue_id: 0,
+            stats: std::sync::Arc::new(parking_lot::RwLock::new(AfXdpStats::default())),
+            kernel_backed: false,
+            #[cfg(feature = "kernel-attach")]
+            kernel_state: None,
+        }
+    }
+
     #[tokio::test]
     async fn test_af_xdp_send_fallback_error() {
-        let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager
-            .create_socket("eth0", 0)
-            .expect("test: create socket");
+        let socket = fallback_socket();
         let result = socket.send(&[1, 2, 3, 4]).await;
         assert!(result.is_err());
         let stats = socket.get_stats();
-        assert_eq!(stats.packets_sent, 1);
-        assert_eq!(stats.bytes_sent, 4);
+        assert_eq!(stats.packets_sent, 0);
+        assert_eq!(stats.bytes_sent, 0);
     }
 
     #[tokio::test]
@@ -199,16 +207,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_af_xdp_send_batch_fallback_error() {
-        let mut manager = AfXdpManager::new().expect("test: create manager");
-        let socket = manager
-            .create_socket("eth0", 0)
-            .expect("test: create socket");
+        let socket = fallback_socket();
         let packets: Vec<&[u8]> = vec![&[1, 2], &[3, 4, 5]];
         let result = socket.send_batch(&packets).await;
         assert!(result.is_err());
         let stats = socket.get_stats();
-        assert_eq!(stats.packets_sent, 2);
-        assert_eq!(stats.bytes_sent, 5);
+        assert_eq!(stats.packets_sent, 0);
+        assert_eq!(stats.bytes_sent, 0);
     }
 
     #[tokio::test]
