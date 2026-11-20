@@ -7,6 +7,26 @@ This index replaces a link to a local-only historical report. Private raw report
 are not published here; source and commands are entrypoints, not proof that a
 new clone has reproduced a result or that the product is accepted.
 
+## User-demonstrable quality gate
+
+Follow the [current gate and trial order](../PLAN.md#current-user-demonstrable-gate-and-trial-order):
+independent prerequisite trials → genuine scoped asset/proof/replay/mirror-loss
+and byte-identity interaction across installations → separately qualified public
+alpha artifact, health and rollback. Seven isolated software STOQ cases, 36,000
+locally reconstructed bytes, 33 NGauge tests/strict Clippy and guest XDP
+9292-versus-9293/detach evidence are **not one combined path**. Caesar's
+financial transmission-only token and SDK completion remain gates. Private
+validation does not require publishing private data or proofs.
+
+The paired [guest README](../tools/demo_gate/guest_xdp/README.md) and
+`tools/demo_gate/guest_xdp/run.sh` provide the command and permissions described
+in PLAN. Its independent no-NIC KVM trial passed at 00:39:47Z (2026-11-20 UTC):
+target-port count 1, off-port count 0 and detach 0. Do not mistake
+that ordinary guest UDP/kernel diagnostic for production STOQ, PQ/admission or
+a two-node asset transfer. Independent reproduction is required for each
+proposed release, and the real production gate remains outstanding. DNS alone or SSH/HTTP3 timeouts establish neither running alpha
+health nor service failure; no deployment or readiness is claimed here.
+
 | Scope | Stable source / check | Conditions and historical limitations |
 |---|---|---|
 | Offline installer | [Source](../scripts/install/hypermesh-install.sh), [recipe](guides/INSTALL.md#private-offline-install); `sh tests/integration/installer_private_offline.sh` ([fixture](../tests/integration/installer_private_offline.sh)) | 68 hermetic mock-artifact cases are packaging checks, not genuine-node evidence. Separately, real Linux x86_64 GNU local no-start installation and relocated help/version were independently reproduced. No start, join, vendor provenance or other-host support established. |

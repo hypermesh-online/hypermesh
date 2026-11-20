@@ -2,6 +2,55 @@
 
 **Status: planning baseline plus bounded execution; only Richard signs off.** This document is not a blanket implementation lease. Current native records supersede dated availability/execution assertions below; dated ledgers remain historical evidence, not current instructions.
 
+## Current user-demonstrable gate and trial order
+
+The evidence below is **separate bounded paths**, not one working end-to-end
+system: seven isolated software STOQ cases; 36,000 locally reconstructed bytes;
+33 NGauge tests plus strict Clippy; and an independent guest XDP diagnostic with
+port 9292 counted, off-target 9293 absent, and attachment confirmed removed.
+These do not establish production STOQ-to-kernel wiring, authentic four-proof
+admission, a two-install transfer or alpha/beta readiness.
+
+1. **Reproduce prerequisites independently:** start with the [local no-start
+   installation recipe](docs/guides/INSTALL.md#private-offline-install). Repeat
+   the bounded software checks, then the guest-only kernel prerequisite below;
+   retain exact source/artifact identity and failures, not just exit summaries.
+2. **Pass the user-visible asset gate:** independent installations must exercise
+   real scoped asset/action and binary four-proof validation, authenticated
+   session binding, wrong-scope/invalid-proof/replay rejection, mirror loss and
+   reconstructed-byte identity. On two independently installed IPv6 nodes,
+   resolve one stable asset through the network-scoped Catalog; authorize the
+   operation with real Proof of State and reconstruct identical BlockMatrix bytes
+   over STOQ, attributing the transfer itself to the attached kernel XDP program
+   against a control. Demonstrate the actual interaction path; local
+   reconstruction is not a substitute. No public disclosure of private data or
+   evidence is required. Caesar's financial transmission-only token behavior
+   and final SDK contract remain explicit completion gates, not proven outcomes.
+3. **Qualify the public alpha separately:** the intended public CA/CT/DNS role
+   at `trust.hypermesh.online` requires a proven running signed artifact, independent health checks, tested
+   rollback and bounded operational evidence before acceptance. DNS observations
+   and SSH/HTTP3 timeouts do not prove remote health or that the service is down.
+   No new deployment is asserted; only Richard signs off.
+
+**Independently tried guest recipe:** see the paired
+[guest README](tools/demo_gate/guest_xdp/README.md). Run
+`./tools/demo_gate/guest_xdp/run.sh` from the checkout. It requires read/write
+access to `/dev/kvm`, a readable packaged kernel, clang's BPF target, GCC,
+libbpf headers/runtime, QEMU, cpio/gzip and GNU utilities, and a caller-owned
+writable SSD output root set through `HYPERMESH_GUEST_OUT_ROOT`;
+`HYPERMESH_GUEST_KERNEL` selects the kernel. No sudo, installation or download
+is performed, and unavailable KVM fails rather than falling back to emulation.
+The runner uses a disposable 512-MiB/one-vCPU guest, no guest NIC/disks/host
+mounts, and a 90-second QEMU timeout. Guest root loads the tracked C object via
+libbpf, attaches generic XDP on guest loopback, sends ordinary IPv6 UDP to 9292
+and 9293, checks the connection map, then requires `post_id=0` after detach.
+It never attaches to the host kernel. This is **not STOQ traffic or the
+production Aya loader**, not transfer-linked counters, authorization or
+asset durability. The independent no-NIC KVM trial passed at 00:39:47Z
+(2026-11-20 UTC): target-port map count 1, off-port count 0 and detach 0.
+Independent reproduction is required for each proposed release; the real
+production interaction gate above remains outstanding.
+
 ## Current execution and next work — observed 2026-11-19; fixture baseline `9f775b3b`
 
 - **Catalog:** Twelve of 15 kind-specific system payload descriptors are committed (`27bd37a4`, `8cdc1633`); the exact four-kind candidate independently passed 33 focused tests and a Catalog library check. See the [Catalog plan](catalog/PLAN.md). Container, Economic and Blockchain definition contracts await owner clarification; application schemas remain separate. Scoped versioned registry, lineage/authority integration and real Proof of State (PoS) remain open.
