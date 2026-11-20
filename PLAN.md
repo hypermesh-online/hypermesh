@@ -2,7 +2,113 @@
 
 **Status: planning baseline plus bounded execution; only Richard signs off.** This document is not a blanket implementation lease. Current native records supersede dated availability/execution assertions below; dated ledgers remain historical evidence, not current instructions.
 
-## Current user-demonstrable gate and trial order
+<a id="current-user-demonstrable-gate-and-trial-order"></a>
+
+## New session — start here (2026-11-20 UTC)
+
+**Resume at the current verified published feature tip, without resetting.**
+`012e30bd` is the demo/CI evidence baseline, not a checkout instruction.
+[PR #6](https://github.com/hypermesh-online/hypermesh/pull/6) is a draft on
+`cluster-dms-vcs`; publication is not a release or owner acceptance. Only Richard
+signs off. Re-read actual HEAD, remote and current checks before work; this note
+claims no CI result for its own prospective documentation commit.
+
+### Find the work, then take one bounded assignment
+
+On the existing operator host, the checkout is `~/hypermesh/core`.
+Read `~/AGENTS.md` and the applicable role/project instructions first. Native
+PDL is locally bound; if explicit selection is needed, use the real core project:
+
+```sh
+cd ~/hypermesh/core
+export PDL_PROJECT=a48e58b0-92d4-4c52-8766-2255e7ad1e86
+pdl status
+pdl find 'four coordinator'
+pdl get 6458dbd05472b3e9a9ce5c2d81022f6b061644b982d37111b4b8496c6e8012d9
+```
+
+That governor handoff links the core roadmap
+`591ad60f82abd853251c6e59d1238cee1ae693d0bd89afc7a5a174bdbbae3452` and
+current native work. Read its latest revision, then find/get the actual task;
+a dated task state is not an implementation lease. Four coordinator lanes are
+[Catalog](catalog/PLAN.md), [NGauge/STOQ](ngauge/PLAN.md),
+[BlockMatrix](blockmatrix/README.md), and [installation/docs](docs/guides/INSTALL.md).
+Operators report through their coordinator to the governor; independent trial
+and exact-image review precede integration/publication. No implementation is
+claimed to be running by this handoff.
+
+### What someone can actually see
+
+The public [45-second video and accessible transcript](docs/demos/stoq-xdp/README.md)
+are a labeled replay of independently captured output, not a live public service.
+The [reproducible guest fixture](tools/demo_gate/stoq_guest/README.md) exchanged a
+fresh, identical 41-byte message using real STOQ/QUIC over IPv6 loopback in one
+isolated Linux guest. Direct-libbpf XDP target counters advanced after handshake
+21→23; the other-port control left them 25→25; detach returned ID 0. These are
+packet counters, not payload-byte accounting or delegated STOQ/AF_XDP proof.
+Separately, BlockMatrix locally reconstructed 36,000 identical bytes with four
+data/two parity shards. Neither result is distributed asset retrieval, real PoS
+authorization, two installations, public alpha or beta. Sources and reproduction
+limits are in the [evidence index](docs/REMEDIATION_EVIDENCE_INDEX.md) and
+[no-start local installation guide](docs/guides/INSTALL.md#private-offline-install).
+
+### Current CI is red, not the predecessor diagnosis
+
+At `012e30bd`, [CI Pipeline](https://github.com/hypermesh-online/hypermesh/actions/runs/44654638697)
+failed on three `stoq/tests/ebpf_integration.rs` cases (`EADDRINUSE`) and 23
+`hypermesh-ebpf` Clippy errors. The adaptive suite passed 7/7; the old NGauge lint
+and pipeline-example diagnoses are not these failures.
+[Quality Gates](https://github.com/hypermesh-online/hypermesh/actions/runs/44654638656)
+failed compilation on stale `blockmatrix/tests/extension_loading_test.rs` APIs
+(22 errors); its separate PR-comment HTTP 403 is a workflow permission failure,
+not a code diagnosis. Historical missing BPF objects and compiler SIGILL remain
+separate observations, not established causes of these current failures.
+
+### Next gates — not optional shortcuts
+
+- **First assignment — authenticated producer:** get native task
+  `f245edfe64fd9ad0818a604e73569e8936e3de7d554b33084fc6cd5ceae851a1`
+  for the legitimate authority producer from Catalog creator/delegation binding.
+  This precedes the downstream asset/network/action enforcement in actual shard
+  seed and fetch paths. Joined-network membership, a known hash, a signature envelope
+  or an unbound grant is not authorization. Preserve meaningful affirmative
+  behavior and deny wrong scope/authority, revoked grants and replay before
+  announcements or bytes; test missing-policy recovery and mirror loss without
+  fabricated demand or premature completion. The attempted handoff retry patch
+  is withdrawn/held after independent failures: do not resurrect or merge it.
+  Find the native task with `pdl find 'authoritative asset scope'`.
+- **Real demonstration:** on two independently installed IPv6 nodes, resolve
+  one stable asset through network-scoped Catalog, authorize the operation with
+  authentic contextual four-proof PoS, reconstruct identical BlockMatrix bytes
+  over STOQ, and attribute that transfer to attached kernel XDP against a control.
+  Include wrong/revoked/replayed authorization and mirror-loss cases. Local and
+  guest prerequisites do not satisfy this gate; private proof need not be public.
+- **Public alpha:** project/instance binding and deployed artifact health for
+  `trust.hypermesh.online` remain blocked. Resume with read-only discovery under
+  the native deployment gate; do not provision, enable APIs, change IAM or deploy
+  on inferred project identity. DNS, authentication and timed-out probes alone
+  prove neither a running service nor an outage. Require signed artifact identity,
+  independent health and rollback evidence before acceptance.
+- **Final product contract:** complete Caesar's financial transmission-only
+  bridge and the paired SDK last; no persistent circulating coin is authorized.
+  Catalog's remaining kind contracts, genuine proof sources, missing BPF/backend
+  contracts and clean-clone lock/toolchain reproducibility also remain open.
+
+### Preserve the checkout and resume safely
+
+Keep existing dirty/untracked work, including the nineteen historical formatting
+overlays; do not wipe, stash/reset, mass-format or blindly merge retained branches.
+Use reviewed immutable SSD candidates under `/usr/lib/hypermesh`, never `/tmp`,
+and pin/review cache, lock and toolchain inputs; a clean clone lacks the ignored
+root lock. Follow the linked guides, use bounded resource/containment gates and
+coordinate the shared Cargo lease. Resume by reporting the actual native task,
+preimages, intended check and coordinator ownership—not by rerunning a stale
+ledger command or treating an old PASS as current. No main merge or release is
+implied.
+
+Handoff signature: OpenAI model/effort unreported — 01a1f16b-5a78-72a1-a2ad-4948857cebf9.
+
+## Historical prerequisite gate — superseded by the start-here status
 
 The evidence below is **separate bounded paths**, not one working end-to-end
 system: seven isolated software STOQ cases; 36,000 locally reconstructed bytes;
@@ -51,7 +157,7 @@ asset durability. The independent no-NIC KVM trial passed at 00:39:47Z
 Independent reproduction is required for each proposed release; the real
 production interaction gate above remains outstanding.
 
-## Current execution and next work — observed 2026-11-19; fixture baseline `9f775b3b`
+## Historical execution and next work — observed 2026-11-19; fixture baseline `9f775b3b`
 
 - **Catalog:** Twelve of 15 kind-specific system payload descriptors are committed (`27bd37a4`, `8cdc1633`); the exact four-kind candidate independently passed 33 focused tests and a Catalog library check. See the [Catalog plan](catalog/PLAN.md). Container, Economic and Blockchain definition contracts await owner clarification; application schemas remain separate. Scoped versioned registry, lineage/authority integration and real Proof of State (PoS) remain open.
 - **NGauge / STOQ:** Canonical indexed provider IDs (`b04b391e`) and network-scoped DNS (`52d037f3`) are committed and have independent bounded tests. NGauge server-feature macro imports (`df53b039`) passed independent NGauge-package all-features/all-targets compilation, not a workspace-wide check. Remaining work: active serving and authenticated session/channel, scoped authority and IPv6 operation. Protocol scopes assets; participation does not transfer ownership.
@@ -59,7 +165,7 @@ production interaction gate above remains outstanding.
 - **Build and tests:** Historical clean snapshot `46eebc2f` passed default-feature workspace all-target compilation and 93 focused tests. At the newer baseline, the two feature-gated fixture repairs in `4913bb92` passed their focused checks: BlockMatrix Gate 3 proxy 7/7 (one print-only summary), its privacy unit 1/1 (nine pair assertions), and root integration target 21/21 (four print-only placeholders). These are not end-to-end validation. The earlier all-features workspace snapshot failed on two QUIC examples and three missing BPF test objects; signed `9f775b3b` fixed the performance-fixture fields and passed its focused target check, not a QUIC, BPF or workspace clearance. Canonical open/scheduler programs for those objects are absent and the Linux BPF backend is explicitly simulation-only; compilation would not prove real kernel behavior. The formatting candidate’s initial compile check failed when cbindgen tried to rewrite its generated header on read-only source. The independently reviewed successor added that exact header to the 497 formatted Rust files: only the order of five prototypes changed, not their declarations. With all source mounted read-only, that candidate passed the default-feature workspace all-targets check (exit 0, 163.623 s) using pinned Rust 1.98.1 and the declared ignored lockfile. This is not an all-features or CI pass; integration and publication are tracked via PR #6. CI uses a moving stable Rust toolchain, and the repository does not track Cargo.lock; the reproducibility policy is awaiting owner clarification.
 - **Delivery limits:** BlockMatrix asset-specific IPv6 locator/authority work remains design only. The next gates are owner/network/action binding, independent four-proof evidence, replay denial and real-network durability. The 17-project programme and 2,551 line-item backlog are unfinished; the bounded checks do not authorize main merge, release or owner acceptance. Preserve unrelated user work. The historical focused/default-workspace evidence above retains its stated snapshots; the current fixture compatibility bound is signed `9f775b3b` (2026-11-19), while the real local no-start installation was independently reproduced that day from the earlier source-bound development build. Neither establishes a newer whole-workspace pass. PR #6 tracks publication and integration. Feature → PR → main is the owner exception; only Richard signs off.
 
-**Superseding current observations — 2026-11-19:** Independent isolated plain-QUIC `::1` trials succeeded for both the basic split and working examples; wrong certificates were rejected, and no-clobber/invalid-input cases failed closed. These are plain QUIC, not STOQ, post-quantum exchange or application admission. `88dd3454` makes the repository’s GNU default CPU configuration portable; the small fixture A/B check is not all-platform validation. At `9f775b3b`, actual GitHub formatting passed, while Clippy failed first on the filter warning; missing BPF objects and a `serde_derive` SIGILL also failed CI. The latest filter source check is not a full CI pass or a real BPF-backend result. A production private single-node start was **not attempted**: mandatory hardware collection and synthetic fallback violated the no-fabricated-proofs boundary. These dated outcomes supersede the QUIC-example status above, not the remaining security, BPF or workspace gates.
+**Historical successor observations — 2026-11-19 (not current HEAD):** Independent isolated plain-QUIC `::1` trials succeeded for both the basic split and working examples; wrong certificates were rejected, and no-clobber/invalid-input cases failed closed. These are plain QUIC, not STOQ, post-quantum exchange or application admission. `88dd3454` makes the repository’s GNU default CPU configuration portable; the small fixture A/B check is not all-platform validation. At `9f775b3b`, actual GitHub formatting passed, while Clippy failed first on the filter warning; missing BPF objects and a `serde_derive` SIGILL also failed CI. The latest filter source check is not a full CI pass or a real BPF-backend result. A production private single-node start was **not attempted**: mandatory hardware collection and synthetic fallback violated the no-fabricated-proofs boundary. These dated outcomes supersede the QUIC-example status above, not the remaining security, BPF or workspace gates.
 
 ### Historical baseline and ledgers
 
