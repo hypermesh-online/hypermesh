@@ -145,7 +145,8 @@ impl DmsDriver {
             .iter()
             .filter_map(|bundle| {
                 let urgency = *urgency_by_shard.get(&bundle.shard_id)?;
-                if !(urgency > urgency_floor as f64) {
+                if urgency.partial_cmp(&(urgency_floor as f64)) != Some(std::cmp::Ordering::Greater)
+                {
                     return None;
                 }
                 plan_mirror(analytics, network, bundle, urgency)

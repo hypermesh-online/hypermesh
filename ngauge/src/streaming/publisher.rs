@@ -141,7 +141,7 @@ impl MetricsPublisher {
     fn build_frame(&mut self, payload: MetricsPayload) -> MetricsFrame {
         let seq = self.next_sequence();
         MetricsFrame {
-            source_node: self.node_id.clone(),
+            source_node: self.node_id,
             timestamp_us: Utc::now().timestamp_micros() as u64,
             privacy_mode: self.privacy_mode,
             payload,

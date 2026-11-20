@@ -682,7 +682,7 @@ impl NGaugeStoqApi {
         // Generate self-signed cert for QUIC
         let cert = rcgen::generate_simple_self_signed(vec!["ngauge".to_string()])
             .map_err(|e| anyhow!("Failed to generate self-signed cert: {e}"))?;
-        let cert_der = rustls::pki_types::CertificateDer::from(cert.cert.der().clone());
+        let cert_der = cert.cert.der().clone();
         let key_der = rustls::pki_types::PrivateKeyDer::try_from(cert.key_pair.serialize_der())
             .map_err(|e| anyhow!("Failed to serialize private key: {e}"))?;
 

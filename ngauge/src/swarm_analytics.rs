@@ -195,7 +195,7 @@ impl SwarmAnalytics {
             .filter(|(_, pop)| pop.request_count >= min_request_count)
             .map(|((_network, hash), pop)| (*hash, pop))
             .collect();
-        popular.sort_by(|a, b| b.1.request_count.cmp(&a.1.request_count));
+        popular.sort_by_key(|item| std::cmp::Reverse(item.1.request_count));
         popular
     }
 
