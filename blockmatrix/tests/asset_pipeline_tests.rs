@@ -8,8 +8,8 @@
 //! Reed-Solomon sharding, and matrix-aware distribution.
 
 use blockmatrix::assets::pipeline::{
-    orchestrator::AssetPipeline, Asset, PipelineInputMetadata, CompressionAlgorithm, CompressionConfig,
-    EncryptionConfig, Encryptor, PipelineConfig, ShardingConfig,
+    orchestrator::AssetPipeline, Asset, CompressionAlgorithm, CompressionConfig, EncryptionConfig,
+    Encryptor, PipelineConfig, PipelineInputMetadata, ShardingConfig,
 };
 use blockmatrix::distribution::{distribute_across_octants, NodeInfo};
 use blockmatrix::matrix::MatrixCoordinate;
@@ -244,12 +244,18 @@ fn test_matrix_aware_distribution() {
 
     // Every placement must land on a REAL node from the pool — never a
     // fabricated coordinate.
-    let real: std::collections::HashSet<(i64, i64, i64)> =
-        nodes.iter().map(|n| (n.position.x, n.position.y, n.position.z)).collect();
+    let real: std::collections::HashSet<(i64, i64, i64)> = nodes
+        .iter()
+        .map(|n| (n.position.x, n.position.y, n.position.z))
+        .collect();
     for placement in &result.placements {
         assert!(placement.distance_from_origin >= 0.0);
         assert!(
-            real.contains(&(placement.position.x, placement.position.y, placement.position.z)),
+            real.contains(&(
+                placement.position.x,
+                placement.position.y,
+                placement.position.z
+            )),
             "placement must sit on a real pool node, not synthetic geometry",
         );
     }

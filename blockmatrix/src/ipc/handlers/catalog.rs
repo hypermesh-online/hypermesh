@@ -14,9 +14,7 @@
 
 use std::sync::Arc;
 
-use crate::catalog::{
-    CatalogDependencyNode, CatalogPeerClient, CatalogProvider, CatalogTypeInfo,
-};
+use crate::catalog::{CatalogDependencyNode, CatalogPeerClient, CatalogProvider, CatalogTypeInfo};
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
@@ -137,8 +135,7 @@ async fn handle_dependencies(
         .map_err(|e| internal_error(format!("resolve failed: {e}")))?;
 
     let direct: Vec<serde_json::Value> = graph.direct.iter().map(node_to_json).collect();
-    let transitive: Vec<serde_json::Value> =
-        graph.transitive.iter().map(node_to_json).collect();
+    let transitive: Vec<serde_json::Value> = graph.transitive.iter().map(node_to_json).collect();
     let missing: Vec<String> = graph
         .missing
         .iter()
@@ -280,10 +277,7 @@ async fn handle_search(
         .get("timeout_ms")
         .and_then(|v| v.as_u64())
         .unwrap_or(2000);
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(50) as usize;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
     // --- Branch 1: registry not wired -> alpha-honest empty response.
     let registry = match state.catalog_registry.as_ref() {
@@ -411,9 +405,7 @@ mod tests {
     /// wired in. We mutate the `catalog_registry` field after building
     /// via the shared `tests::test_state()` helper so we exercise the
     /// real "Some(provider)" branch.
-    async fn state_with_provider(
-        provider: Arc<dyn CatalogProvider>,
-    ) -> Arc<DaemonState> {
+    async fn state_with_provider(provider: Arc<dyn CatalogProvider>) -> Arc<DaemonState> {
         let base = super::super::tests::test_state().await;
         // Re-build with the provider field populated. We cannot mutate
         // through `Arc<DaemonState>`, so reconstruct.
@@ -429,12 +421,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: base.node_id.clone(),
+            network_id: base.network_id.clone(),
             data_dir: base.data_dir.clone(),
             privacy_mode: base.privacy_mode.clone(),
             started_at: base.started_at,
             shutdown_tx,
             dns_resolver: base.dns_resolver.clone(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -485,9 +477,10 @@ mod tests {
         );
         assert_eq!(result["total"], 0);
         assert!(result["direct_deps"].as_array().expect("array").is_empty());
-        assert!(
-            result["transitive_deps"].as_array().expect("array").is_empty()
-        );
+        assert!(result["transitive_deps"]
+            .as_array()
+            .expect("array")
+            .is_empty());
         assert!(result["missing"].as_array().expect("array").is_empty());
     }
 
@@ -693,10 +686,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "catalog.search",
-            serde_json::json!({"query": "Message"}),
-        );
+        let req = RpcRequest::new("catalog.search", serde_json::json!({"query": "Message"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result");
@@ -763,10 +753,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "catalog.search",
-            serde_json::json!({"query": ""}),
-        );
+        let req = RpcRequest::new("catalog.search", serde_json::json!({"query": ""}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result");

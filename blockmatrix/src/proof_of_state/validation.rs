@@ -12,8 +12,8 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
-use trustchain::proof_of_state::{StateProof, StateRequirements};
 use trustchain::proof_of_state::StateProofOps;
+use trustchain::proof_of_state::{StateProof, StateRequirements};
 
 /// State proof validator trait (binary pass/fail)
 #[async_trait]
@@ -146,8 +146,7 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                     // magnitude — the failure is "no bound identity", not "too
                     // little stake".
                     if state_proof.stake_proof.stake_holder_id.is_empty() {
-                        failed_requirements
-                            .push("PoStake carries no bound identity".to_string());
+                        failed_requirements.push("PoStake carries no bound identity".to_string());
                     }
 
                     if state_proof.time_proof.network_time_offset
@@ -166,16 +165,14 @@ impl StateAuthenticator for DefaultStateAuthenticator {
                     if state_proof.space_proof.file_hash.is_empty()
                         && state_proof.space_proof.storage_path.is_empty()
                     {
-                        failed_requirements
-                            .push("PoSpace carries no bound location".to_string());
+                        failed_requirements.push("PoSpace carries no bound location".to_string());
                     }
 
                     // CANONICAL MODEL: PoWork is the HASH of work done (WHAT),
                     // never a capacity magnitude — the failure is "no work
                     // hash", not "too little compute".
                     if state_proof.work_proof.work_hash == [0u8; 32] {
-                        failed_requirements
-                            .push("PoWork carries no work hash".to_string());
+                        failed_requirements.push("PoWork carries no work hash".to_string());
                     }
 
                     warn!(

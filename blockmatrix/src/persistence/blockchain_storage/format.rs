@@ -63,8 +63,8 @@ pub(super) fn canonical_hash_bytes(block: &Block) -> [u8; 32] {
 ///
 /// Returns the full byte sequence: magic + payload_size + canonical_hash + payload.
 pub(super) fn serialize_block_v1(block: &Block) -> PersistenceResult<Vec<u8>> {
-    let payload = bincode::serialize(block)
-        .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
+    let payload =
+        bincode::serialize(block).map_err(|e| PersistenceError::Serialization(e.to_string()))?;
     let payload_size = payload.len() as u32;
     let hash_bytes = canonical_hash_bytes(block);
 
@@ -83,8 +83,8 @@ pub(super) fn serialize_block_v1(block: &Block) -> PersistenceResult<Vec<u8>> {
 /// tests can produce V2-prefixed bytes that `deserialize_block_verified`
 /// will recognise. **V2 schema is currently identical to V1.**
 pub(super) fn serialize_block_v2(block: &Block) -> PersistenceResult<Vec<u8>> {
-    let payload = bincode::serialize(block)
-        .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
+    let payload =
+        bincode::serialize(block).map_err(|e| PersistenceError::Serialization(e.to_string()))?;
     let payload_size = payload.len() as u32;
     let hash_bytes = canonical_hash_bytes(block);
 
@@ -115,11 +115,9 @@ pub(super) fn deserialize_block_verified(buffer: &[u8]) -> PersistenceResult<Blo
         let is_v2 = buffer[..4] == BLOCK_MAGIC_V2;
         let payload_size =
             u32::from_le_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]) as usize;
-        let stored_hash_bytes: [u8; 32] = buffer[8..40]
-            .try_into()
-            .map_err(|_| PersistenceError::Deserialization(
-                "invalid canonical hash in header".to_string(),
-            ))?;
+        let stored_hash_bytes: [u8; 32] = buffer[8..40].try_into().map_err(|_| {
+            PersistenceError::Deserialization("invalid canonical hash in header".to_string())
+        })?;
 
         let payload_end = BLOCK_HEADER_SIZE + payload_size;
         if buffer.len() < payload_end {
@@ -130,9 +128,8 @@ pub(super) fn deserialize_block_verified(buffer: &[u8]) -> PersistenceResult<Blo
             )));
         }
 
-        let block: Block =
-            bincode::deserialize(&buffer[BLOCK_HEADER_SIZE..payload_end])
-                .map_err(|e| PersistenceError::Deserialization(e.to_string()))?;
+        let block: Block = bincode::deserialize(&buffer[BLOCK_HEADER_SIZE..payload_end])
+            .map_err(|e| PersistenceError::Deserialization(e.to_string()))?;
 
         // V2 reservation: future schema changes go here. For now V2
         // is byte-identical to V1, so the migration pass is a no-op

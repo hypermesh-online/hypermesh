@@ -497,7 +497,11 @@ mod tests {
     async fn test_hybrid_encryption_decryption() {
         let hybrid = HybridCrypto::new().expect("test: creation");
 
-        let kyber_keypair = hybrid.kyber.generate_keypair().await.expect("test: async operation");
+        let kyber_keypair = hybrid
+            .kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
         let test_data = b"Secret hybrid encryption test data";
 
         // Create hybrid encryption

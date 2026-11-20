@@ -648,7 +648,11 @@ mod tests {
 
     #[test]
     fn all_pages_use_dark_theme() {
-        for html in [GATEWAY_PUBLIC_HTML, GATEWAY_PRIVATE_HTML, GATEWAY_ADMIN_HTML] {
+        for html in [
+            GATEWAY_PUBLIC_HTML,
+            GATEWAY_PRIVATE_HTML,
+            GATEWAY_ADMIN_HTML,
+        ] {
             assert!(html.contains("#0a0a0a"), "background color missing");
             assert!(html.contains("#00ff88"), "accent color missing");
             assert!(html.contains("monospace"), "monospace font missing");
@@ -657,10 +661,17 @@ mod tests {
 
     #[test]
     fn no_external_dependencies() {
-        for html in [GATEWAY_PUBLIC_HTML, GATEWAY_PRIVATE_HTML, GATEWAY_ADMIN_HTML] {
+        for html in [
+            GATEWAY_PUBLIC_HTML,
+            GATEWAY_PRIVATE_HTML,
+            GATEWAY_ADMIN_HTML,
+        ] {
             // No CDN links, no external scripts/stylesheets
             assert!(!html.contains("cdn."), "must not reference CDN");
-            assert!(!html.contains("googleapis.com"), "must not reference external APIs");
+            assert!(
+                !html.contains("googleapis.com"),
+                "must not reference external APIs"
+            );
             assert!(!html.contains("<link rel=\"stylesheet\" href=\"http"));
             assert!(!html.contains("<script src=\"http"));
         }

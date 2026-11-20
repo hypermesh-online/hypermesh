@@ -62,16 +62,16 @@ impl<T: ShardTransport> ContributionDistributionBridge<T> {
         for shard_id in shard_ids {
             self.announce_shard(*shard_id).await;
         }
-        info!(count = shard_ids.len(), "Contributor announced batch of shards");
+        info!(
+            count = shard_ids.len(),
+            "Contributor announced batch of shards"
+        );
     }
 
     /// Serve a shard request through the swarm (auto-cascade).
     ///
     /// The local node becomes a provider after successful fetch.
-    pub async fn serve_shard(
-        &self,
-        shard_id: &ContentHash,
-    ) -> Result<Vec<u8>, TransportError> {
+    pub async fn serve_shard(&self, shard_id: &ContentHash) -> Result<Vec<u8>, TransportError> {
         self.swarm
             .serve_shard(shard_id, self.local_node_id)
             .await
@@ -144,7 +144,10 @@ mod tests {
         let bridge = ContributionDistributionBridge::new(swarm.clone(), n2);
         bridge.register_contributor().await;
 
-        let fetched = bridge.serve_shard(&s1).await.expect("test: serve should succeed");
+        let fetched = bridge
+            .serve_shard(&s1)
+            .await
+            .expect("test: serve should succeed");
         assert_eq!(fetched, data);
 
         // n2 should now be a provider via cascade.

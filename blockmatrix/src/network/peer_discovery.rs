@@ -13,8 +13,8 @@ use tracing::{debug, error, info, warn};
 use crate::bootstrap::PrivacyMode;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::matrix::neighbors::{find_k_nearest, find_neighbors};
-use crate::network::gossip;
 use crate::network::discovery;
+use crate::network::gossip;
 
 use super::message_handlers::TAG_GOSSIP;
 use super::{NetworkManager, NetworkNode};
@@ -50,7 +50,10 @@ impl NetworkManager {
             );
             for bootstrap_addr in &self.bootstrap_nodes {
                 if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
-                    warn!("Failed to connect to private peer {}: {}", bootstrap_addr, e);
+                    warn!(
+                        "Failed to connect to private peer {}: {}",
+                        bootstrap_addr, e
+                    );
                 }
             }
         }
@@ -69,7 +72,10 @@ impl NetworkManager {
 
         for bootstrap_addr in &self.bootstrap_nodes {
             if let Err(e) = self.connect_to_peer(*bootstrap_addr, None).await {
-                warn!("Failed to connect to bootstrap node {}: {}", bootstrap_addr, e);
+                warn!(
+                    "Failed to connect to bootstrap node {}: {}",
+                    bootstrap_addr, e
+                );
             }
         }
 
@@ -84,7 +90,10 @@ impl NetworkManager {
         for bootstrap_addr in &self.bootstrap_nodes {
             match self.connect_to_peer(*bootstrap_addr, None).await {
                 Ok(node_id) => {
-                    info!("Connected to bootstrap node {} ({})", bootstrap_addr, node_id);
+                    info!(
+                        "Connected to bootstrap node {} ({})",
+                        bootstrap_addr, node_id
+                    );
                 }
                 Err(e) => {
                     error!("Failed to connect to bootstrap {}: {}", bootstrap_addr, e);
@@ -130,7 +139,12 @@ impl NetworkManager {
     /// Start mDNS discovery for local network.
     pub(super) async fn start_mdns_discovery(&self) -> Result<()> {
         let node_id = self.get_node_id();
-        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
+        let stoq_port = self
+            .transport
+            .local_addr()
+            .ok()
+            .map(|a| a.port())
+            .unwrap_or(9292);
 
         let mdns = discovery::MdnsDiscovery::new(node_id, self.local_coordinate, stoq_port);
         match mdns.start().await {
@@ -149,14 +163,15 @@ impl NetworkManager {
         let node_id = self.get_node_id();
         let mode = *self.privacy_mode.read().await;
         let privacy_str = format!("{mode:?}");
-        let stoq_port = self.transport.local_addr().ok().map(|a| a.port()).unwrap_or(9292);
+        let stoq_port = self
+            .transport
+            .local_addr()
+            .ok()
+            .map(|a| a.port())
+            .unwrap_or(9292);
 
-        let gossip_proto = gossip::GossipProtocol::new(
-            node_id,
-            self.local_coordinate,
-            stoq_port,
-            privacy_str,
-        );
+        let gossip_proto =
+            gossip::GossipProtocol::new(node_id, self.local_coordinate, stoq_port, privacy_str);
         gossip_proto.start().await;
 
         let nodes = self.nodes.clone();
@@ -167,14 +182,19 @@ impl NetworkManager {
             gossip_broadcast_loop(nodes, gossip_state, interval).await;
         });
 
-        info!("Gossip protocol started with {} second interval", interval.as_secs());
+        info!(
+            "Gossip protocol started with {} second interval",
+            interval.as_secs()
+        );
         Ok(())
     }
 }
 
 /// Background loop that periodically sends gossip to connected peers.
 async fn gossip_broadcast_loop(
-    nodes: std::sync::Arc<tokio::sync::RwLock<std::collections::HashMap<String, super::NetworkNode>>>,
+    nodes: std::sync::Arc<
+        tokio::sync::RwLock<std::collections::HashMap<String, super::NetworkNode>>,
+    >,
     gossip_state: std::sync::Arc<tokio::sync::RwLock<gossip::GossipState>>,
     interval: std::time::Duration,
 ) {

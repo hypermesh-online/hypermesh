@@ -421,7 +421,10 @@ mod tests {
         );
 
         // Should have default seed records
-        let records = bootstrap.get_all_records().await.expect("test: async operation");
+        let records = bootstrap
+            .get_all_records()
+            .await
+            .expect("test: async operation");
         assert!(!records.is_empty());
     }
 
@@ -454,7 +457,10 @@ mod tests {
             timestamp: 0,
         };
 
-        bootstrap.add_dns_record(record.clone()).await.expect("test: async operation");
+        bootstrap
+            .add_dns_record(record.clone())
+            .await
+            .expect("test: async operation");
 
         // Query the record
         let result = bootstrap
@@ -475,9 +481,18 @@ mod tests {
         assert!(!bootstrap.is_operational().await);
 
         // Mark components as ready
-        bootstrap.mark_ca_ready().await.expect("test: async operation");
-        bootstrap.mark_ct_ready().await.expect("test: async operation");
-        bootstrap.mark_dns_ready().await.expect("test: async operation");
+        bootstrap
+            .mark_ca_ready()
+            .await
+            .expect("test: async operation");
+        bootstrap
+            .mark_ct_ready()
+            .await
+            .expect("test: async operation");
+        bootstrap
+            .mark_dns_ready()
+            .await
+            .expect("test: async operation");
 
         // Now should be operational
         assert!(bootstrap.is_operational().await);

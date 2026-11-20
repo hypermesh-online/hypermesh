@@ -256,8 +256,7 @@ impl AssetLibraryExtension for CatalogExtension {
             if proof.stake_proof.stake_holder_id.is_empty() {
                 self.complete_operation().await;
                 return Err(ExtensionError::RuntimeError {
-                    message: "Publishing requires a bound authorization identity (WHO)"
-                        .to_string(),
+                    message: "Publishing requires a bound authorization identity (WHO)".to_string(),
                 });
             }
 

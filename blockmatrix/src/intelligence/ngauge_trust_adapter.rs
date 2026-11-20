@@ -28,9 +28,7 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use ngauge::{PeerTrustSignals, TrustBand};
-use trustchain::ca::trust_provider::{
-    PeerCertFingerprint, PeerTrustBand, TrustSignalProvider,
-};
+use trustchain::ca::trust_provider::{PeerCertFingerprint, PeerTrustBand, TrustSignalProvider};
 
 /// Adapter exposing ngauge-derived signals as a TrustChain
 /// [`TrustSignalProvider`].

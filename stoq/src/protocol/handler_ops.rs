@@ -266,7 +266,9 @@ mod tests {
                 .as_secs()
                 - 400, // 400 seconds ago (more than 5 minutes)
         };
-        assert!(!handler.validate_token(&expired_token).expect("test: validation"));
+        assert!(!handler
+            .validate_token(&expired_token)
+            .expect("test: validation"));
     }
 
     #[test]
@@ -275,11 +277,15 @@ mod tests {
         let handler = StoqProtocolHandler::new(extensions.clone(), None, 10);
 
         let data = b"test data for sharding and reassembly";
-        let shards = extensions.shard_packet(data, 10).expect("test: shard operation");
+        let shards = extensions
+            .shard_packet(data, 10)
+            .expect("test: shard operation");
 
         // Store all shards for reassembly
         for shard in shards {
-            handler.store_shard_for_reassembly(shard).expect("test: shard operation");
+            handler
+                .store_shard_for_reassembly(shard)
+                .expect("test: shard operation");
         }
 
         // Verify shards were stored and reassembled (check storage is empty)

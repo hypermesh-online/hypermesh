@@ -11,14 +11,14 @@
 //! leases, pricing), metrics stream, and lease creation.
 
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::debug;
 
 use super::stoq_api::{
-    ApiError, ApiHandler, ApiRequest, ApiResponse, CreateLeaseRequest, NGaugeAppState,
-    LeaseContractEntry, MetricsFrameEntry, PricingInfoEntry, ResourcePoolEntry,
+    ApiError, ApiHandler, ApiRequest, ApiResponse, CreateLeaseRequest, LeaseContractEntry,
+    MetricsFrameEntry, NGaugeAppState, PricingInfoEntry, ResourcePoolEntry,
     RoutingAdvisoryResponse, ThrottleStatusResponse, TrendingMetricEntry,
 };
 
@@ -279,12 +279,9 @@ fn now_unix() -> u64 {
         .as_secs()
 }
 
-fn serialize_response<T: Serialize>(
-    request_id: &str,
-    body: &T,
-) -> Result<ApiResponse, ApiError> {
-    let payload = serde_json::to_vec(body)
-        .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+fn serialize_response<T: Serialize>(request_id: &str, body: &T) -> Result<ApiResponse, ApiError> {
+    let payload =
+        serde_json::to_vec(body).map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
     Ok(ApiResponse {
         request_id: request_id.to_string(),
@@ -387,36 +384,54 @@ mod tests {
         let state = Arc::new(NGaugeAppState::new());
 
         assert_eq!(
-            TrendingHandler { state: state.clone() }.path(),
+            TrendingHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/trending"
         );
         assert_eq!(
-            ThrottleHandler { state: state.clone() }.path(),
+            ThrottleHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/throttle"
         );
         assert_eq!(
-            RoutingAdvisoryHandler { state: state.clone() }.path(),
+            RoutingAdvisoryHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/routing_advisory"
         );
         assert_eq!(
-            MarketplacePoolsHandler { state: state.clone() }.path(),
+            MarketplacePoolsHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/marketplace_pools"
         );
         assert_eq!(
-            MarketplaceLeasesHandler { state: state.clone() }.path(),
+            MarketplaceLeasesHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/marketplace_leases"
         );
         assert_eq!(
-            MarketplacePricingHandler { state: state.clone() }.path(),
+            MarketplacePricingHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/marketplace_pricing"
         );
         assert_eq!(
-            MetricsStreamHandler { state: state.clone() }.path(),
+            MetricsStreamHandler {
+                state: state.clone()
+            }
+            .path(),
             "ngauge/metrics_stream"
         );
-        assert_eq!(
-            CreateLeaseHandler { state }.path(),
-            "ngauge/create_lease"
-        );
+        assert_eq!(CreateLeaseHandler { state }.path(), "ngauge/create_lease");
     }
 }

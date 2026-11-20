@@ -65,7 +65,7 @@ fn compile_ebpf_programs() {
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.extension().map_or(true, |e| e != "c") {
+        if path.extension().is_none_or(|e| e != "c") {
             continue;
         }
 

@@ -16,7 +16,7 @@ mod tests {
     use super::*;
     use crate::assets::core::{
         AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
-        StateProof, ContainerRequirements, PortMapping, PrivacyMode, SpaceProof, StakeProof,
+        ContainerRequirements, PortMapping, PrivacyMode, SpaceProof, StakeProof, StateProof,
         TimeProof, VolumeMount, WorkProof,
     };
     use std::collections::HashMap;
@@ -54,7 +54,6 @@ mod tests {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),
                     stake_timestamp: SystemTime::now(),
-
                 },
                 TimeProof {
                     network_time_offset: Duration::from_secs(10),

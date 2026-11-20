@@ -116,7 +116,13 @@ async fn scenario_a_dns_happy_path_grant_attestation_round_trips() {
 
 // ─── Scenario B: Cross-network transfer receipt convergence ─────────────
 
-fn make_receipt(transfer_id: &str, src: &str, src_h: &str, tgt: &str, tgt_h: &str) -> TransferReceipt {
+fn make_receipt(
+    transfer_id: &str,
+    src: &str,
+    src_h: &str,
+    tgt: &str,
+    tgt_h: &str,
+) -> TransferReceipt {
     TransferReceipt {
         transfer_id: transfer_id.to_string(),
         source_chain_id: src.to_string(),
@@ -231,11 +237,7 @@ async fn scenario_c_validator_rebuild_from_blocks_recovers_state() {
         storage_pointer: StoragePointer::Local { path: receipt_json },
         registration: blockmatrix::assets::core::AssetRegistration::genesis(coord),
     };
-    let block_with_receipt = Block::new(
-        1,
-        vec![receipt_entry],
-        genesis.hash.clone(),
-    );
+    let block_with_receipt = Block::new(1, vec![receipt_entry], genesis.hash.clone());
 
     // A "noise" block with a non-receipt entry.
     let noise_entry = BlockAssetEntry {
@@ -248,11 +250,7 @@ async fn scenario_c_validator_rebuild_from_blocks_recovers_state() {
         },
         registration: blockmatrix::assets::core::AssetRegistration::genesis(coord),
     };
-    let noise_block = Block::new(
-        2,
-        vec![noise_entry],
-        block_with_receipt.hash.clone(),
-    );
+    let noise_block = Block::new(2, vec![noise_entry], block_with_receipt.hash.clone());
 
     let blocks = vec![genesis, block_with_receipt, noise_block];
 
@@ -287,9 +285,7 @@ async fn scenario_c_validator_rebuild_from_blocks_recovers_state() {
 #[ignore = "requires release binary; run manually with HM_RUN_SUBPROCESS_HARNESS=1"]
 async fn subprocess_driver_smoke_check() {
     if std::env::var("HM_RUN_SUBPROCESS_HARNESS").ok().as_deref() != Some("1") {
-        eprintln!(
-            "skipping subprocess harness — set HM_RUN_SUBPROCESS_HARNESS=1 to enable"
-        );
+        eprintln!("skipping subprocess harness — set HM_RUN_SUBPROCESS_HARNESS=1 to enable");
         return;
     }
     let bin_path = std::path::Path::new("target/release/hypermesh");

@@ -393,7 +393,9 @@ mod tests {
 
         // Record multiple accesses
         for i in 0..100 {
-            metrics.record_access(&MatrixCoordinate::new(i % 10, i / 10, 0).expect("test: valid coordinate"));
+            metrics.record_access(
+                &MatrixCoordinate::new(i % 10, i / 10, 0).expect("test: valid coordinate"),
+            );
         }
 
         assert_eq!(metrics.access_count, 100);
@@ -447,7 +449,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let metrics = strategy.get_metrics(&content_id).await.expect("test: async operation");
+        let metrics = strategy
+            .get_metrics(&content_id)
+            .await
+            .expect("test: async operation");
         assert_eq!(metrics.access_count, 1);
     }
 

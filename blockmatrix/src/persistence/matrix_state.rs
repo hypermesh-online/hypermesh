@@ -261,12 +261,19 @@ mod tests {
     fn test_bincode_serialization() {
         let coord = MatrixCoordinate::new(5, 10, 15).expect("test: valid coordinate");
         let mut state = MatrixState::new(coord);
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate"));
+        state.add_neighbor(
+            "node1".to_string(),
+            MatrixCoordinate::new(1, 2, 3).expect("test: valid coordinate"),
+        );
         state.cache_distance("a".to_string(), "b".to_string(), 42.0);
 
         let serializer = MatrixStateSerializer::new(SerializationFormat::Bincode, false);
-        let serialized = serializer.serialize(&state).expect("test: expected success");
-        let deserialized = serializer.deserialize(&serialized).expect("test: expected success");
+        let serialized = serializer
+            .serialize(&state)
+            .expect("test: expected success");
+        let deserialized = serializer
+            .deserialize(&serialized)
+            .expect("test: expected success");
 
         assert_eq!(deserialized.coordinate, state.coordinate);
         assert_eq!(deserialized.neighbors.len(), state.neighbors.len());
@@ -282,8 +289,12 @@ mod tests {
         let state = MatrixState::new(coord);
 
         let serializer = MatrixStateSerializer::new(SerializationFormat::Json, false);
-        let serialized = serializer.serialize(&state).expect("test: expected success");
-        let deserialized = serializer.deserialize(&serialized).expect("test: expected success");
+        let serialized = serializer
+            .serialize(&state)
+            .expect("test: expected success");
+        let deserialized = serializer
+            .deserialize(&serialized)
+            .expect("test: expected success");
 
         assert_eq!(deserialized.coordinate, state.coordinate);
         assert_eq!(deserialized.version, state.version);
@@ -295,8 +306,12 @@ mod tests {
         let state = MatrixState::new(coord);
 
         let serializer = MatrixStateSerializer::new(SerializationFormat::MessagePack, false);
-        let serialized = serializer.serialize(&state).expect("test: expected success");
-        let deserialized = serializer.deserialize(&serialized).expect("test: expected success");
+        let serialized = serializer
+            .serialize(&state)
+            .expect("test: expected success");
+        let deserialized = serializer
+            .deserialize(&serialized)
+            .expect("test: expected success");
 
         assert_eq!(deserialized.coordinate, state.coordinate);
     }
@@ -315,14 +330,20 @@ mod tests {
         let uncompressed = MatrixStateSerializer::new(SerializationFormat::Bincode, false);
         let compressed = MatrixStateSerializer::new(SerializationFormat::Bincode, true);
 
-        let uncompressed_data = uncompressed.serialize(&state).expect("test: expected success");
-        let compressed_data = compressed.serialize(&state).expect("test: expected success");
+        let uncompressed_data = uncompressed
+            .serialize(&state)
+            .expect("test: expected success");
+        let compressed_data = compressed
+            .serialize(&state)
+            .expect("test: expected success");
 
         // Compression should reduce size
         assert!(compressed_data.len() < uncompressed_data.len());
 
         // Should still deserialize correctly
-        let deserialized = compressed.deserialize(&compressed_data).expect("test: expected success");
+        let deserialized = compressed
+            .deserialize(&compressed_data)
+            .expect("test: expected success");
         assert_eq!(deserialized.neighbors.len(), 100);
     }
 
@@ -330,10 +351,16 @@ mod tests {
     fn test_incremental_serialization() {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate");
         let mut previous = MatrixState::new(coord);
-        previous.add_neighbor("node1".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
+        previous.add_neighbor(
+            "node1".to_string(),
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+        );
 
         let mut current = previous.clone();
-        current.add_neighbor("node2".to_string(), MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"));
+        current.add_neighbor(
+            "node2".to_string(),
+            MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"),
+        );
         current.cache_distance("a".to_string(), "b".to_string(), 10.0);
 
         let serializer = MatrixStateSerializer::new(SerializationFormat::Bincode, false);
@@ -342,7 +369,9 @@ mod tests {
             .expect("test: expected success");
 
         // Delta should be smaller than full serialization
-        let full = serializer.serialize(&current).expect("test: expected success");
+        let full = serializer
+            .serialize(&current)
+            .expect("test: expected success");
         assert!(delta.len() < full.len());
     }
 
@@ -353,7 +382,10 @@ mod tests {
 
         let initial_size = state.size_estimate();
 
-        state.add_neighbor("node1".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
+        state.add_neighbor(
+            "node1".to_string(),
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+        );
         let after_neighbor = state.size_estimate();
         assert!(after_neighbor > initial_size);
 
@@ -369,7 +401,9 @@ mod tests {
         state.version = CURRENT_VERSION + 1; // Future version
 
         let serializer = MatrixStateSerializer::new(SerializationFormat::Json, false);
-        let serialized = serializer.serialize(&state).expect("test: expected success");
+        let serialized = serializer
+            .serialize(&state)
+            .expect("test: expected success");
 
         let result = serializer.deserialize(&serialized);
         assert!(result.is_err());

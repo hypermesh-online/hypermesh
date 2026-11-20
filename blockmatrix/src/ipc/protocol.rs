@@ -45,8 +45,7 @@ pub fn major_version(version: &str) -> Option<u64> {
 /// True when `client_version` and `daemon_version` share the same
 /// major-version component (or both are unparseable, treated as 0).
 pub fn protocol_versions_compatible(client_version: &str, daemon_version: &str) -> bool {
-    major_version(client_version).unwrap_or(0)
-        == major_version(daemon_version).unwrap_or(0)
+    major_version(client_version).unwrap_or(0) == major_version(daemon_version).unwrap_or(0)
 }
 
 /// Global request ID counter for client-side auto-increment.

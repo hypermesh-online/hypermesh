@@ -269,10 +269,7 @@ fn compute_identity_content_hash(falcon_pubkey: &[u8], kyber_pubkey: &[u8]) -> C
 }
 
 /// Deterministic content hash for a genesis asset.
-fn compute_asset_content_hash(
-    kind: SystemAssetKind,
-    caps: &HardwareCapabilities,
-) -> ContentHash {
+fn compute_asset_content_hash(kind: SystemAssetKind, caps: &HardwareCapabilities) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&[kind.type_id()]);
     hasher.update(&caps.cpu_cores.to_le_bytes());

@@ -13,13 +13,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use blockmatrix::assets::pipeline::compression::CompressionAlgorithm;
 use blockmatrix::assets::pipeline::sharding::Shard;
 use blockmatrix::assets::pipeline::streaming_pipeline::{
     StreamingAssetPipeline, StreamingPipelineConfig,
 };
-use blockmatrix::assets::pipeline::compression::CompressionAlgorithm;
 use blockmatrix::assets::pipeline::PipelineInputMetadata;
-use blockmatrix::gateway::asset_transfer::{AssetTransfer, PosTransferValidator, TransferValidator};
+use blockmatrix::gateway::asset_transfer::{
+    AssetTransfer, PosTransferValidator, TransferValidator,
+};
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::network::consumer_provider::ConsumerProviderManager;
 use blockmatrix::network::shard_dedup::{DedupPolicy, ShardStoreResult};
@@ -31,7 +33,7 @@ use ngauge::swarm_analytics::{
     ReplicationConfig, ReplicationRecommendation, ReplicationTrigger, SwarmAnalytics,
 };
 
-use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, ProofType};
+use hypermesh_lib::{AssetId, BlockchainScope, ContentHash, ProofType, DEFAULT_NETWORK};
 
 // ---------------------------------------------------------------------------
 // Simulation infrastructure
@@ -106,11 +108,7 @@ fn test_metadata() -> PipelineInputMetadata {
     }
 }
 
-fn make_pipeline(
-    segment_size: u32,
-    data_shards: u8,
-    parity_shards: u8,
-) -> StreamingAssetPipeline {
+fn make_pipeline(segment_size: u32, data_shards: u8, parity_shards: u8) -> StreamingAssetPipeline {
     let config = StreamingPipelineConfig {
         segment_size,
         compression: CompressionAlgorithm::None,
@@ -129,8 +127,8 @@ async fn distribute_shards(
 ) {
     for set in shard_sets {
         for (j, shard) in set.shards.iter().enumerate() {
-            let target_idx = (set.segment_index as usize * set.shards.len() + j)
-                % harness.nodes.len();
+            let target_idx =
+                (set.segment_index as usize * set.shards.len() + j) % harness.nodes.len();
             let target = &harness.nodes[target_idx];
             let hash = ContentHash(*blake3::hash(&shard.data).as_bytes());
             target.shard_store.store(hash, shard.data.clone()).await;
@@ -159,7 +157,10 @@ async fn test_10_node_asset_lifecycle() {
         .process_segmented(&data, &test_metadata())
         .expect("test: process_segmented");
 
-    assert!(!shard_sets.is_empty(), "Should produce at least one segment");
+    assert!(
+        !shard_sets.is_empty(),
+        "Should produce at least one segment"
+    );
 
     // 2. Distribute shards across 10 nodes
     distribute_shards(&harness, &shard_sets).await;
@@ -272,16 +273,15 @@ async fn test_shard_loss_recovery() {
         })
         .collect();
 
-    assert_eq!(
-        data_only[0].len(),
-        10,
-        "Should have exactly 10 data shards"
-    );
+    assert_eq!(data_only[0].len(), 10, "Should have exactly 10 data shards");
 
     let reconstructed = pipeline
         .reconstruct_segmented(&manifest, &key, &data_only)
         .expect("test: reconstruct with data shards only");
-    assert_eq!(reconstructed, data, "Must reconstruct from data shards only");
+    assert_eq!(
+        reconstructed, data,
+        "Must reconstruct from data shards only"
+    );
 }
 
 // ===========================================================================
@@ -300,10 +300,7 @@ async fn test_byzantine_proof_rejection() {
         BlockchainScope::Network,
     );
     let result = validator.validate_transfer(&transfer_empty).await;
-    assert!(
-        result.is_err(),
-        "Empty proof bytes should be rejected"
-    );
+    assert!(result.is_err(), "Empty proof bytes should be rejected");
 
     // 4b. Too-small proof bytes should be rejected (< 256 bytes)
     let mut transfer_small = AssetTransfer::new(
@@ -364,10 +361,7 @@ async fn test_byzantine_proof_rejection() {
         .validate_transfer(&transfer_no_space)
         .await
         .expect("test: validation");
-    assert!(
-        !result,
-        "Missing PoSpace requirement should return false"
-    );
+    assert!(!result, "Missing PoSpace requirement should return false");
 }
 
 // ===========================================================================
@@ -465,12 +459,10 @@ async fn test_privacy_scoped_dedup_anonymous() {
         Arc::clone(&cp_store),
         Arc::clone(&cp_index),
         "anon-node".to_string(),
+        DEFAULT_NETWORK,
     );
     let cp_result = manager
-        .process_fetched_shards_with_policy(
-            vec![(hash, data.clone())],
-            DedupPolicy::HashOnly,
-        )
+        .process_fetched_shards_with_policy(vec![(hash, data.clone())], DedupPolicy::HashOnly)
         .await;
 
     assert_eq!(cp_result.shards_stored, 1);
@@ -479,7 +471,10 @@ async fn test_privacy_scoped_dedup_anonymous() {
         "Anonymous mode must NOT generate announcements"
     );
     assert!(
-        cp_index.get_providers(&hash).await.is_empty(),
+        cp_index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await
+            .is_empty(),
         "Anonymous mode must NOT register providers in ShardLocationIndex"
     );
 }
@@ -517,9 +512,12 @@ async fn test_consumer_becomes_provider_demand_tracking() {
         Arc::clone(&node5.shard_store),
         Arc::clone(&node5.shard_index),
         node5.node_id.clone(),
+        DEFAULT_NETWORK,
     );
 
-    let result = cp_manager.process_fetched_shards(fetched_shards.clone()).await;
+    let result = cp_manager
+        .process_fetched_shards(fetched_shards.clone())
+        .await;
 
     // Some shards may already be on node 5 from distribution (deduped)
     let total = result.shards_stored + result.shards_deduped;
@@ -535,7 +533,10 @@ async fn test_consumer_becomes_provider_demand_tracking() {
 
     // Verify node 5 is registered as provider for all fetched shards
     for (hash, _) in &fetched_shards {
-        let providers = node5.shard_index.get_providers(hash).await;
+        let providers = node5
+            .shard_index
+            .get_providers_in_network(DEFAULT_NETWORK, hash)
+            .await;
         assert!(
             providers.contains(&node5.node_id),
             "Node 5 should be provider for shard {}",
@@ -548,13 +549,13 @@ async fn test_consumer_becomes_provider_demand_tracking() {
     for i in 0..5 {
         node5
             .demand_tracker
-            .record_fetch(popular_shard, &format!("requester-{}", i))
+            .record_fetch_in_network(DEFAULT_NETWORK, popular_shard, &format!("requester-{}", i))
             .await;
     }
 
     let entry = node5
         .demand_tracker
-        .get(&popular_shard)
+        .get_in_network(DEFAULT_NETWORK, &popular_shard)
         .await
         .expect("test: demand entry should exist");
     assert_eq!(entry.request_count, 5);
@@ -630,6 +631,7 @@ async fn test_end_to_end_intelligence_loop() {
             Arc::clone(&node.shard_store),
             Arc::clone(&node.shard_index),
             node.node_id.clone(),
+            DEFAULT_NETWORK,
         );
         cp.process_fetched_shards(vec![(target_hash, target_shard.data.clone())])
             .await;
@@ -638,7 +640,7 @@ async fn test_end_to_end_intelligence_loop() {
     // Step 3: Verify 4 additional providers registered
     let providers_count = harness.nodes[2]
         .shard_index
-        .get_providers(&target_hash)
+        .get_providers_in_network(DEFAULT_NETWORK, &target_hash)
         .await
         .len();
     assert_eq!(

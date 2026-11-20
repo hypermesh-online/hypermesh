@@ -1,9 +1,9 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
+use super::to_json_ptr;
 use crate::error_state;
 use crate::handle::{borrow_handle, HypermeshClientHandle};
-use super::to_json_ptr;
 use std::os::raw::c_char;
 
 /// Fetch the current node status as a JSON string.
@@ -12,9 +12,7 @@ use std::os::raw::c_char;
 ///
 /// `client` must be a valid pointer returned by `hypermesh_connect`.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_status(
-    client: *mut HypermeshClientHandle,
-) -> *mut c_char {
+pub unsafe extern "C" fn hypermesh_status(client: *mut HypermeshClientHandle) -> *mut c_char {
     let h = match borrow_handle(client) {
         Some(h) => h,
         None => return std::ptr::null_mut(),

@@ -473,37 +473,48 @@ mod tests {
     #[tokio::test]
     async fn test_backup_creation() {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
-        let backup =
-            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
+        let backup = TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+            .expect("test: creation");
 
         // Create test topology
         let mut topology = NetworkTopology::new();
 
-        let mut node1 =
-            TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let mut node1 = TopologyNode::new(
+            "node1".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
         node1.add_peer("node2".to_string());
         topology.add_node(node1);
 
-        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
+        let node2 = TopologyNode::new(
+            "node2".to_string(),
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+        );
         topology.add_node(node2);
 
         topology.add_edge("node1".to_string(), "node2".to_string(), 1.0);
 
         // Create full backup
-        let backup_path = backup.create_full_backup(&topology).await.expect("test: async operation");
+        let backup_path = backup
+            .create_full_backup(&topology)
+            .await
+            .expect("test: async operation");
         assert!(backup_path.exists());
     }
 
     #[tokio::test]
     async fn test_backup_restore() {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
-        let backup =
-            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
+        let backup = TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+            .expect("test: creation");
 
         // Create backup data
         let mut data = TopologyBackupData::new(BackupMode::Full);
 
-        let node = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"));
+        let node = TopologyNode::new(
+            "node1".to_string(),
+            MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"),
+        );
         data.nodes.insert("node1".to_string(), node);
 
         let edge = TopologyEdge {
@@ -515,8 +526,14 @@ mod tests {
         data.edges.push(edge);
 
         // Save and restore
-        let path = backup.save_backup(&data, "test").await.expect("test: async operation");
-        let restored = backup.restore_backup(&path).await.expect("test: async operation");
+        let path = backup
+            .save_backup(&data, "test")
+            .await
+            .expect("test: async operation");
+        let restored = backup
+            .restore_backup(&path)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(restored.nodes.len(), 1);
         assert_eq!(restored.edges.len(), 1);
@@ -526,20 +543,32 @@ mod tests {
     #[tokio::test]
     async fn test_incremental_backup() {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
-        let backup =
-            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
+        let backup = TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+            .expect("test: creation");
 
         // Create initial topology
         let mut topology = NetworkTopology::new();
-        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let node1 = TopologyNode::new(
+            "node1".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
         topology.add_node(node1);
 
         // Create full backup
-        let full_path = backup.create_full_backup(&topology).await.expect("test: async operation");
-        let full_data = backup.restore_backup(&full_path).await.expect("test: async operation");
+        let full_path = backup
+            .create_full_backup(&topology)
+            .await
+            .expect("test: async operation");
+        let full_data = backup
+            .restore_backup(&full_path)
+            .await
+            .expect("test: async operation");
 
         // Modify topology
-        let node2 = TopologyNode::new("node2".to_string(), MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"));
+        let node2 = TopologyNode::new(
+            "node2".to_string(),
+            MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"),
+        );
         topology.add_node(node2);
 
         // Create incremental backup
@@ -547,7 +576,10 @@ mod tests {
             .create_incremental_backup(&topology, &full_data)
             .await
             .expect("test: expected success");
-        let inc_data = backup.restore_backup(&inc_path).await.expect("test: async operation");
+        let inc_data = backup
+            .restore_backup(&inc_path)
+            .await
+            .expect("test: async operation");
 
         // Incremental should only contain the new node
         assert_eq!(inc_data.nodes.len(), 1);
@@ -557,8 +589,8 @@ mod tests {
     #[tokio::test]
     async fn test_essential_backup() {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
-        let backup =
-            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
+        let backup = TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+            .expect("test: creation");
 
         let mut topology = NetworkTopology::new();
 
@@ -574,14 +606,22 @@ mod tests {
 
         // Add regular nodes
         for i in 1..5 {
-            let node =
-                TopologyNode::new(format!("node{i}"), MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"));
+            let node = TopologyNode::new(
+                format!("node{i}"),
+                MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"),
+            );
             topology.add_node(node);
         }
 
         // Create essential backup
-        let path = backup.create_essential_backup(&topology).await.expect("test: async operation");
-        let data = backup.restore_backup(&path).await.expect("test: async operation");
+        let path = backup
+            .create_essential_backup(&topology)
+            .await
+            .expect("test: async operation");
+        let data = backup
+            .restore_backup(&path)
+            .await
+            .expect("test: async operation");
 
         // Should only contain the leader
         assert_eq!(data.nodes.len(), 1);
@@ -591,8 +631,8 @@ mod tests {
     #[tokio::test]
     async fn test_backup_cleanup() {
         let temp_dir = TempDir::new().expect("test: temp dir creation");
-        let backup =
-            TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string()).expect("test: creation");
+        let backup = TopologyBackup::new(temp_dir.path().to_path_buf(), "test_node".to_string())
+            .expect("test: creation");
 
         // Create multiple backups
         for i in 0..5 {
@@ -622,8 +662,10 @@ mod tests {
         let mut data = TopologyBackupData::new(BackupMode::Full);
 
         for i in 0..10 {
-            let node =
-                TopologyNode::new(format!("node{i}"), MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"));
+            let node = TopologyNode::new(
+                format!("node{i}"),
+                MatrixCoordinate::new(i, i, i).expect("test: valid coordinate"),
+            );
             data.nodes.insert(format!("node{i}"), node);
         }
 

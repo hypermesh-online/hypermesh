@@ -297,7 +297,10 @@ mod tests {
     #[test]
     fn test_coordinator_state_display() {
         assert_eq!(CoordinatorState::Initiated.to_string(), "Initiated");
-        assert_eq!(CoordinatorState::ShardsHandedOff.to_string(), "ShardsHandedOff");
+        assert_eq!(
+            CoordinatorState::ShardsHandedOff.to_string(),
+            "ShardsHandedOff"
+        );
         assert_eq!(CoordinatorState::RolledBack.to_string(), "RolledBack");
     }
 }

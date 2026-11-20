@@ -165,7 +165,10 @@ mod tests {
         );
         assert!(records <= GLOBAL_ASSET_CAP * PER_ASSET_RECORD_CAP);
         // Oldest-first-seen asset evicted, most recent still queryable.
-        assert!(ledger.query("asset-0").is_empty(), "oldest asset not evicted");
+        assert!(
+            ledger.query("asset-0").is_empty(),
+            "oldest asset not evicted"
+        );
         assert!(
             !ledger.query(&format!("asset-{}", n - 1)).is_empty(),
             "most recent asset was evicted"

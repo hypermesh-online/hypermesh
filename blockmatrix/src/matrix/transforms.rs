@@ -242,14 +242,22 @@ mod tests {
     fn test_translate() {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         let translated = coord.translate(5, -10, 15).expect("test: expected success");
-        assert_eq!(translated, MatrixCoordinate::new(15, 10, 45).expect("test: valid coordinate"));
+        assert_eq!(
+            translated,
+            MatrixCoordinate::new(15, 10, 45).expect("test: valid coordinate")
+        );
     }
 
     #[test]
     fn test_translate_negative() {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
-        let translated = coord.translate(-20, -30, -40).expect("test: expected success");
-        assert_eq!(translated, MatrixCoordinate::new(-10, -10, -10).expect("test: valid coordinate"));
+        let translated = coord
+            .translate(-20, -30, -40)
+            .expect("test: expected success");
+        assert_eq!(
+            translated,
+            MatrixCoordinate::new(-10, -10, -10).expect("test: valid coordinate")
+        );
     }
 
     #[test]
@@ -266,14 +274,20 @@ mod tests {
     fn test_scale() {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         let scaled = coord.scale(2).expect("test: expected success");
-        assert_eq!(scaled, MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate"));
+        assert_eq!(
+            scaled,
+            MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate")
+        );
     }
 
     #[test]
     fn test_scale_negative() {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
         let scaled = coord.scale(-1).expect("test: expected success");
-        assert_eq!(scaled, MatrixCoordinate::new(-10, -20, -30).expect("test: valid coordinate"));
+        assert_eq!(
+            scaled,
+            MatrixCoordinate::new(-10, -20, -30).expect("test: valid coordinate")
+        );
     }
 
     #[test]
@@ -339,15 +353,27 @@ mod tests {
     #[test]
     fn test_chained_transformations() {
         let coord = MatrixCoordinate::new(10, 10, 10).expect("test: valid coordinate");
-        let result = coord.translate(5, 5, 5).expect("test: expected result").scale(2).expect("test: expected result");
+        let result = coord
+            .translate(5, 5, 5)
+            .expect("test: expected result")
+            .scale(2)
+            .expect("test: expected result");
 
-        assert_eq!(result, MatrixCoordinate::new(30, 30, 30).expect("test: valid coordinate"));
+        assert_eq!(
+            result,
+            MatrixCoordinate::new(30, 30, 30).expect("test: valid coordinate")
+        );
     }
 
     #[test]
     fn test_apply_transform() {
         let coord = MatrixCoordinate::new(10, 20, 30).expect("test: valid coordinate");
-        let result = coord.apply_transform(|c| c.scale(2)).expect("test: expected result");
-        assert_eq!(result, MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate"));
+        let result = coord
+            .apply_transform(|c| c.scale(2))
+            .expect("test: expected result");
+        assert_eq!(
+            result,
+            MatrixCoordinate::new(20, 40, 60).expect("test: valid coordinate")
+        );
     }
 }

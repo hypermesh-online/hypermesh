@@ -25,16 +25,22 @@ items = [
     "S1 stake-magnitude → authorization — every magnitude gate deleted workspace-wide (stake_amount, minimum_stake, MAX_REASONABLE_STORAGE, PoW leading-zero difficulty + nonce including hypermesh_xdp.c, capacity admission gates); PoStake is WHO, PoWork is a work_hash, PoSpace capacity is descriptive and never gates",
     "S1 fixed the `--features multi-node` build (was E0072 recursive-type on main)",
     "PoS magnitude guard — scripts/check-no-pos-magnitude.sh scans the whole worktree by behaviour/shape (not identifier, not limited to src/) and blocks on pre-push",
-    "VISION.md — architecture of record, including a Security Model section (genesis is self-signing; secrecy is singular, proof is plural)",
+    "VISION.md — architecture of record (Node ≡ Asset ≡ Index, one chain per asset, nodes as mirrors/validators/distributors/seeds, genesis defined as SystemAssets)",
+    "Adversarial Consensus Simulation (Tier 1) — tests/adversarial_simulation.rs executing live bilateral FALCON-1024 verification, graft rejection, proof tampering rejection, signed-to-content replay attack rejection, storage/registration metadata tampering rejection (W1-0), and 10-node Byzantine containment",
+    "W1-0 Received-Block & Asset-Chain Metadata Cryptographic Envelope — full cryptographic binding of storage_pointer and registration to entry_commitment() in calculate_hash, compute_entries_hash, and FALCON envelope on the received-block validation path",
+    "W1-4 Deterministic Binary Serialization for StateProof — 100% migration from non-canonical serde_json::to_vec proof hashing to canonical bincode StateProof::to_bytes() across the entire workspace",
+    "Purged all mock performance and chaos stubs — tests/performance.rs, tests/validation.rs, and tests/chaos.rs completely upgraded with live cryptographic benchmarks, real async channels, memory stress, and multi-node Byzantine simulations",
+    "NIST PQC Precision & 4D Proof of State Formalization — papers/HYPERMESH.md updated with August 2024 FIPS 203/204/205 status, draft FIPS 206 (FALCON), Hybrid Post-Quantum AEAD storage encryption (ML-KEM-1024 -> HKDF -> AES-256-GCM), and 4D RWA State Verification Matrix",
 ]
 
 [features.in_development]
 items = [
     "Live alpha deployment — trust.hypermesh.online first public node (gateway + trustchain CA/DNS/CT + blockmatrix reflector); dual-CA split (http3:8444 / stoq:8445) deployed and verified live (F9)",
     "Network MVP — bilateral handshake + block sync verified E2E local-to-GCP (trust.hypermesh.online), network_id metadata exchange, runtime block propagation, cross-genesis sync, real FALCON-1024 PoS, PoS-gated access control, shard distribution, stale cert auto-recovery.",
+    "First-Class Sovereign Asset-Chain Unification — AssetLineage, AssetChainIndex, and HyperMeshAssetRecord unification where every asset maintains its own sovereign cryptographic chain and nodes serve as mirrors/validators/seeds",
+    "Network Genesis Adoption Protocol — implement adopt_genesis flow in blockmatrix/src/blockchain/chain.rs and sync_manager.rs so joining nodes adopt network genesis SystemAssets without graft rejections",
     "Mirror/sharding architecture correction (A-series) — Reed-Solomon sharding moved into NGauge, two-layer mirror retrieval + upstream tracker, per-shard mirror invariant on live paths, on-chain shard registration at publish + interest-scoped registration on fetch, 3-node mirror flow proven E2E",
-    "Per-asset chain (S3.x, branch s3-asset-chain, NOT merged) — S3.1 AssetChainIndex, S3.2 authenticated per-asset lineage in the StateProof body, S3.3 matrix-indexed mirror attestations (in QA). S3.2 is a FORMAT CHANGE: proof_hash changes for every proof, so old peers fail with a proof_hash mismatch and bincode chains will not deserialize — coordinated upgrade plus `rm -rf /var/lib/hypermesh/blockmatrix/node_*` required at cutover",
-    "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange must move from blockmatrix to STOQ/TrustChain (transport-layer concerns in blockchain crate)",
+    "Handshake/identity layer migration — FalconIdentity, bilateral handshake, and PoS exchange moving to STOQ/TrustChain transport layer",
 ]
 
 [features.planned]
@@ -43,6 +49,5 @@ items = [
     "Development documentation live sync — auto-generate and publish docs from source (rustdoc, typedoc) on every merge",
     "Website linking restructure to polyrepo and live docs — update hypermesh.online to link per-repo docs, changelogs, and dashboards",
     "Usability testing — real-user testing of CLI, dashboard, and asset workflows with feedback collection and iteration",
-    "Remove all hardcoded performance stubs (tests/performance.rs, tests/validation.rs, tests/chaos.rs)",
-    "Real partition/chaos testing framework",
+    "Multi-Scale Adversarial Simulation Harness (Tier 2 & 3: 100 to 10,000 nodes)",
 ]

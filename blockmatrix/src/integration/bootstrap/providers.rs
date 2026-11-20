@@ -19,8 +19,8 @@ use std::time::{Duration, SystemTime};
 pub use trustchain::proof_of_state::StateProof;
 
 use super::{
-    BootstrapPhase, Certificate, CertificateProvider, Connection, StateProofProvider, Listener,
-    ServiceDiscovery, ServiceEndpoint, ServiceRegistration, ServiceType, TransportProvider,
+    BootstrapPhase, Certificate, CertificateProvider, Connection, Listener, ServiceDiscovery,
+    ServiceEndpoint, ServiceRegistration, ServiceType, StateProofProvider, TransportProvider,
 };
 
 // --- Discovery Providers ---
@@ -257,14 +257,19 @@ impl StateProofProvider for NoOpStateProof {
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
-        use trustchain::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof,
-        };
+        use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
         Ok(StateProof::new(
             StakeProof::new("noop".to_string(), "noop".to_string()),
             TimeProof::new(Duration::from_secs(0)),
             SpaceProof::new("noop".to_string(), "/dev/null".to_string(), 0),
-            WorkProof::new("noop".to_string(), "noop_work".to_string(), *blake3::hash(format!("{}:{}", "noop".to_string(), "noop_work".to_string()).as_bytes()).as_bytes()),
+            WorkProof::new(
+                "noop".to_string(),
+                "noop_work".to_string(),
+                *blake3::hash(
+                    format!("{}:{}", "noop".to_string(), "noop_work".to_string()).as_bytes(),
+                )
+                .as_bytes(),
+            ),
         ))
     }
 
@@ -295,14 +300,20 @@ impl StateProofProvider for OptionalStateProof {
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
-        use trustchain::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof,
-        };
+        use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
         Ok(StateProof::new(
             StakeProof::new("optional".to_string(), "validator1".to_string()),
             TimeProof::new(Duration::from_secs(1)),
             SpaceProof::new("optional".to_string(), "/tmp/optional".to_string(), 1024),
-            WorkProof::new("optional".to_string(), "optional_work".to_string(), *blake3::hash(format!("{}:{}", "optional".to_string(), "optional_work".to_string()).as_bytes()).as_bytes()),
+            WorkProof::new(
+                "optional".to_string(),
+                "optional_work".to_string(),
+                *blake3::hash(
+                    format!("{}:{}", "optional".to_string(), "optional_work".to_string())
+                        .as_bytes(),
+                )
+                .as_bytes(),
+            ),
         ))
     }
 
@@ -335,14 +346,20 @@ impl StateProofProvider for RequiredStateProof {
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
-        use trustchain::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof,
-        };
+        use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
         Ok(StateProof::new(
             StakeProof::new("required".to_string(), "validator2".to_string()),
             TimeProof::new(Duration::from_secs(5)),
             SpaceProof::new("required".to_string(), "/tmp/required".to_string(), 10240),
-            WorkProof::new("required".to_string(), "required_work".to_string(), *blake3::hash(format!("{}:{}", "required".to_string(), "required_work".to_string()).as_bytes()).as_bytes()),
+            WorkProof::new(
+                "required".to_string(),
+                "required_work".to_string(),
+                *blake3::hash(
+                    format!("{}:{}", "required".to_string(), "required_work".to_string())
+                        .as_bytes(),
+                )
+                .as_bytes(),
+            ),
         ))
     }
 
@@ -373,20 +390,24 @@ impl StateProofProvider for FullStateProof {
         // identity, never a stake amount. PoSpace is WHERE — require a bound
         // location, never a capacity floor. PoWork is the HASH of work done.
         Ok(!proof.stake_proof.stake_holder_id.is_empty()
-            && !(proof.space_proof.node_id.is_empty()
-                && proof.space_proof.storage_path.is_empty())
+            && !(proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty())
             && proof.work_proof.work_hash != [0u8; 32])
     }
 
     async fn generate_proof(&self, _data: &[u8]) -> Result<StateProof> {
-        use trustchain::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof,
-        };
+        use trustchain::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
         Ok(StateProof::new(
             StakeProof::new("full".to_string(), "validator4".to_string()),
             TimeProof::new(Duration::from_secs(10)),
             SpaceProof::new("full".to_string(), "/var/hypermesh".to_string(), 1048576),
-            WorkProof::new("full".to_string(), "full_work".to_string(), *blake3::hash(format!("{}:{}", "full".to_string(), "full_work".to_string()).as_bytes()).as_bytes()),
+            WorkProof::new(
+                "full".to_string(),
+                "full_work".to_string(),
+                *blake3::hash(
+                    format!("{}:{}", "full".to_string(), "full_work".to_string()).as_bytes(),
+                )
+                .as_bytes(),
+            ),
         ))
     }
 

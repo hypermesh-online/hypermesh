@@ -20,7 +20,6 @@ use tracing::{debug, info, warn};
 
 use hypermesh_lib::{BlockchainScope, NetworkId, PrivacyMode};
 
-use crate::network_isolation::NetworkIsolationManager;
 use crate::protocol::pos_fast_validator::PosFastValidator;
 use crate::transport::connection::Endpoint;
 
@@ -128,7 +127,6 @@ pub struct MultiPathConnection {
     policy: Arc<PathPolicy>,
     selector: Arc<RwLock<PathSelector>>,
     _pos_fast_validator: Option<Arc<PosFastValidator>>,
-    _isolation_manager: Option<Arc<NetworkIsolationManager>>,
     metrics: Arc<MultiPathMetrics>,
 }
 
@@ -143,7 +141,6 @@ impl MultiPathConnection {
             policy: Arc::new(policy),
             selector: Arc::new(RwLock::new(PathSelector::new(PathScheduler::RoundRobin))),
             _pos_fast_validator: None,
-            _isolation_manager: None,
             metrics: Arc::new(MultiPathMetrics::new()),
         }
     }
@@ -151,12 +148,6 @@ impl MultiPathConnection {
     /// Attach a PoS fast validator for privacy-tier-aware validation.
     pub fn with_pos_validator(mut self, validator: Arc<PosFastValidator>) -> Self {
         self._pos_fast_validator = Some(validator);
-        self
-    }
-
-    /// Attach a network isolation manager for tunnel verification.
-    pub fn with_isolation_manager(mut self, manager: Arc<NetworkIsolationManager>) -> Self {
-        self._isolation_manager = Some(manager);
         self
     }
 
@@ -411,9 +402,8 @@ impl MultiPathConnection {
         let path = match self.paths.get(&from_path_id) {
             Some(entry) => entry,
             None => {
-                return PathValidation::Rejected(PathRejectionReason::TunnelNotConfigured {
-                    from: NetworkId([0u8; 16]),
-                    to: *target_network,
+                return PathValidation::Rejected(PathRejectionReason::UnknownPath {
+                    path_id: from_path_id,
                 });
             }
         };

@@ -68,10 +68,9 @@ pub async fn distribute_to_peers(
         let target_pos = placement_position(i, placements);
         match find_closest_peer(target_pos, peers) {
             Some(peer) => {
-                let result = send_shard_to_peer(
-                    transport, peer, i, shard_hash, shard_data, target_pos,
-                )
-                .await;
+                let result =
+                    send_shard_to_peer(transport, peer, i, shard_hash, shard_data, target_pos)
+                        .await;
                 if result {
                     sent += 1;
                 } else {
@@ -80,17 +79,13 @@ pub async fn distribute_to_peers(
                 }
             }
             None => {
-                tracing::debug!(
-                    "Shard {i}: no peer near target position, kept locally"
-                );
+                tracing::debug!("Shard {i}: no peer near target position, kept locally");
                 kept_local += 1;
             }
         }
     }
 
-    tracing::info!(
-        "Shard distribution: {sent} sent, {kept_local} kept locally, {failed} failed"
-    );
+    tracing::info!("Shard distribution: {sent} sent, {kept_local} kept locally, {failed} failed");
 
     NetworkDistributionResult {
         sent,
@@ -133,10 +128,7 @@ async fn send_shard_to_peer(
 }
 
 /// Look up the target position for a shard index, falling back to origin.
-fn placement_position(
-    shard_index: usize,
-    placements: &[ShardPlacement],
-) -> MatrixCoordinate {
+fn placement_position(shard_index: usize, placements: &[ShardPlacement]) -> MatrixCoordinate {
     placements
         .iter()
         .find(|p| p.shard_index == shard_index)
@@ -169,12 +161,7 @@ mod tests {
     use super::*;
     use crate::network::shard_transport::MockShardTransport;
 
-    fn make_placement(
-        index: usize,
-        x: i64,
-        y: i64,
-        z: i64,
-    ) -> ShardPlacement {
+    fn make_placement(index: usize, x: i64, y: i64, z: i64) -> ShardPlacement {
         let position = MatrixCoordinate::new(x, y, z).expect("test: valid coord");
         ShardPlacement {
             shard_index: index,
@@ -191,18 +178,14 @@ mod tests {
         let hash = ContentHash([0xAA; 32]);
         let shards = vec![(hash, vec![1, 2, 3])];
 
-        let result =
-            distribute_to_peers(&shards, &[], &[], &transport).await;
+        let result = distribute_to_peers(&shards, &[], &[], &transport).await;
         assert_eq!(result.sent, 0);
         assert_eq!(result.kept_local, 1);
     }
 
     #[test]
     fn test_placement_position_lookup() {
-        let placements = vec![
-            make_placement(0, 10, 20, 30),
-            make_placement(1, 40, 50, 60),
-        ];
+        let placements = vec![make_placement(0, 10, 20, 30), make_placement(1, 40, 50, 60)];
 
         let pos0 = placement_position(0, &placements);
         assert_eq!(pos0.x, 10);
@@ -221,16 +204,14 @@ mod tests {
 
         // Peer with connection=None should be filtered out
         let peers = vec![NetworkNode {
-            coordinate: MatrixCoordinate::new(1, 1, 1)
-                .expect("test: valid coord"),
+            coordinate: MatrixCoordinate::new(1, 1, 1).expect("test: valid coord"),
             address: "[::1]:9292".parse().expect("test: valid addr"),
             node_id: "no-conn".to_string(),
             privacy_mode: PrivacyMode::PUBLIC,
             connection: None,
         }];
 
-        let target =
-            MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
+        let target = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
         let closest = find_closest_peer(target, &peers);
         assert!(closest.is_none());
     }

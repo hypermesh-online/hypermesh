@@ -167,10 +167,10 @@ pub unsafe extern "C" fn hypermesh_caesar_governor_params(
         Some(h) => h,
         None => return std::ptr::null_mut(),
     };
-    match h
-        .runtime
-        .block_on(h.client.raw_call("caesar.governor_params", serde_json::json!({})))
-    {
+    match h.runtime.block_on(
+        h.client
+            .raw_call("caesar.governor_params", serde_json::json!({})),
+    ) {
         Ok(val) => json_to_cstring(&val),
         Err(e) => {
             error_state::set_last_error(e.to_string());

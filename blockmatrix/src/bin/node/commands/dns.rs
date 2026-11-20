@@ -7,7 +7,9 @@
 use anyhow::{Context, Result};
 use tracing::{info, warn};
 
-use blockmatrix::assets::core::{AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope};
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::bootstrap::NodeBootstrap;
 use blockmatrix::StateProof;
 
@@ -130,8 +132,8 @@ pub async fn run_dns(
                 owner: node_id.to_string(),
                 grant_signature: None,
             };
-            let dns_bytes = serde_json::to_vec(&dns_entry)
-                .context("failed to serialize DNS entry")?;
+            let dns_bytes =
+                serde_json::to_vec(&dns_entry).context("failed to serialize DNS entry")?;
 
             let asset_data = AssetData {
                 config: name.as_bytes().to_vec(),
@@ -165,12 +167,10 @@ pub async fn run_dns(
             println!("  chain: height {}", bc.get_height().await);
             println!();
         }
-        DnsAction::Resolve { name } => {
-            match bootstrap.dns().resolve(&name).await {
-                Some(addr) => println!("{name} -> {addr}"),
-                None => println!("{name}: not found"),
-            }
-        }
+        DnsAction::Resolve { name } => match bootstrap.dns().resolve(&name).await {
+            Some(addr) => println!("{name} -> {addr}"),
+            None => println!("{name}: not found"),
+        },
         DnsAction::List => {
             let records = bootstrap.dns().all_records().await;
             if records.is_empty() {

@@ -365,7 +365,10 @@ mod tests {
 
         // Only qualified node receives the full amount
         assert_eq!(result.distributions.len(), 1);
-        assert_eq!(result.distributions[0].node_id, NodeId::from_public_key(b"good"));
+        assert_eq!(
+            result.distributions[0].node_id,
+            NodeId::from_public_key(b"good")
+        );
         assert_eq!(result.distributions[0].amount.0, dec!(100));
     }
 
@@ -403,7 +406,10 @@ mod tests {
             qualified_node("h2"),
             qualified_node("n1"),
         ];
-        let shard_holders = vec![NodeId::from_public_key(b"h1"), NodeId::from_public_key(b"h2")];
+        let shard_holders = vec![
+            NodeId::from_public_key(b"h1"),
+            NodeId::from_public_key(b"h2"),
+        ];
 
         let result = GravityDissolution::dissolve(
             PacketId::zero(),

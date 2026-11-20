@@ -546,11 +546,17 @@ mod tests {
         // Let's confirm with 2 confirmations first (should NOT meet threshold)
         p.record_confirmation(10, "p1");
         p.record_confirmation(10, "p2");
-        assert!(!p.has_sufficient_peers(10), "2/3 should not meet threshold at 0.67");
+        assert!(
+            !p.has_sufficient_peers(10),
+            "2/3 should not meet threshold at 0.67"
+        );
 
         // 3 out of 3 -> should meet threshold
         p.record_confirmation(10, "p3");
-        assert!(p.has_sufficient_peers(10), "3/3 should meet threshold at 0.67");
+        assert!(
+            p.has_sufficient_peers(10),
+            "3/3 should meet threshold at 0.67"
+        );
     }
 
     #[test]

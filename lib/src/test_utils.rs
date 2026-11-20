@@ -8,12 +8,8 @@
 //! Other crates can enable `test-utils` in dev-dependencies to reuse these
 //! factories and avoid duplicating setup code across test modules.
 
-use crate::types::{
-    AssetId, ContentHash, MatrixPosition, NetworkId, NodeId, PrivacyMode,
-};
-use crate::proof::{
-    SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
-};
+use crate::proof::{SpaceProof, StakeProof, StateProof, TimeProof, WorkProof};
+use crate::types::{AssetId, ContentHash, MatrixPosition, NetworkId, NodeId, PrivacyMode};
 use std::time::Duration;
 
 /// Create a test [`NodeId`] by hashing the given name.
@@ -112,7 +108,11 @@ pub fn test_stake_proof() -> StakeProof {
 
 /// Create a valid test [`WorkProof`] (hash of work done).
 pub fn test_work_proof() -> WorkProof {
-    WorkProof::from_work("test-node".to_string(), "test-workload".to_string(), b"test-work")
+    WorkProof::from_work(
+        "test-node".to_string(),
+        "test-workload".to_string(),
+        b"test-work",
+    )
 }
 
 /// Create a valid test [`TimeProof`].

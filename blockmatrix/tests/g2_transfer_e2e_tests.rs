@@ -320,10 +320,7 @@ async fn test_lock_crashes_resume_completes() {
     }
     #[async_trait]
     impl TransferTransport for HangingTransport {
-        async fn broadcast_lock(
-            &self,
-            msg: TransferLockMessage,
-        ) -> Result<(), GatewayError> {
+        async fn broadcast_lock(&self, msg: TransferLockMessage) -> Result<(), GatewayError> {
             self.locks.lock().await.push(msg);
             Ok(())
         }
@@ -337,16 +334,10 @@ async fn test_lock_crashes_resume_completes() {
             std::future::pending::<()>().await;
             unreachable!()
         }
-        async fn broadcast_release(
-            &self,
-            _msg: TransferRelease,
-        ) -> Result<(), GatewayError> {
+        async fn broadcast_release(&self, _msg: TransferRelease) -> Result<(), GatewayError> {
             Ok(())
         }
-        async fn broadcast_rollback(
-            &self,
-            _msg: TransferRollback,
-        ) -> Result<(), GatewayError> {
+        async fn broadcast_rollback(&self, _msg: TransferRollback) -> Result<(), GatewayError> {
             Ok(())
         }
     }
@@ -526,9 +517,7 @@ async fn test_register_ack_waiter_delivery() {
     ));
 
     let (tx, rx) = tokio::sync::oneshot::channel();
-    coord
-        .register_ack_waiter("tx-wait-1".into(), tx)
-        .await;
+    coord.register_ack_waiter("tx-wait-1".into(), tx).await;
 
     // Wire handler-side: ack arrives, delivered via deliver_register_ack.
     let ack = TransferRegisterAck {

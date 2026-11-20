@@ -32,6 +32,8 @@ pub enum PathRejectionReason {
     MaxPathsExceeded,
     /// Maximum path count per network exceeded.
     MaxPathsPerNetworkExceeded,
+    /// The originating path id is not registered on this connection.
+    UnknownPath { path_id: u32 },
 }
 
 impl fmt::Display for PathRejectionReason {
@@ -63,6 +65,9 @@ impl fmt::Display for PathRejectionReason {
             }
             Self::MaxPathsPerNetworkExceeded => {
                 write!(f, "Maximum paths per network exceeded")
+            }
+            Self::UnknownPath { path_id } => {
+                write!(f, "Unknown path id {path_id} on this connection")
             }
         }
     }
@@ -318,7 +323,7 @@ mod tests {
     use super::*;
 
     fn default_network() -> NetworkId {
-        NetworkId([0u8; 16])
+        hypermesh_lib::DEFAULT_NETWORK
     }
 
     fn network(id: u8) -> NetworkId {

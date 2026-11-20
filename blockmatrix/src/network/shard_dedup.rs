@@ -288,18 +288,16 @@ mod tests {
         let existing_data = b"already-here";
         let hash_bytes: [u8; 32] = *blake3::hash(existing_data as &[u8]).as_bytes();
         store
-            .store(hypermesh_lib::ContentHash(hash_bytes), existing_data.to_vec())
+            .store(
+                hypermesh_lib::ContentHash(hash_bytes),
+                existing_data.to_vec(),
+            )
             .await;
 
         let shard_existing = make_test_shard(existing_data);
         let shard_new = make_test_shard(b"never-seen-before");
 
-        let results = dedup_shards(
-            &[shard_existing, shard_new],
-            &store,
-            DedupPolicy::Full,
-        )
-        .await;
+        let results = dedup_shards(&[shard_existing, shard_new], &store, DedupPolicy::Full).await;
 
         assert_eq!(results.len(), 2);
         assert!(matches!(results[0], ShardStatus::AlreadyStored { .. }));

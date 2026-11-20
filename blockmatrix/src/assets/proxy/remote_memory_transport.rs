@@ -748,8 +748,11 @@ mod tests {
                 .expect("test: quic server config"),
         ));
 
-        let endpoint = quinn::Endpoint::server(server_config, "127.0.0.1:0".parse().expect("test: valid parse"))
-            .expect("test: endpoint creation");
+        let endpoint = quinn::Endpoint::server(
+            server_config,
+            "127.0.0.1:0".parse().expect("test: valid parse"),
+        )
+        .expect("test: endpoint creation");
 
         let transport = RemoteMemoryTransport::new(endpoint, TransportConfig::default())
             .await

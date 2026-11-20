@@ -486,41 +486,6 @@ char *hypermesh_domain_list(hypermesh_client_t *client);
 // `name` and `privacy` must be valid null-terminated UTF-8 strings.
 char *hypermesh_domain_register(hypermesh_client_t *client, const char *name, const char *privacy);
 
-// Fetch current node capacity metrics. Returns JSON.
-//
-// # Safety
-//
-// `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_ngauge_capacity(hypermesh_client_t *client);
-
-// Fetch current traffic statistics. Returns JSON.
-//
-// # Safety
-//
-// `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_ngauge_traffic(hypermesh_client_t *client);
-
-// Fetch marketplace resource pool info. Returns JSON.
-//
-// # Safety
-//
-// `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_ngauge_marketplace(hypermesh_client_t *client);
-
-// Fetch detailed node-level metrics. Returns JSON.
-//
-// # Safety
-//
-// `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_ngauge_node_metrics(hypermesh_client_t *client);
-
-// Fetch active resource leases. Returns JSON array.
-//
-// # Safety
-//
-// `client` must be a valid pointer returned by `hypermesh_connect`.
-char *hypermesh_ngauge_leases(hypermesh_client_t *client);
-
 // Generate a fresh post-quantum identity (FALCON-1024 + Kyber-1024).
 //
 // Returns an opaque handle the caller must free with
@@ -644,6 +609,41 @@ int hypermesh_signed_proof_verify(const uint8_t *wire, uintptr_t wire_len);
 //
 // `client` must be a valid pointer returned by `hypermesh_connect`.
 char *hypermesh_peers(hypermesh_client_t *client);
+
+// Fetch current node capacity metrics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_ngauge_capacity(hypermesh_client_t *client);
+
+// Fetch current traffic statistics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_ngauge_traffic(hypermesh_client_t *client);
+
+// Fetch marketplace resource pool info. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_ngauge_marketplace(hypermesh_client_t *client);
+
+// Fetch detailed node-level metrics. Returns JSON.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_ngauge_node_metrics(hypermesh_client_t *client);
+
+// Fetch active resource leases. Returns JSON array.
+//
+// # Safety
+//
+// `client` must be a valid pointer returned by `hypermesh_connect`.
+char *hypermesh_ngauge_leases(hypermesh_client_t *client);
 
 // Fetch the current node status as a JSON string.
 //

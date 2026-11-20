@@ -94,12 +94,7 @@ impl IpcClient {
     ) -> Result<serde_json::Value> {
         let response = self.call(method, params).await?;
         if let Some(err) = response.error {
-            anyhow::bail!(
-                "RPC error {}: {} (code {})",
-                method,
-                err.message,
-                err.code
-            );
+            anyhow::bail!("RPC error {}: {} (code {})", method, err.message, err.code);
         }
         response
             .result

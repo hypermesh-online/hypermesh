@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use hypermesh_lib::PrivacyMode;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use stoq::protocol::{
     MatrixPosition, MatrixPositionExt, PosToken, SpaceProof, StakeProof, StateProof,
     StoqPosIntegration, TimeProof, WorkProof,
@@ -53,7 +53,6 @@ fn canonical_test_proof() -> StateProof {
         ),
     )
 }
-
 
 #[tokio::test]
 async fn test_anonymous_network_validation() -> Result<()> {

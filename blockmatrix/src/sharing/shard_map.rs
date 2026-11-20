@@ -135,4 +135,51 @@ mod tests {
         let rec_json = serde_json::to_string(&recovered).expect("test: ser rec");
         assert_eq!(orig_json, rec_json);
     }
+
+    /// R6 reality check (KNOWN GAP — honest measurement, not aspiration).
+    ///
+    /// The retrieval instruction that ACTUALLY travels is
+    /// `serde_json::to_vec(&travel_map)` — the `ShardMap` with `key_envelope`
+    /// stripped, stored in `ShareInvite.shard_map_json` (see
+    /// `ipc/handlers/share.rs`, which builds `travel_map` exactly as below). This
+    /// measures that REAL wire size for a representative default Reed-Solomon
+    /// 10+4 map.
+    ///
+    /// R6 ("<1 KB instruction map") is VIOLATED on the live `shard_map_json`
+    /// path (~3 KB for 10+4): the JSON carries each shard's 64-hex BLAKE3 TWICE
+    /// (`shard_hashes` + per-shard `metadata.hash`) plus full `ShardMetadata`.
+    /// Achieving R6 needs a compact travel-map encoding (32-byte binary hashes,
+    /// no duplication) — deferred to cluster H (pipeline/sharding convergence).
+    /// This test asserts the TRUE current state so the gap is RECORDED, not
+    /// hidden behind a fictional compact-size estimate.
+    #[test]
+    fn test_shard_map_json_exceeds_r6_budget_known_gap() {
+        // Representative default 10 data + 4 parity map. `key_envelope: None`
+        // and the field set mirror the `travel_map` share.rs serializes.
+        let travel_map = ShardMap {
+            asset_id: "a".repeat(64),
+            shard_hashes: (0..14).map(|i| format!("{i:064x}")).collect(),
+            key_envelope: None,
+            shard_count: 14,
+            original_size: 1_073_741_824, // 1 GiB — instruction size must not scale with asset size.
+            shard_metadata: sample_metadata(14),
+        };
+
+        let wire = serde_json::to_vec(&travel_map).expect("test: serialize travel map");
+        let size = wire.len();
+        eprintln!("live shard_map_json wire size (10+4 default) = {size} bytes (R6 budget 1024)");
+
+        // The live instruction is ~3 KB — well OVER the R6 1 KB budget. Assert
+        // the real state (the recorded gap), not the aspirational one.
+        assert!(
+            size > 1024,
+            "shard_map_json is EXPECTED to violate the R6 <1KB budget on the \
+             live JSON path (cluster-H gap); measured {size} bytes",
+        );
+        // Upper sanity bound so runaway growth of the travel map is still caught.
+        assert!(
+            (2048..6144).contains(&size),
+            "10+4 travel-map JSON should sit in the ~2-5KB band, measured {size} bytes",
+        );
+    }
 }

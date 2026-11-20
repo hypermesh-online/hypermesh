@@ -13,9 +13,7 @@ use uuid::Uuid;
 use crate::network::stoq_integration::MatrixMessage;
 
 use super::super::PeerContext;
-use super::dns_protocol::{
-    select_canonical, DistributedDnsQuery, DistributedDnsResponse,
-};
+use super::dns_protocol::{select_canonical, DistributedDnsQuery, DistributedDnsResponse};
 use super::protocol::{
     TAG_DNS_QUERY, TAG_DNS_RESOLVE, TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE, TAG_SYNC_MESSAGE,
 };
@@ -162,23 +160,17 @@ async fn try_query_peer_h1(
 /// Try resolving a DNS name from a single peer.
 ///
 /// Opens a new stream, sends TAG_DNS_RESOLVE + name, reads response.
-async fn try_resolve_from_peer(
-    name: &str,
-    conn: &stoq::Connection,
-) -> Option<std::net::IpAddr> {
+async fn try_resolve_from_peer(name: &str, conn: &stoq::Connection) -> Option<std::net::IpAddr> {
     let mut stream = conn.open_stream().await.ok()?;
 
     let mut request = vec![TAG_DNS_RESOLVE];
     request.extend_from_slice(name.as_bytes());
     stream.send(&request).await.ok()?;
 
-    let response = tokio::time::timeout(
-        std::time::Duration::from_secs(3),
-        stream.receive(),
-    )
-    .await
-    .ok()?
-    .ok()?;
+    let response = tokio::time::timeout(std::time::Duration::from_secs(3), stream.receive())
+        .await
+        .ok()?
+        .ok()?;
 
     // Response format: [TAG_DNS_RESOLVE_RESPONSE][addr_string_bytes]
     if response.len() <= 1 {
@@ -230,7 +222,8 @@ pub(super) async fn handle_metrics_connection(
     // Validate it's parseable JSON (MetricsFrame format)
     let frame_json = match serde_json::from_slice::<serde_json::Value>(&data) {
         Ok(frame) => {
-            let source = frame.get("source_node")
+            let source = frame
+                .get("source_node")
                 .and_then(|v| v.as_str())
                 .unwrap_or("unknown");
             debug!(
@@ -254,17 +247,15 @@ pub(super) async fn handle_metrics_connection(
             // MetricsReporter builds JSON manually, so this may fail for
             // older formats — log and continue rather than crashing.
             match serde_json::from_value::<ngauge::MetricsFrame>(_json.clone()) {
-                Ok(metrics_frame) => {
-                    match ingestion.lock() {
-                        Ok(mut pipeline) => {
-                            pipeline.ingest(metrics_frame);
-                            debug!("Ingested metrics frame into ngauge pipeline");
-                        }
-                        Err(e) => {
-                            debug!("Failed to lock ingestion pipeline: {e}");
-                        }
+                Ok(metrics_frame) => match ingestion.lock() {
+                    Ok(mut pipeline) => {
+                        pipeline.ingest(metrics_frame);
+                        debug!("Ingested metrics frame into ngauge pipeline");
                     }
-                }
+                    Err(e) => {
+                        debug!("Failed to lock ingestion pipeline: {e}");
+                    }
+                },
                 Err(e) => {
                     debug!("Metrics frame not ngauge-compatible (ok for alpha): {e}");
                 }
@@ -313,7 +304,10 @@ pub(super) async fn handle_gossip_connection(
                 sender_short, entry_count, updated,
             );
         } else {
-            debug!("Gossip from {} but no gossip protocol configured", sender_short);
+            debug!(
+                "Gossip from {} but no gossip protocol configured",
+                sender_short
+            );
         }
     } else {
         debug!("Gossip from {} but no PeerContext — dropping", sender_short);
@@ -321,4 +315,3 @@ pub(super) async fn handle_gossip_connection(
 
     Ok(())
 }
-

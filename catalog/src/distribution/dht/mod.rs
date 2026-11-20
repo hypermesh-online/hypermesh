@@ -23,7 +23,6 @@ use crate::assets::AssetPackageId;
 use routing_table::RoutingTable;
 use value_store::{StoredValue, ValueData, ValueKey, ValueStore};
 
-
 /// Kademlia DHT node identity (256-bit, XOR-distance).
 /// Distinct from hypermesh_lib::NodeId which is a human-readable string identifier.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]

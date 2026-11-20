@@ -446,7 +446,10 @@ mod tests {
     async fn test_kyber_keypair_generation() {
         let kyber = KyberCrypto::new().expect("test: creation");
 
-        let keypair = kyber.generate_keypair().await.expect("test: async operation");
+        let keypair = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
 
         assert_eq!(
             keypair.public_key.key_bytes.len(),
@@ -462,12 +465,18 @@ mod tests {
     #[tokio::test]
     async fn test_kyber_encrypt_decrypt_roundtrip() {
         let kyber = KyberCrypto::new().expect("test: creation");
-        let keypair = kyber.generate_keypair().await.expect("test: async operation");
+        let keypair = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
 
         let test_data = b"Secret message for Kyber-1024 encryption test";
 
         // Encrypt the data
-        let ciphertext = kyber.encrypt(test_data, &keypair.public_key).await.expect("test: async operation");
+        let ciphertext = kyber
+            .encrypt(test_data, &keypair.public_key)
+            .await
+            .expect("test: async operation");
 
         assert!(!ciphertext.is_empty());
         assert_ne!(ciphertext, test_data.to_vec());
@@ -484,7 +493,10 @@ mod tests {
     #[tokio::test]
     async fn test_kyber_keypair_validation() {
         let kyber = KyberCrypto::new().expect("test: creation");
-        let keypair = kyber.generate_keypair().await.expect("test: async operation");
+        let keypair = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
 
         let is_valid = kyber.validate_keypair(&keypair).expect("test: validation");
         assert!(is_valid);
@@ -493,7 +505,9 @@ mod tests {
         let mut corrupted_keypair = keypair.clone();
         corrupted_keypair.public_key.key_bytes[0] ^= 0xFF; // Flip bits
 
-        let is_invalid = kyber.validate_keypair(&corrupted_keypair).expect("test: validation");
+        let is_invalid = kyber
+            .validate_keypair(&corrupted_keypair)
+            .expect("test: validation");
         assert!(!is_invalid);
     }
 
@@ -513,7 +527,10 @@ mod tests {
     #[tokio::test]
     async fn test_large_data_encryption() {
         let kyber = KyberCrypto::new().expect("test: creation");
-        let keypair = kyber.generate_keypair().await.expect("test: async operation");
+        let keypair = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
 
         // Test with larger data (1MB)
         let large_data = vec![0xAA; 1024 * 1024];
@@ -534,8 +551,14 @@ mod tests {
     async fn test_multiple_keypairs() {
         let kyber = KyberCrypto::new().expect("test: creation");
 
-        let keypair1 = kyber.generate_keypair().await.expect("test: async operation");
-        let keypair2 = kyber.generate_keypair().await.expect("test: async operation");
+        let keypair1 = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
+        let keypair2 = kyber
+            .generate_keypair()
+            .await
+            .expect("test: async operation");
 
         // Keypairs should be different
         assert_ne!(keypair1.public_key.key_bytes, keypair2.public_key.key_bytes);

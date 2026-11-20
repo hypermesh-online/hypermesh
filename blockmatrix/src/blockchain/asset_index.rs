@@ -410,12 +410,7 @@ mod tests {
 
     fn entry(tag: u8, pointer: StoragePointer) -> BlockAssetEntry {
         let reg = AssetRegistration::genesis(coord());
-        BlockAssetEntry::new_bound(
-            [tag; 32],
-            &StateProof::new_for_testing(),
-            pointer,
-            reg,
-        )
+        BlockAssetEntry::new_bound([tag; 32], &StateProof::new_for_testing(), pointer, reg)
     }
 
     fn sharded(tag: u8, shards: Vec<[u8; 32]>) -> BlockAssetEntry {
@@ -540,10 +535,7 @@ mod tests {
         // Out-of-order arrival (received blocks / orphan drains) must not
         // lower the high water.
         let reverse = AssetChainIndex::rebuild([&b2, &b1]);
-        assert_eq!(
-            reverse.asset_high_water(&asset).map(|hw| hw.seq),
-            Some(1),
-        );
+        assert_eq!(reverse.asset_high_water(&asset).map(|hw| hw.seq), Some(1),);
         // ...and re-indexing is idempotent for the tombstone too.
         let mut again = reverse.clone();
         again.index_block(&b1);

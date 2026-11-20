@@ -100,7 +100,7 @@ fn test_state_proof_structure() {
     // each binding is PRESENT — never that a number clears a threshold.
     #[derive(Debug)]
     struct StateProof {
-        location: String,   // WHERE — bound storage location
+        location: String,       // WHERE — bound storage location
         owner_identity: String, // WHO — authorization identity binding
         work_hash: [u8; 32],    // WHAT — hash of work done
         time_fresh: bool,       // WHEN — within the freshness window

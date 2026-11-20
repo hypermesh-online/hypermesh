@@ -113,9 +113,7 @@ impl<T: ShardTransport> ClusterTransportBridge<T> {
                 status,
                 NodeStatus::Healthy | NodeStatus::Degraded | NodeStatus::Joining
             ) {
-                let lib_id = NodeId::from_bytes(
-                    *blake3::hash(node_id.as_bytes()).as_bytes(),
-                );
+                let lib_id = NodeId::from_bytes(*blake3::hash(node_id.as_bytes()).as_bytes());
                 if self.transport.is_reachable(&lib_id).await {
                     let _ = self.cluster.record_heartbeat(node_id);
                 }
@@ -222,7 +220,10 @@ mod tests {
         assert!(hc.is_some());
 
         // Node should still be healthy.
-        let node = bridge.cluster().get_node_status("peer1").expect("test: exists");
+        let node = bridge
+            .cluster()
+            .get_node_status("peer1")
+            .expect("test: exists");
         assert_eq!(node.status, NodeStatus::Healthy);
     }
 }

@@ -2,493 +2,303 @@
 // Licensed under the Business Source License 1.1.
 // See the LICENSE file in the repository root for full license text.
 
-//! Tests for adaptive connection optimization
+//! Userspace adaptive-control tests over genuine IPv6-loopback QUIC streams.
+//! Tier/parameter records and stream continuity are observed, not physical network
+//! capacity, live buffer/MTU reconfiguration, congestion-controller replacement,
+//! PoS authorization, or kernel acceleration. No synthetic adaptation result.
 
+use anyhow::Result;
 use std::net::Ipv6Addr;
-use std::time::Duration;
-use stoq::transport::{Endpoint, NetworkTier, StoqTransport, TransportConfig};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use stoq::transport::{
+    AdaptiveConnection, Connection, Endpoint, NetworkTier, StoqTransport, TransportConfig,
+};
 use tokio::time::{sleep, timeout};
-use tracing::{debug, info};
 
-/// Test that configuration changes affect live connections
+const DEADLINE: Duration = Duration::from_secs(10);
+
+struct Fixture {
+    transport: StoqTransport,
+    client: Arc<Connection>,
+    peer: Arc<Connection>,
+    adaptive: Arc<AdaptiveConnection>,
+}
+
+fn config() -> TransportConfig {
+    TransportConfig {
+        bind_address: Ipv6Addr::LOCALHOST,
+        port: 0,
+        enable_kernel_acceleration: false, // Userspace fixture, never attach kernel programs.
+        send_buffer_size: 1024 * 1024,
+        ..TransportConfig::default()
+    }
+}
+
+impl Fixture {
+    async fn new(enabled: bool) -> Self {
+        let transport = StoqTransport::new(config()).await.unwrap();
+        transport.start_adaptation().await;
+        transport.set_adaptation_enabled(enabled);
+        let addr = transport.local_addr().unwrap();
+        assert_eq!(addr.ip(), Ipv6Addr::LOCALHOST);
+        assert_ne!(addr.port(), 0);
+        let endpoint = Endpoint::new(Ipv6Addr::LOCALHOST, addr.port());
+        // Observe BOTH accept/connect results; no detached server task or hidden error.
+        let (client, peer) = timeout(DEADLINE, async {
+            tokio::try_join!(transport.connect(&endpoint), transport.accept())
+        })
+        .await
+        .expect("connect/accept deadline")
+        .expect("connect/accept failed");
+        let adaptive = transport
+            .get_adaptive_connection(&client.id())
+            .expect("connected client must have an adaptive wrapper");
+        let fixture = Self {
+            transport,
+            client,
+            peer,
+            adaptive,
+        };
+        fixture.echo(b"before adaptation").await;
+        fixture
+    }
+
+    async fn echo(&self, payload: &[u8]) {
+        let server = async {
+            let (mut send, mut recv) = self.peer.accept_bi().await?;
+            let bytes = recv.read_to_end(4096).await?;
+            anyhow::ensure!(bytes == payload, "server received unexpected data");
+            send.write_all(&bytes).await?;
+            send.finish()?;
+            Ok::<_, anyhow::Error>(())
+        };
+        let client = async {
+            let (mut send, mut recv) = self.client.open_bi().await?;
+            send.write_all(payload).await?;
+            send.finish()?;
+            let bytes = recv.read_to_end(4096).await?;
+            anyhow::ensure!(bytes == payload, "client received unexpected echo");
+            Ok::<_, anyhow::Error>(())
+        };
+        timeout(DEADLINE, async { tokio::try_join!(server, client) })
+            .await
+            .expect("echo deadline")
+            .expect("checked bidirectional exchange failed");
+    }
+
+    async fn finish(self) {
+        self.echo(b"after adaptation").await;
+        self.transport.shutdown().await;
+    }
+}
+
+async fn wait_for_count(adaptive: &AdaptiveConnection, previous: u64) {
+    timeout(DEADLINE, async {
+        while adaptive.adaptation_stats().adaptation_count <= previous {
+            sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("expected adaptation counter transition");
+}
+
+/// The live-config call triggers adaptation; exact new buffer values are NOT applied
+/// by this production API, so this does not pretend to verify buffer reconfiguration.
 #[tokio::test]
 async fn test_live_connection_adaptation() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    // Create transport with initial config
-    let config = TransportConfig {
-        port: 0,                       // Random port
-        send_buffer_size: 1024 * 1024, // 1MB initial
-        ..Default::default()
-    };
-
-    let mut transport = StoqTransport::new(config.clone()).await.unwrap();
-
-    // Start adaptation manager
-    transport.start_adaptation().await;
-
-    // Create a mock server
-    let server_addr = transport.local_addr().unwrap();
-    info!("Server listening on {}", server_addr);
-
-    // Spawn server accept loop
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            match server_transport.accept().await {
-                Ok(conn) => {
-                    info!("Server accepted connection: {}", conn.id());
-                }
-                Err(e) => {
-                    debug!("Accept error: {}", e);
-                    break;
-                }
-            }
-        }
-    });
-
-    // Connect to server
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
-    );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-    info!("Connected with ID: {}", conn_id);
-
-    // Wait for initial adaptation
-    sleep(Duration::from_millis(1500)).await;
-
-    // Get initial stats
-    let initial_stats = transport.adaptation_stats();
-    assert!(!initial_stats.is_empty(), "Should have adaptation stats");
-
-    // Update config for live connections
-    let mut new_config = config.clone();
-    new_config.send_buffer_size = 16 * 1024 * 1024; // 16MB
-    new_config.max_concurrent_streams = 1000;
-
-    transport.update_live_config(new_config).await;
-
-    // Wait for adaptation to apply
-    sleep(Duration::from_millis(2000)).await;
-
-    // Verify adaptation occurred
-    let updated_stats = transport.adaptation_stats();
-    let conn_stats = updated_stats
-        .iter()
-        .find(|(id, _)| id == &conn_id)
-        .map(|(_, stats)| stats);
-
-    assert!(conn_stats.is_some(), "Should have stats for connection");
-    let stats = conn_stats.unwrap();
-    assert!(
-        stats.adaptation_count > 0,
-        "Should have adapted at least once"
-    );
-
-    info!(
-        "Test passed: Live connection adapted {} times",
-        stats.adaptation_count
-    );
+    let mut fixture = Fixture::new(true).await;
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    let mut next = config();
+    next.send_buffer_size = 16 * 1024 * 1024;
+    next.max_concurrent_streams = 1000;
+    fixture.transport.update_live_config(next).await;
+    wait_for_count(&fixture.adaptive, before).await;
+    assert!(fixture.adaptive.adaptation_stats().enabled);
+    fixture.finish().await;
 }
 
-/// Test automatic network tier detection
+/// Detect actual loopback observations, not a fabricated bandwidth measurement.
 #[tokio::test]
 async fn test_tier_detection() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..TransportConfig::default()
-    };
-    let transport = StoqTransport::new(config).await.unwrap();
-
-    // Start adaptation
-    transport.start_adaptation().await;
-
-    // Create server
-    let server_addr = transport.local_addr().unwrap();
-
-    // Spawn server
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            if server_transport.accept().await.is_err() {
-                break;
-            }
+    let fixture = Fixture::new(true).await;
+    fixture
+        .transport
+        .set_connection_tier(
+            &fixture.client.id(),
+            NetworkTier::DataCenter { gbps: 100.0 },
+        )
+        .await
+        .unwrap();
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    timeout(DEADLINE, async {
+        while fixture.adaptive.adaptation_stats().adaptation_count == before {
+            fixture.transport.auto_detect_tiers().await;
+            sleep(Duration::from_millis(200)).await;
         }
-    });
-
-    // Connect with different simulated conditions
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
-    );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-
-    // Auto-detect tiers
-    transport.auto_detect_tiers().await;
-
-    // Wait for detection
-    sleep(Duration::from_secs(2)).await;
-
-    // Check detected tier
-    if let Some(adaptive_conn) = transport.get_adaptive_connection(&conn_id) {
-        let tier = adaptive_conn.current_tier();
-        info!("Detected network tier: {:?}", tier);
-
-        // Should detect at least standard tier for localhost
-        match tier {
-            NetworkTier::Standard { .. }
-            | NetworkTier::Performance { .. }
-            | NetworkTier::DataCenter { .. } => {
-                info!("Correctly detected high-performance tier for localhost");
-            }
-            _ => {
-                // Acceptable if network is actually slow
-                info!("Detected lower tier, may be due to actual network conditions");
-            }
-        }
-    }
+    })
+    .await
+    .expect("automatic tier detection must actually transition");
+    assert!(!matches!(
+        fixture.adaptive.current_tier(),
+        NetworkTier::DataCenter { .. }
+    ));
+    assert!(fixture.adaptive.conditions().last_update.elapsed() < Duration::from_secs(1));
+    fixture.finish().await;
 }
 
-/// Test hysteresis prevents parameter thrashing
+/// Normal adaptation must respect stability; force_adapt explicitly bypasses it.
 #[tokio::test]
 async fn test_hysteresis() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..TransportConfig::default()
-    };
-    let transport = StoqTransport::new(config).await.unwrap();
-
-    transport.start_adaptation().await;
-
-    let server_addr = transport.local_addr().unwrap();
-
-    // Server loop
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            if server_transport.accept().await.is_err() {
-                break;
-            }
+    let fixture = Fixture::new(true).await;
+    fixture
+        .transport
+        .set_connection_tier(
+            &fixture.client.id(),
+            NetworkTier::DataCenter { gbps: 100.0 },
+        )
+        .await
+        .unwrap();
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    timeout(Duration::from_secs(2), async {
+        for _ in 0..5 {
+            fixture.adaptive.adapt().await.unwrap();
+            sleep(Duration::from_millis(100)).await;
         }
-    });
-
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
+    })
+    .await
+    .expect("rapid stability-window observations");
+    assert_eq!(fixture.adaptive.adaptation_stats().adaptation_count, before);
+    assert!(matches!(
+        fixture.adaptive.current_tier(),
+        NetworkTier::DataCenter { .. }
+    ));
+    fixture
+        .transport
+        .force_connection_adaptation(&fixture.client.id())
+        .await
+        .unwrap();
+    assert_eq!(
+        fixture.adaptive.adaptation_stats().adaptation_count,
+        before + 1
     );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-
-    // Force multiple rapid adaptations
-    for _i in 0..5 {
-        transport.force_connection_adaptation(&conn_id).await.ok();
-        sleep(Duration::from_millis(100)).await; // Rapid changes
-    }
-
-    // Get stats
-    let stats = transport.adaptation_stats();
-    let conn_stats = stats
-        .iter()
-        .find(|(id, _)| id == &conn_id)
-        .map(|(_, stats)| stats);
-
-    if let Some(stats) = conn_stats {
-        // Due to hysteresis, adaptations should be limited
-        info!("Adaptations with hysteresis: {}", stats.adaptation_count);
-
-        // Should have some adaptations but not every attempt
-        assert!(
-            stats.adaptation_count > 0,
-            "Should have at least one adaptation"
-        );
-        assert!(
-            stats.adaptation_count <= 5,
-            "Hysteresis should limit adaptations"
-        );
-    }
+    fixture.finish().await;
 }
 
-/// Test that adaptation can be disabled
 #[tokio::test]
 async fn test_disable_adaptation() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..TransportConfig::default()
-    };
-    let transport = StoqTransport::new(config).await.unwrap();
-
-    // Start but then disable adaptation
-    transport.start_adaptation().await;
-    transport.set_adaptation_enabled(false);
-
-    let server_addr = transport.local_addr().unwrap();
-
-    // Server
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            if server_transport.accept().await.is_err() {
-                break;
-            }
-        }
-    });
-
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
+    let fixture = Fixture::new(false).await;
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    assert!(!fixture.adaptive.adaptation_stats().enabled);
+    fixture
+        .transport
+        .force_connection_adaptation(&fixture.client.id())
+        .await
+        .unwrap();
+    sleep(Duration::from_millis(200)).await;
+    assert_eq!(fixture.adaptive.adaptation_stats().adaptation_count, before);
+    fixture.transport.set_adaptation_enabled(true);
+    fixture
+        .transport
+        .force_connection_adaptation(&fixture.client.id())
+        .await
+        .unwrap();
+    assert!(fixture.adaptive.adaptation_stats().enabled);
+    assert_eq!(
+        fixture.adaptive.adaptation_stats().adaptation_count,
+        before + 1
     );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-
-    // Try to force adaptation (should be disabled)
-    transport.force_connection_adaptation(&conn_id).await.ok();
-
-    sleep(Duration::from_secs(2)).await;
-
-    let stats = transport.adaptation_stats();
-    let conn_stats = stats
-        .iter()
-        .find(|(id, _)| id == &conn_id)
-        .map(|(_, stats)| stats);
-
-    if let Some(stats) = conn_stats {
-        assert!(!stats.enabled, "Adaptation should be disabled");
-        info!("Adaptation correctly disabled");
-    }
+    fixture.finish().await;
 }
 
-/// Test connection-specific tier setting
 #[tokio::test]
 async fn test_manual_tier_setting() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..TransportConfig::default()
-    };
-    let transport = StoqTransport::new(config).await.unwrap();
-
-    transport.start_adaptation().await;
-
-    let server_addr = transport.local_addr().unwrap();
-
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            if server_transport.accept().await.is_err() {
-                break;
-            }
-        }
-    });
-
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
-    );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-
-    // Set specific tier
-    let tier = NetworkTier::DataCenter { gbps: 100.0 };
-    transport
-        .set_connection_tier(&conn_id, tier.clone())
+    let fixture = Fixture::new(true).await;
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    fixture
+        .transport
+        .set_connection_tier(
+            &fixture.client.id(),
+            NetworkTier::DataCenter { gbps: 100.0 },
+        )
         .await
         .unwrap();
-
-    // Verify parameters were applied
-    if let Some(adaptive_conn) = transport.get_adaptive_connection(&conn_id) {
-        let params = adaptive_conn.parameters();
-
-        // DataCenter tier should have maximum parameters
-        assert!(
-            params.stream_window >= 32 * 1024 * 1024,
-            "Should have large stream window"
-        );
-        assert!(
-            params.max_streams >= 1000,
-            "Should have many concurrent streams"
-        );
-        info!("Manual tier setting applied correct parameters");
-    }
-}
-
-/// Integration test simulating real network changes
-#[tokio::test]
-async fn test_real_network_simulation() {
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..Default::default()
-    };
-
-    let transport = StoqTransport::new(config.clone()).await.unwrap();
-
-    transport.start_adaptation().await;
-
-    let server_addr = transport.local_addr().unwrap();
-
-    // Server with connection tracking
-    let server_transport = transport.clone();
-    let server_handle = tokio::spawn(async move {
-        let mut connections = Vec::new();
-        for _ in 0..3 {
-            match timeout(Duration::from_secs(5), server_transport.accept()).await {
-                Ok(Ok(conn)) => {
-                    info!("Server accepted connection: {}", conn.id());
-                    connections.push(conn);
-                }
-                _ => break,
-            }
-        }
-        connections
-    });
-
-    // Simulate multiple network conditions
-    let scenarios = vec![
-        ("Home Network", NetworkTier::Home { mbps: 300.0 }),
-        ("Gigabit LAN", NetworkTier::Standard { gbps: 1.0 }),
-        ("Data Center", NetworkTier::DataCenter { gbps: 100.0 }),
-    ];
-
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
-    );
-
-    for (name, tier) in scenarios {
-        info!("Testing scenario: {}", name);
-
-        let connection = transport.connect(&endpoint).await.unwrap();
-        let conn_id = connection.id();
-
-        // Simulate tier change
-        transport.set_connection_tier(&conn_id, tier).await.unwrap();
-
-        // Give time for adaptation
-        sleep(Duration::from_millis(500)).await;
-
-        // Verify adaptation
-        if let Some(adaptive) = transport.get_adaptive_connection(&conn_id) {
-            let current = adaptive.current_tier();
-            info!("Connection adapted to: {:?}", current);
-
-            let stats = adaptive.adaptation_stats();
-            assert!(stats.adaptation_count > 0, "Should have adapted for {name}");
-        }
-    }
-
-    // Clean shutdown
-    drop(transport);
-    let _ = server_handle.await;
-
-    info!("Real network simulation test completed");
-}
-
-/// Performance test - adaptation overhead
-#[tokio::test]
-async fn test_adaptation_overhead() {
-    use std::time::Instant;
-
-    let _ = tracing_subscriber::fmt::try_init();
-
-    let config = TransportConfig {
-        port: 0,
-        ..TransportConfig::default()
-    };
-    let transport = StoqTransport::new(config).await.unwrap();
-
-    transport.start_adaptation().await;
-
-    let server_addr = transport.local_addr().unwrap();
-
-    let server_transport = transport.clone();
-    tokio::spawn(async move {
-        loop {
-            if server_transport.accept().await.is_err() {
-                break;
-            }
-        }
-    });
-
-    let endpoint = Endpoint::new(
-        server_addr
-            .ip()
-            .to_string()
-            .parse::<Ipv6Addr>()
-            .unwrap_or(Ipv6Addr::LOCALHOST),
-        server_addr.port(),
-    );
-
-    let connection = transport.connect(&endpoint).await.unwrap();
-    let conn_id = connection.id();
-
-    // Measure adaptation time
-    let start = Instant::now();
-    transport
-        .force_connection_adaptation(&conn_id)
-        .await
-        .unwrap();
-    let adaptation_time = start.elapsed();
-
-    info!("Adaptation took: {:?}", adaptation_time);
-
-    // Should be very fast
     assert!(
-        adaptation_time < Duration::from_millis(100),
-        "Adaptation should be fast, took {adaptation_time:?}"
+        matches!(fixture.adaptive.current_tier(), NetworkTier::DataCenter { gbps } if gbps == 100.0)
     );
+    assert_eq!(
+        fixture.adaptive.adaptation_stats().adaptation_count,
+        before + 1
+    );
+    let params = fixture.adaptive.parameters();
+    assert!(params.stream_window >= 32 * 1024 * 1024);
+    assert!(params.max_streams >= 1000);
+    fixture.finish().await;
+}
 
-    // Measure multiple adaptations
+/// Manual tier transitions on one real connection, NOT simulated physical networks.
+#[tokio::test]
+async fn test_manual_tier_transitions_with_live_streams() {
+    let fixture = Fixture::new(true).await;
+    let scenarios = [
+        (NetworkTier::Home { mbps: 300.0 }, 2 * 1024 * 1024, 50),
+        (NetworkTier::Standard { gbps: 1.0 }, 8 * 1024 * 1024, 100),
+        (
+            NetworkTier::DataCenter { gbps: 100.0 },
+            32 * 1024 * 1024,
+            1000,
+        ),
+    ];
+    for (tier, window, streams) in scenarios {
+        let before = fixture.adaptive.adaptation_stats().adaptation_count;
+        fixture
+            .transport
+            .set_connection_tier(&fixture.client.id(), tier.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            format!("{:?}", fixture.adaptive.current_tier()),
+            format!("{tier:?}")
+        );
+        assert_eq!(
+            fixture.adaptive.adaptation_stats().adaptation_count,
+            before + 1
+        );
+        let params = fixture.adaptive.parameters();
+        assert_eq!(params.stream_window, window);
+        assert_eq!(params.max_streams, streams);
+        fixture.echo(format!("tier {tier:?}").as_bytes()).await;
+    }
+    fixture.finish().await;
+}
+
+/// Existing local latency limits, with every requested adaptation observed.
+#[tokio::test]
+async fn test_adaptation_overhead() -> Result<()> {
+    let fixture = Fixture::new(true).await;
+    let before = fixture.adaptive.adaptation_stats().adaptation_count;
+    let start = Instant::now();
+    fixture
+        .transport
+        .force_connection_adaptation(&fixture.client.id())
+        .await?;
+    assert!(start.elapsed() < Duration::from_millis(100));
+    assert_eq!(
+        fixture.adaptive.adaptation_stats().adaptation_count,
+        before + 1
+    );
     let start = Instant::now();
     for _ in 0..10 {
-        transport.force_connection_adaptation(&conn_id).await.ok();
+        fixture
+            .transport
+            .force_connection_adaptation(&fixture.client.id())
+            .await?;
     }
-    let total_time = start.elapsed();
-
-    let avg_time = total_time / 10;
-    info!("Average adaptation time: {:?}", avg_time);
-
-    assert!(
-        avg_time < Duration::from_millis(10),
-        "Average adaptation should be very fast"
+    assert!(start.elapsed() / 10 < Duration::from_millis(10));
+    assert_eq!(
+        fixture.adaptive.adaptation_stats().adaptation_count,
+        before + 11
     );
+    fixture.finish().await;
+    Ok(())
 }

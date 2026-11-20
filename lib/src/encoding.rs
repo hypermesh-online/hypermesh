@@ -24,10 +24,7 @@ pub fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, EncodingError> {
 /// Encode with a maximum size limit.
 ///
 /// Returns error if encoded size exceeds `max_bytes`.
-pub fn encode_bounded<T: Serialize>(
-    value: &T,
-    max_bytes: usize,
-) -> Result<Vec<u8>, EncodingError> {
+pub fn encode_bounded<T: Serialize>(value: &T, max_bytes: usize) -> Result<Vec<u8>, EncodingError> {
     let encoded = encode(value)?;
     if encoded.len() > max_bytes {
         return Err(EncodingError::SizeExceeded {

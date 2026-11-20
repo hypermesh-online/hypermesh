@@ -7,7 +7,7 @@
 //! Provides bilateral binary authentication. Each proof is pass/fail.
 //! No leader election, no voting, no quorum.
 
-use crate::proof_of_state::{StateProofConfig, StateProofError, StateProof};
+use crate::proof_of_state::{StateProof, StateProofConfig, StateProofError};
 use crate::transport::PeerIdentity;
 use anyhow::Result;
 use async_trait::async_trait;
@@ -53,6 +53,11 @@ impl DefaultStateProof {
     pub fn new(config: StateProofConfig, node_id: String) -> Self {
         Self { config, node_id }
     }
+
+    /// Access the state proof configuration
+    pub fn config(&self) -> &StateProofConfig {
+        &self.config
+    }
 }
 
 #[async_trait]
@@ -65,16 +70,30 @@ impl AsyncStateProof for DefaultStateProof {
     ) -> StateProofOpResult<StateProof> {
         StateProof::generate_from_network(&self.node_id)
             .await
-            .map_err(|e| StateProofError::ValidationFailed(
-                format!("PoS generation failed: {e}")
-            ))
+            .map_err(|e| StateProofError::ValidationFailed(format!("PoS generation failed: {e}")))
     }
 
     async fn validate_state_proof(&self, proof: &StateProof) -> StateProofOpResult<bool> {
-        proof
+        let valid = proof
             .validate_comprehensive()
             .await
-            .map_err(|e| StateProofError::ValidationFailed(e.to_string()))
+            .map_err(|e| StateProofError::ValidationFailed(e.to_string()))?;
+        if !valid {
+            return Ok(false);
+        }
+
+        // Enforce temporal freshness of WHEN proof against configured bound
+        let now = std::time::SystemTime::now();
+        if let Ok(elapsed) = now.duration_since(proof.time_proof.time_verification_timestamp) {
+            if elapsed > self.config.max_time_offset {
+                return Err(StateProofError::ValidationFailed(format!(
+                    "State proof expired: age {:?} exceeds max allowed {:?}",
+                    elapsed, self.config.max_time_offset
+                )));
+            }
+        }
+
+        Ok(true)
     }
 
     async fn get_state(&self) -> StateProofOpResult<StateProofState> {

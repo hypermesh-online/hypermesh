@@ -8,6 +8,7 @@
 //! [`AuthenticatedPeers`]. All block/shard/sync message handlers
 //! check this map before processing incoming data.
 
+use hypermesh_lib::NetworkId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -21,12 +22,19 @@ const AUTH_TTL: std::time::Duration = std::time::Duration::from_secs(3600);
 pub struct AuthenticatedPeer {
     /// Node ID (hex hash of genesis block).
     pub node_id: String,
+    /// Local STOQ session identity, never supplied by peer metadata.
+    pub connection_id: String,
     /// FALCON-1024 public key bytes.
     pub pubkey: Vec<u8>,
     /// Matrix coordinate of the peer.
     pub coordinate: (i32, i32, i32),
-    /// Network ID the peer belongs to.
-    pub network_id: String,
+    /// Canonical network the peer belongs to.
+    ///
+    /// Derived at the handshake ingress boundary from the peer's advertised
+    /// wire string via [`NetworkId::from_wire_str`]. Comparisons are against our
+    /// own network id put through the SAME converter, so two nodes that agree on
+    /// a wire string agree here.
+    pub network_id: NetworkId,
     /// When the peer was authenticated.
     pub authenticated_at: std::time::Instant,
     /// Last verified PoS proof bytes (from handshake).
@@ -54,161 +62,119 @@ pub async fn register_authenticated_peer(
     peers: &AuthenticatedPeers,
     peer: AuthenticatedPeer,
 ) -> bool {
-    let short_id = &peer.node_id[..8.min(peer.node_id.len())];
-
-    // Reject peers with empty proof bytes — bilateral PoS must have completed
-    if peer.proof_bytes.is_empty() {
-        warn!(
-            "Rejecting peer {} — empty proof_bytes (bilateral PoS handshake incomplete)",
-            short_id,
-        );
+    if peer.node_id.is_empty()
+        || peer.connection_id.is_empty()
+        || peer.proof_bytes.is_empty()
+        || peer.pubkey.is_empty()
+    {
+        warn!("Rejecting peer — missing identity, session, proof or public key");
         return false;
     }
-
-    // Reject peers with empty public key — identity not established
-    if peer.pubkey.is_empty() {
-        warn!(
-            "Rejecting peer {} — empty pubkey (FALCON-1024 identity not established)",
-            short_id,
-        );
-        return false;
-    }
-
-    // Reject peers with empty node_id
-    if peer.node_id.is_empty() {
-        warn!("Rejecting peer — empty node_id");
-        return false;
-    }
-
     debug!(
-        "Registering authenticated peer {} (network={}, proof={} bytes, pubkey={} bytes)",
-        short_id, peer.network_id, peer.proof_bytes.len(), peer.pubkey.len(),
+        "Registering authenticated peer {} (network={})",
+        peer.node_id, peer.network_id
     );
     peers.write().await.insert(peer.node_id.clone(), peer);
     true
 }
 
-/// Remove a peer from the authenticated set.
+/// Remove only the registration owned by this local STOQ connection.
 pub async fn remove_authenticated_peer(
     peers: &AuthenticatedPeers,
     node_id: &str,
+    connection_id: &str,
 ) {
-    let short_id = &node_id[..8.min(node_id.len())];
-    if peers.write().await.remove(node_id).is_some() {
-        warn!("Removed authenticated peer {}", short_id);
+    let mut map = peers.write().await;
+    if !connection_id.is_empty()
+        && map
+            .get(node_id)
+            .is_some_and(|peer| peer.connection_id == connection_id)
+    {
+        map.remove(node_id);
+        warn!("Removed authenticated peer {}", node_id);
     }
 }
 
 /// Check whether a node_id is in the authenticated peers map.
-pub async fn is_authenticated(
-    peers: &AuthenticatedPeers,
-    node_id: &str,
-) -> bool {
+pub async fn is_authenticated(peers: &AuthenticatedPeers, node_id: &str) -> bool {
     peers.read().await.contains_key(node_id)
 }
 
-/// Check whether a node_id belongs to the given network_id.
+/// The canonical [`NetworkId`] an authenticated peer belongs to, if known.
+///
+/// Returns `None` when the peer has not completed a bilateral handshake (not in
+/// the map). Used to attribute a peer's shard demand/announcements to ITS
+/// network rather than flattening to the default.
+pub async fn peer_network_id(peers: &AuthenticatedPeers, node_id: &str) -> Option<NetworkId> {
+    peers.read().await.get(node_id).map(|p| p.network_id)
+}
+
+/// Check whether a node_id belongs to the given network.
+///
+/// `our_network_id` is the caller's wire-form network string; it is mapped to
+/// its canonical [`NetworkId`] through the single ingress converter before the
+/// comparison, so this stays byte-for-byte equivalent to the old
+/// string-equality check under a single network.
 pub async fn is_same_network(
     peers: &AuthenticatedPeers,
     node_id: &str,
     our_network_id: &str,
 ) -> bool {
+    let ours = NetworkId::from_wire_str(our_network_id);
     match peers.read().await.get(node_id) {
-        Some(peer) => peer.network_id == our_network_id,
+        Some(peer) => peer.network_id == ours,
         None => false,
     }
 }
 
-/// Verify that a sender is both authenticated and in the same network.
-///
-/// Returns `true` if the peer passes both checks. Logs a warning on
-/// rejection so operators can see unauthorized access attempts.
+/// Authorize this local session against a single current registry row.
+/// Status/membership helpers above do not authorize a connection.
 pub async fn verify_peer_access(
     peers: &AuthenticatedPeers,
     node_id: &str,
+    connection_id: &str,
     our_network_id: &str,
 ) -> bool {
-    let short_id = &node_id[..8.min(node_id.len())];
-
-    let expired = {
-        let map = peers.read().await;
-        match map.get(node_id) {
-            None => {
-                warn!(
-                    "Rejected message from unauthenticated peer {}",
-                    short_id,
-                );
-                return false;
-            }
-            Some(peer) if peer.network_id != our_network_id => {
-                warn!(
-                    "Rejected message from peer {} (network '{}' != ours '{}')",
-                    short_id, peer.network_id, our_network_id,
-                );
-                return false;
-            }
-            Some(peer) => peer.authenticated_at.elapsed() > AUTH_TTL,
-        }
-    };
-
-    if expired {
-        warn!(
-            "Rejected message from peer {} (auth expired after {:?})",
-            short_id, AUTH_TTL,
-        );
-        peers.write().await.remove(node_id);
-        return false;
-    }
-
-    true
+    authorize_session(peers, node_id, connection_id, our_network_id, false).await
 }
 
-/// Verify a peer's PoS proof binding for a specific shard fetch (F6).
-///
-/// This is the per-asset half of shard authorization. Coarse membership
-/// (`verify_peer_access`) answers "is this peer authenticated for our
-/// network"; this answers "does this authenticated peer's PoS proof bind
-/// it to THIS asset". A peer may only fetch a shard when BOTH hold:
-///
-///  1. `verify_peer_access` passed (authenticated + same network + fresh), and
-///  2. the peer carries a non-empty validated PoS proof (`proof_bytes`),
-///     which the bilateral handshake established.
-///
-/// The asset-level anchor — that the shard actually belongs to a
-/// registered asset on a shared chain — is supplied by the caller via
-/// [`crate::blockchain::node_chain::NodeBlockchain::authorizes_shard`].
-/// This function enforces the requester-side proof binding; the caller
-/// combines it with the chain anchor. Returns `true` only when the peer
-/// is authenticated AND carries a bound proof.
-///
-/// Rationale (F6): the previous gate served any shard to any same-network
-/// peer. Binding the fetch to the requester's PoS proof means a peer that
-/// passed handshake but has no proof-of-state stake in the network cannot
-/// pull arbitrary shards — authorization is per-asset (via the chain
-/// anchor) and per-proof (here), not membership-only.
+/// Require current-session authorization and a bound proof from the SAME row.
+/// The caller separately checks the shard's chain anchor; this is not a
+/// cryptographic or asset-specific proof validation implementation.
 pub async fn verify_shard_proof_binding(
     peers: &AuthenticatedPeers,
     node_id: &str,
+    connection_id: &str,
     our_network_id: &str,
 ) -> bool {
-    // Reuse the membership/freshness gate first.
-    if !verify_peer_access(peers, node_id, our_network_id).await {
+    authorize_session(peers, node_id, connection_id, our_network_id, true).await
+}
+
+async fn authorize_session(
+    peers: &AuthenticatedPeers,
+    node_id: &str,
+    connection_id: &str,
+    our_network_id: &str,
+    require_proof: bool,
+) -> bool {
+    let mut map = peers.write().await;
+    let Some(peer) = map.get(node_id) else {
+        warn!("Rejected message from unauthenticated peer {}", node_id);
+        return false;
+    };
+    if connection_id.is_empty()
+        || peer.connection_id != connection_id
+        || peer.network_id != NetworkId::from_wire_str(our_network_id)
+    {
+        warn!("Rejected peer {} — session or network mismatch", node_id);
         return false;
     }
-    // Then require a non-empty bound PoS proof from the handshake.
-    let map = peers.read().await;
-    match map.get(node_id) {
-        Some(peer) if !peer.proof_bytes.is_empty() => true,
-        Some(_) => {
-            let short_id = &node_id[..8.min(node_id.len())];
-            warn!(
-                "Rejected shard fetch from peer {} — no bound PoS proof (F6 per-asset auth)",
-                short_id,
-            );
-            false
-        }
-        None => false,
+    if peer.authenticated_at.elapsed() > AUTH_TTL {
+        map.remove(node_id);
+        warn!("Rejected peer {} — authentication expired", node_id);
+        return false;
     }
+    !require_proof || !peer.proof_bytes.is_empty()
 }
 
 /// Validate that a peer's claimed public key is consistent with their
@@ -249,227 +215,20 @@ pub async fn validate_key_continuity(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod tests;
 
-    fn make_peer(node_id: &str, network_id: &str) -> AuthenticatedPeer {
-        AuthenticatedPeer {
-            node_id: node_id.to_string(),
-            pubkey: vec![1, 2, 3],
-            coordinate: (0, 0, 0),
-            network_id: network_id.to_string(),
-            authenticated_at: std::time::Instant::now(),
-            proof_bytes: vec![4, 5, 6],
-        }
-    }
+pub(super) mod demand;
 
-    #[tokio::test]
-    async fn test_register_and_check() {
-        let peers = new_authenticated_peers();
-        let peer = make_peer("abc123def456", "net-1");
-
-        assert!(!is_authenticated(&peers, "abc123def456").await);
-        assert!(register_authenticated_peer(&peers, peer).await);
-        assert!(is_authenticated(&peers, "abc123def456").await);
-    }
-
-    #[tokio::test]
-    async fn test_register_rejects_empty_proof() {
-        let peers = new_authenticated_peers();
-        let mut peer = make_peer("emptyproof1", "net-1");
-        peer.proof_bytes = Vec::new();
-
-        assert!(!register_authenticated_peer(&peers, peer).await);
-        assert!(!is_authenticated(&peers, "emptyproof1").await);
-    }
-
-    #[tokio::test]
-    async fn test_register_rejects_empty_pubkey() {
-        let peers = new_authenticated_peers();
-        let mut peer = make_peer("emptypubk1", "net-1");
-        peer.pubkey = Vec::new();
-
-        assert!(!register_authenticated_peer(&peers, peer).await);
-        assert!(!is_authenticated(&peers, "emptypubk1").await);
-    }
-
-    #[tokio::test]
-    async fn test_register_rejects_empty_node_id() {
-        let peers = new_authenticated_peers();
-        let peer = AuthenticatedPeer {
-            node_id: String::new(),
-            pubkey: vec![1, 2, 3],
-            coordinate: (0, 0, 0),
-            network_id: "net-1".to_string(),
-            authenticated_at: std::time::Instant::now(),
-            proof_bytes: vec![4, 5, 6],
-        };
-
-        assert!(!register_authenticated_peer(&peers, peer).await);
-    }
-
-    #[tokio::test]
-    async fn test_remove_peer() {
-        let peers = new_authenticated_peers();
-        assert!(register_authenticated_peer(&peers, make_peer("node1234", "net-1")).await);
-        assert!(is_authenticated(&peers, "node1234").await);
-
-        remove_authenticated_peer(&peers, "node1234").await;
-        assert!(!is_authenticated(&peers, "node1234").await);
-    }
-
-    #[tokio::test]
-    async fn test_network_scoping() {
-        let peers = new_authenticated_peers();
-        assert!(register_authenticated_peer(&peers, make_peer("nodeAAAA", "net-alpha")).await);
-
-        assert!(is_same_network(&peers, "nodeAAAA", "net-alpha").await);
-        assert!(!is_same_network(&peers, "nodeAAAA", "net-beta").await);
-    }
-
-    #[tokio::test]
-    async fn test_verify_peer_access_authenticated_same_network() {
-        let peers = new_authenticated_peers();
-        assert!(register_authenticated_peer(&peers, make_peer("nodeX123", "main")).await);
-
-        assert!(verify_peer_access(&peers, "nodeX123", "main").await);
-    }
-
-    #[tokio::test]
-    async fn test_verify_peer_access_unauthenticated() {
-        let peers = new_authenticated_peers();
-        assert!(!verify_peer_access(&peers, "unknown1", "main").await);
-    }
-
-    #[tokio::test]
-    async fn test_verify_peer_access_wrong_network() {
-        let peers = new_authenticated_peers();
-        assert!(register_authenticated_peer(&peers, make_peer("nodeY456", "other-net")).await);
-
-        assert!(!verify_peer_access(&peers, "nodeY456", "main").await);
-    }
-
-    // ── F6: per-asset shard-fetch proof binding ─────────────────────────
-
-    #[tokio::test]
-    async fn test_shard_proof_binding_ok_for_authenticated_peer() {
-        let peers = new_authenticated_peers();
-        // make_peer sets non-empty proof_bytes (vec![4,5,6]).
-        assert!(register_authenticated_peer(&peers, make_peer("shardOK01", "main")).await);
-        assert!(verify_shard_proof_binding(&peers, "shardOK01", "main").await);
-    }
-
-    #[tokio::test]
-    async fn test_shard_proof_binding_rejects_unauthenticated() {
-        let peers = new_authenticated_peers();
-        // Never registered → no proof binding.
-        assert!(!verify_shard_proof_binding(&peers, "ghostpeer", "main").await);
-    }
-
-    #[tokio::test]
-    async fn test_shard_proof_binding_rejects_wrong_network() {
-        let peers = new_authenticated_peers();
-        assert!(register_authenticated_peer(&peers, make_peer("shardWN01", "other")).await);
-        // Authenticated, but for a different network → refused.
-        assert!(!verify_shard_proof_binding(&peers, "shardWN01", "main").await);
-    }
-
-    #[tokio::test]
-    async fn test_shard_proof_binding_rejects_empty_proof() {
-        // A peer inserted DIRECTLY (bypassing register_authenticated_peer's
-        // non-empty-proof guard) with empty proof_bytes must be refused by
-        // the F6 binding check — membership alone is not enough.
-        let peers = new_authenticated_peers();
-        let mut peer = make_peer("noproof01", "main");
-        peer.proof_bytes = Vec::new();
-        peers.write().await.insert(peer.node_id.clone(), peer);
-
-        assert!(!verify_shard_proof_binding(&peers, "noproof01", "main").await);
-    }
-
-    #[tokio::test]
-    async fn expired_auth_is_rejected() {
-        let peers = new_authenticated_peers();
-        let mut peer = make_peer("expiredAA", "net-1");
-        peer.authenticated_at =
-            std::time::Instant::now() - std::time::Duration::from_secs(7200);
-
-        peers.write().await.insert(peer.node_id.clone(), peer);
-
-        assert!(!verify_peer_access(&peers, "expiredAA", "net-1").await);
-        assert!(!peers.read().await.contains_key("expiredAA"));
-    }
-
-    // ── Key continuity tests ────────────────────────────────────────
-
-    #[tokio::test]
-    async fn test_validate_key_continuity_no_history() {
-        let chains = tokio::sync::RwLock::new(HashMap::new());
-        // No rotation chain at all → accept any key
-        assert!(validate_key_continuity(&chains, "node-aaa", "fp-xyz").await);
-    }
-
-    #[tokio::test]
-    async fn test_validate_key_continuity_empty_chain() {
-        let chains = tokio::sync::RwLock::new(HashMap::new());
-        chains
-            .write()
-            .await
-            .insert("node-bbb".to_string(), Vec::new());
-        // Empty chain → accept any key
-        assert!(validate_key_continuity(&chains, "node-bbb", "fp-xyz").await);
-    }
-
-    #[tokio::test]
-    async fn test_validate_key_continuity_matches_latest() {
-        let chains = tokio::sync::RwLock::new(HashMap::new());
-        let entry = serde_json::json!({
-            "old_key_fingerprint": "fp-A",
-            "new_key_fingerprint": "fp-B",
-            "reason": "Scheduled",
-        });
-        chains
-            .write()
-            .await
-            .insert("node-ccc".to_string(), vec![entry]);
-        // Claimed key matches latest rotation's new_key → true
-        assert!(validate_key_continuity(&chains, "node-ccc", "fp-B").await);
-    }
-
-    #[tokio::test]
-    async fn test_validate_key_continuity_stale_key() {
-        let chains = tokio::sync::RwLock::new(HashMap::new());
-        let entry = serde_json::json!({
-            "old_key_fingerprint": "fp-A",
-            "new_key_fingerprint": "fp-B",
-            "reason": "Scheduled",
-        });
-        chains
-            .write()
-            .await
-            .insert("node-ddd".to_string(), vec![entry]);
-        // Claimed key is the old key, not the new one → false
-        assert!(!validate_key_continuity(&chains, "node-ddd", "fp-A").await);
-    }
-
-    #[tokio::test]
-    async fn test_validate_key_continuity_multi_rotation() {
-        let chains = tokio::sync::RwLock::new(HashMap::new());
-        let entry1 = serde_json::json!({
-            "old_key_fingerprint": "fp-A",
-            "new_key_fingerprint": "fp-B",
-        });
-        let entry2 = serde_json::json!({
-            "old_key_fingerprint": "fp-B",
-            "new_key_fingerprint": "fp-C",
-        });
-        chains
-            .write()
-            .await
-            .insert("node-eee".to_string(), vec![entry1, entry2]);
-        // Only the latest new_key (fp-C) should pass
-        assert!(validate_key_continuity(&chains, "node-eee", "fp-C").await);
-        assert!(!validate_key_continuity(&chains, "node-eee", "fp-B").await);
-        assert!(!validate_key_continuity(&chains, "node-eee", "fp-A").await);
-    }
+/// Synchronous commit-time revalidation; caller holds this exact auth row.
+fn shard_demand_network(
+    peer: &AuthenticatedPeer,
+    connection_id: &str,
+    our_network_id: &str,
+) -> Option<NetworkId> {
+    let valid = !connection_id.is_empty()
+        && peer.connection_id == connection_id
+        && peer.network_id == NetworkId::from_wire_str(our_network_id)
+        && peer.authenticated_at.elapsed() <= AUTH_TTL
+        && !peer.proof_bytes.is_empty();
+    valid.then_some(peer.network_id)
 }

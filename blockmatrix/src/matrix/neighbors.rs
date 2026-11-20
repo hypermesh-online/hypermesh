@@ -254,7 +254,9 @@ mod tests {
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
         assert!(neighbors.len() >= 3); // At least the unit distance ones
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")));
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"))
+        );
     }
 
     #[test]
@@ -325,8 +327,12 @@ mod tests {
 
         // Should include (1,1,1), (2,2,2), and unit distance ones
         assert!(neighbors.len() >= 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
-        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate")));
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"))
+        );
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"))
+        );
     }
 
     #[test]
@@ -364,8 +370,12 @@ mod tests {
 
         let neighbors = find_neighbors_manhattan(&center, &candidates, 4);
         assert_eq!(neighbors.len(), 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate")));
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"))
+        );
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(1, 0, 0).expect("test: valid coordinate"))
+        );
     }
 
     #[test]
@@ -379,8 +389,12 @@ mod tests {
 
         let neighbors = find_neighbors_chebyshev(&center, &candidates, 3);
         assert_eq!(neighbors.len(), 2);
-        assert!(neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate")));
-        assert!(neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate")));
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(2, 2, 2).expect("test: valid coordinate"))
+        );
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(1, 1, 1).expect("test: valid coordinate"))
+        );
     }
 
     #[test]
@@ -394,6 +408,8 @@ mod tests {
 
         let neighbors = find_neighbors(&center, &candidates, 5.0);
         assert!(!neighbors.is_empty());
-        assert!(neighbors.contains(&MatrixCoordinate::new(-4, -4, -4).expect("test: valid coordinate")));
+        assert!(
+            neighbors.contains(&MatrixCoordinate::new(-4, -4, -4).expect("test: valid coordinate"))
+        );
     }
 }

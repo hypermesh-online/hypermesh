@@ -10,7 +10,7 @@ use std::time::SystemTime;
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetError, AssetRegistration, AssetResult, StateProof, GpuRequirements, ProxyAddress,
+    AssetError, AssetRegistration, AssetResult, GpuRequirements, ProxyAddress, StateProof,
 };
 
 use super::types::*;

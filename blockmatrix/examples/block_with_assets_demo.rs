@@ -164,7 +164,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let hash_valid = block.verify_hash();
     println!(
         "   ├─ Hash integrity: {}",
-        if hash_valid { "✅ VALID" } else { "❌ INVALID" }
+        if hash_valid {
+            "✅ VALID"
+        } else {
+            "❌ INVALID"
+        }
     );
 
     let belongs = block.belongs_to_node(&node_coord);
@@ -196,8 +200,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
     println!("🚫 PART 7: Enforcement - Blocks MUST Contain Entries\n");
 
-    let result =
-        std::panic::catch_unwind(|| Block::new(2, vec![], "prev_hash".to_string()));
+    let result = std::panic::catch_unwind(|| Block::new(2, vec![], "prev_hash".to_string()));
 
     match result {
         Ok(_) => {

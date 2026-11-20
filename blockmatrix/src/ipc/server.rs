@@ -8,8 +8,8 @@
 
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{
-    self, protocol_versions_compatible, RpcRequest, RpcResponse, IPC_PROTOCOL_VERSION,
-    INTERNAL_ERROR, PROTOCOL_VERSION_MISMATCH,
+    self, protocol_versions_compatible, RpcRequest, RpcResponse, INTERNAL_ERROR,
+    IPC_PROTOCOL_VERSION, PROTOCOL_VERSION_MISMATCH,
 };
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -56,8 +56,8 @@ impl IpcServer {
         self.prepare_socket_path()
             .context("failed to prepare socket path")?;
 
-        let listener = UnixListener::bind(&self.socket_path)
-            .context("failed to bind unix socket")?;
+        let listener =
+            UnixListener::bind(&self.socket_path).context("failed to bind unix socket")?;
 
         self.write_pid_file()?;
 
@@ -116,8 +116,7 @@ impl IpcServer {
     /// Ensure the parent directory exists and remove stale socket files.
     fn prepare_socket_path(&self) -> Result<()> {
         if let Some(parent) = self.socket_path.parent() {
-            std::fs::create_dir_all(parent)
-                .context("failed to create socket directory")?;
+            std::fs::create_dir_all(parent).context("failed to create socket directory")?;
         }
 
         if self.socket_path.exists() {
@@ -225,6 +224,7 @@ async fn handle_connection(
 }
 
 /// Check whether a process with the given PID is alive.
+#[allow(unsafe_code)]
 fn process_alive(pid: u32) -> bool {
     #[cfg(unix)]
     {
@@ -273,7 +273,11 @@ mod tests {
             }
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-        assert!(path.exists(), "test: socket did not appear within timeout: {}", path.display());
+        assert!(
+            path.exists(),
+            "test: socket did not appear within timeout: {}",
+            path.display()
+        );
     }
 
     #[tokio::test]
@@ -282,9 +286,8 @@ mod tests {
         let sock = test_socket_path(&tmp);
 
         let handler = make_ping_handler();
-        let server = Arc::new(
-            IpcServer::with_path(handler, sock.clone()).expect("test: create server"),
-        );
+        let server =
+            Arc::new(IpcServer::with_path(handler, sock.clone()).expect("test: create server"));
 
         let server_clone = Arc::clone(&server);
         let server_handle = tokio::spawn(async move {
@@ -314,9 +317,8 @@ mod tests {
         let sock = test_socket_path(&tmp);
 
         let handler = make_ping_handler();
-        let server = Arc::new(
-            IpcServer::with_path(handler, sock.clone()).expect("test: create server"),
-        );
+        let server =
+            Arc::new(IpcServer::with_path(handler, sock.clone()).expect("test: create server"));
 
         let server_clone = Arc::clone(&server);
         let run_handle = tokio::spawn(async move {
@@ -329,7 +331,10 @@ mod tests {
         server.shutdown();
         let _ = run_handle.await;
 
-        assert!(!sock.exists(), "test: socket should be removed after shutdown");
+        assert!(
+            !sock.exists(),
+            "test: socket should be removed after shutdown"
+        );
     }
 
     #[tokio::test]

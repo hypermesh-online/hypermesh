@@ -66,9 +66,7 @@ pub enum SyncMessage {
         block_hash: String,
     },
     /// Request the genesis block for a network.
-    GenesisRequest {
-        network_id: String,
-    },
+    GenesisRequest { network_id: String },
     /// Response with the network's genesis block.
     GenesisResponse {
         network_id: String,
@@ -271,10 +269,7 @@ mod tests {
         let json = serde_json::to_string(&msg).expect("test: serialize");
         let parsed: SyncMessage = serde_json::from_str(&json).expect("test: deserialize");
         match parsed {
-            SyncMessage::BlockResponse {
-                network_id,
-                blocks,
-            } => {
+            SyncMessage::BlockResponse { network_id, blocks } => {
                 assert_eq!(network_id, "net-zeta");
                 assert_eq!(blocks.len(), 1);
                 assert_eq!(blocks[0].hash, block.hash);

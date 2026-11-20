@@ -546,12 +546,18 @@ mod tests {
         let package_id = package.id.to_string();
 
         // Add package
-        library.add_package(package).await.expect("test: async operation");
+        library
+            .add_package(package)
+            .await
+            .expect("test: async operation");
 
         // Get package
         let retrieved = library.get_package(&package_id).await;
         assert!(retrieved.is_some());
-        assert_eq!(retrieved.expect("test: assertion value").id.as_ref(), package_id);
+        assert_eq!(
+            retrieved.expect("test: assertion value").id.as_ref(),
+            package_id
+        );
 
         // Check stats
         let stats = library.get_stats().await.expect("test: async operation");
@@ -567,7 +573,10 @@ mod tests {
             let mut package = create_test_package();
             package.id = Arc::from(format!("test-{i}"));
             package.name = format!("Package {i}");
-            library.add_package(package).await.expect("test: async operation");
+            library
+                .add_package(package)
+                .await
+                .expect("test: async operation");
         }
 
         // Search packages using the simple string search

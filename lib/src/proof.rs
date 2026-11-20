@@ -5,20 +5,26 @@
 //! Canonical Proof of State types (single source of truth).
 //!
 //! These types define the four-proof Proof of State system used across all
-//! HyperMesh crates. TrustChain re-exports them and attaches the real
-//! generation (hardware assessment, NTP) and FALCON-1024 signature logic;
-//! STOQ / BlockMatrix consume these shapes directly without a TrustChain dep.
+//! HyperMesh crates. Rather than using Proof of Work and Proof of Stake for
+//! energy-intensive leader elections or financial staking cartels, HyperMesh
+//! implements a Four-Dimensional Real-World Asset (RWA) State Verification model:
 //!
 //! CANONICAL MODEL (asset-pos-model-canonical):
-//! - **PoStake = WHO / AUTHORIZATION** — a FALCON identity binding
-//!   (`stake_holder` + `stake_holder_id`). There is **no** stake amount / coin
-//!   magnitude. Authorization, never a quantity.
-//! - **PoWork = WHAT (hash of work done)** — `work_hash: [u8; 32]` is the
-//!   BLAKE3 of the work performed, NOT a resource-capacity number. There is no
-//!   `computational_power`, `pid`, `workload_type`, or `work_state`.
-//! - **PoSpace = WHERE** and **PoTime = WHEN** are location / temporal proofs.
+//! - **PoStake = WHO / TITLE & ENTITLEMENT** — Who holds the legitimate "stake"
+//!   in the resource, data, or CAESAR value-packet/goods (`stake_holder` +
+//!   `stake_holder_id`). Enforces cryptographic ownership and authorization grants,
+//!   with **no** financial coin-staking magnitude or cartel lockup.
+//! - **PoWork = WHAT / PROCESS & ARTIFACT INTEGRITY** — Cryptographic non-repudiation
+//!   for the work performed ("sign it and hash it to verify that it is what we claim
+//!   it is"). `work_hash: [u8; 32]` is the BLAKE3 digest of the execution context,
+//!   NOT an arbitrary hashcash puzzle or compute-capacity number.
+//! - **PoSpace = WHERE / RESIDENCY & CUSTODIAL LINEAGE** — Location and historical
+//!   custody trail. Captures storage path, hardware profile, and 3D Block-MATRIX
+//!   coordinates `(x, y, z)`, tracking where the asset lives and where it has been.
+//! - **PoTime = WHEN / TEMPORAL ANCHOR** — Monotonic sequence anchoring, freshness TTL,
+//!   and replay protection.
 //! - Capacity is a *descriptive* asset attribute (`authz::CapacityProfile`),
-//!   never a proof and never a gate.
+//!   never an admission gate.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -27,10 +33,12 @@ use std::time::{Duration, SystemTime};
 use crate::types::ProofType;
 
 // ---------------------------------------------------------------------------
-// SpaceProof — WHERE
+// SpaceProof — WHERE (Residency & Custodial Lineage)
 // ---------------------------------------------------------------------------
 
-/// Proof of Space: WHERE the asset is stored (storage commitment / location).
+/// Proof of Space: WHERE the asset is stored and where it has been. Captures
+/// physical/virtual storage path, capacity profile, and 3D matrix location,
+/// forming a verifiable chain of custody with mirror attestations.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SpaceProof {
     /// Node providing storage.
@@ -106,12 +114,13 @@ impl Default for SpaceProof {
 }
 
 // ---------------------------------------------------------------------------
-// StakeProof — WHO / AUTHORIZATION (no magnitude)
+// StakeProof — WHO / TITLE & ENTITLEMENT (no magnitude)
 // ---------------------------------------------------------------------------
 
-/// Proof of Stake: WHO owns / is authorized. This is an **authorization**
-/// (FALCON identity binding), NOT an economic magnitude. There is no stake
-/// amount.
+/// Proof of Stake: WHO owns / holds legal or access entitlement to an asset.
+/// This is an **authorization and title binding** (FALCON identity), NOT a
+/// financial staking deposit. Represents who has a legitimate "stake" in the
+/// data, resource, or CAESAR-based value-packet/goods.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StakeProof {
     /// Entity owning / authorized for the asset (e.g. CA, node, service).
@@ -187,11 +196,13 @@ impl Default for StakeProof {
 }
 
 // ---------------------------------------------------------------------------
-// WorkProof — WHAT (hash of work done)
+// WorkProof — WHAT (Process & Artifact Integrity)
 // ---------------------------------------------------------------------------
 
-/// Proof of Work: WHAT work was done, captured as the BLAKE3 hash of that
-/// work. This is NOT a resource-capacity figure.
+/// Proof of Work: WHAT work was done — process and artifact integrity.
+/// Cryptographically validates that the operation was executed authentically
+/// ("sign it and hash it to verify that it is what we claim it is").
+/// Captured as the BLAKE3 digest of the execution context.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorkProof {
     /// Entity that performed / requested the work.
@@ -590,7 +601,12 @@ impl StateProof {
 
     /// All four proof types present in this system.
     pub fn proof_types() -> &'static [ProofType] {
-        &[ProofType::Space, ProofType::Stake, ProofType::Work, ProofType::Time]
+        &[
+            ProofType::Space,
+            ProofType::Stake,
+            ProofType::Work,
+            ProofType::Time,
+        ]
     }
 
     /// List of proof types present (always all four for a valid `StateProof`).
@@ -633,9 +649,7 @@ impl StateProof {
     /// Serialize for network transmission.
     pub fn to_bytes(&self) -> Result<Vec<u8>, crate::error::HypermeshError> {
         bincode::serialize(self).map_err(|e| {
-            crate::error::HypermeshError::StateProof(format!(
-                "Failed to serialize StateProof: {e}"
-            ))
+            crate::error::HypermeshError::StateProof(format!("Failed to serialize StateProof: {e}"))
         })
     }
 
@@ -721,19 +735,25 @@ pub struct StateRequirements {
 
 impl Default for StateRequirements {
     fn default() -> Self {
-        Self { max_time_offset: Duration::from_secs(60) }
+        Self {
+            max_time_offset: Duration::from_secs(60),
+        }
     }
 }
 
 impl StateRequirements {
     /// Production bound: 30s clock freshness.
     pub fn production() -> Self {
-        Self { max_time_offset: Duration::from_secs(30) }
+        Self {
+            max_time_offset: Duration::from_secs(30),
+        }
     }
 
     /// Relaxed bound for localhost testing: 300s clock freshness.
     pub fn localhost_testing() -> Self {
-        Self { max_time_offset: Duration::from_secs(300) }
+        Self {
+            max_time_offset: Duration::from_secs(300),
+        }
     }
 }
 
@@ -984,7 +1004,10 @@ mod tests {
         let bytes = pos.to_bytes().expect("test: to_bytes");
         let back = StateProof::from_bytes(&bytes).expect("test: from_bytes");
         assert_eq!(pos, back);
-        assert_eq!(pos.hash().expect("test: hash"), back.hash().expect("test: hash"));
+        assert_eq!(
+            pos.hash().expect("test: hash"),
+            back.hash().expect("test: hash")
+        );
     }
 
     #[test]

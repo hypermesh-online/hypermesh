@@ -14,8 +14,8 @@ use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 use super::SecuritySeverity;
-use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
+use crate::proof_of_state::StateProof;
 
 /// Security alert manager
 pub struct SecurityAlertManager {
@@ -477,7 +477,11 @@ impl SecurityAlertManager {
     ) -> AlertCategory {
         let content = format!("{} {}", title.to_lowercase(), description.to_lowercase());
 
-        if content.contains("state_proof") || content.contains("state proof") || content.contains("proof") || state_proof.is_some() {
+        if content.contains("state_proof")
+            || content.contains("state proof")
+            || content.contains("proof")
+            || state_proof.is_some()
+        {
             AlertCategory::StateProofValidation
         } else if content.contains("byzantine") || content.contains("malicious") {
             AlertCategory::ByzantineBehavior
@@ -647,7 +651,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let active_alerts = manager.get_active_alerts().await.expect("test: async operation");
+        let active_alerts = manager
+            .get_active_alerts()
+            .await
+            .expect("test: async operation");
         assert_eq!(active_alerts.len(), 1);
         assert!(matches!(active_alerts[0].status, AlertStatus::Acknowledged));
     }
@@ -673,7 +680,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let active_alerts = manager.get_active_alerts().await.expect("test: async operation");
+        let active_alerts = manager
+            .get_active_alerts()
+            .await
+            .expect("test: async operation");
         assert_eq!(active_alerts.len(), 1);
         assert!(matches!(active_alerts[0].status, AlertStatus::Resolved));
     }
@@ -697,7 +707,10 @@ mod tests {
                 .expect("test: expected success");
         }
 
-        let recent_alerts = manager.get_recent_alerts(3).await.expect("test: async operation");
+        let recent_alerts = manager
+            .get_recent_alerts(3)
+            .await
+            .expect("test: async operation");
         assert_eq!(recent_alerts.len(), 3);
     }
 
@@ -717,6 +730,9 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        assert!(matches!(alert.category, AlertCategory::StateProofValidation));
+        assert!(matches!(
+            alert.category,
+            AlertCategory::StateProofValidation
+        ));
     }
 }

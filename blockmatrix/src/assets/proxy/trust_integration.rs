@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
-use crate::assets::core::{AssetError, AssetResult, ProxyCapabilities, ProxyNodeInfo};
+use crate::assets::core::{AssetError, AssetResult, ProxyNodeInfo};
 
 /// TrustChain integration handler
 pub struct TrustChainIntegration {
@@ -442,10 +442,7 @@ impl TrustChainIntegration {
             expires_at: SystemTime::now() + self.config.validation_cache_timeout,
         };
 
-        tracing::debug!(
-            "Trust chain validation result: {}",
-            result.valid,
-        );
+        tracing::debug!("Trust chain validation result: {}", result.valid,);
 
         Ok(result)
     }
@@ -527,10 +524,7 @@ impl TrustChainIntegration {
     }
 
     /// Check if certificate is valid (binary: valid or invalid)
-    pub async fn is_certificate_valid(
-        &self,
-        certificate_fingerprint: &str,
-    ) -> AssetResult<bool> {
+    pub async fn is_certificate_valid(&self, certificate_fingerprint: &str) -> AssetResult<bool> {
         if let Some(cached_result) = self.get_cached_validation(certificate_fingerprint).await? {
             if cached_result.expires_at > SystemTime::now() {
                 return Ok(cached_result.valid);
@@ -637,9 +631,7 @@ impl CertificateValidator {
             } else {
                 result.valid = false;
                 result.validation_message = "Intermediate CA with unverified root".to_string();
-                result
-                    .errors
-                    .push("Root CA not verified".to_string());
+                result.errors.push("Root CA not verified".to_string());
             }
             return Ok(result);
         }

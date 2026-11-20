@@ -125,7 +125,9 @@ impl LoadBalancer {
                 .min_by(|(_, a), (_, b)| {
                     let score_a = a.cpu_utilization + a.memory_utilization;
                     let score_b = b.cpu_utilization + b.memory_utilization;
-                    score_a.partial_cmp(&score_b).expect("utilization scores should be valid for comparison")
+                    score_a
+                        .partial_cmp(&score_b)
+                        .expect("utilization scores should be valid for comparison")
                 })
                 .map(|(id, _)| id.clone())
                 .ok_or_else(|| crate::assets::core::AssetError::AllocationFailed {

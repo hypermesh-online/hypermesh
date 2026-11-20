@@ -105,8 +105,7 @@ async fn test_three_node_threshold_signing() {
     transport.set_share(fp_a, key_shares[1].clone());
     transport.set_share(fp_b, key_shares[2].clone());
 
-    let coordinator =
-        ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
+    let coordinator = ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
 
     let message = b"phase F.1 threshold signing test message";
     let signature = coordinator
@@ -118,8 +117,7 @@ async fn test_three_node_threshold_signing() {
     let mut hasher = Sha256::new();
     hasher.update(message);
     let digest: [u8; 32] = hasher.finalize().into();
-    let sig = falcon1024::DetachedSignature::from_bytes(&signature)
-        .expect("test: parse sig");
+    let sig = falcon1024::DetachedSignature::from_bytes(&signature).expect("test: parse sig");
     let verify = falcon1024::verify_detached_signature(&sig, &digest, &pk);
     assert!(
         verify.is_ok(),
@@ -181,8 +179,7 @@ async fn test_threshold_timeout() {
     transport.silence(fp_a);
     transport.silence(fp_b);
 
-    let coordinator =
-        ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
+    let coordinator = ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
 
     let message = b"timeout test";
     // We have 1 local share, need 2 more from peers, but they are
@@ -251,8 +248,7 @@ async fn test_byzantine_peer_excluded_from_quorum() {
     transport.set_share(fp_byz, shares[1].clone());
     transport.set_share(fp_good, shares[2].clone());
 
-    let coordinator =
-        ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
+    let coordinator = ThresholdSignCoordinator::new(fed.clone(), transport.clone() as Arc<_>);
 
     let _ = coordinator
         .sign(ca_fp, b"any", 2, Duration::from_millis(200))

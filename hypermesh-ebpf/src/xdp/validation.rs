@@ -344,7 +344,10 @@ mod map_serializer_tests {
         let bytes = asset_hash_entry_to_bytes(&hash, 14, true);
         assert_eq!(bytes.len(), 40);
         assert_eq!(&bytes[0..32], &hash);
-        assert_eq!(u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]), 14);
+        assert_eq!(
+            u32::from_le_bytes([bytes[32], bytes[33], bytes[34], bytes[35]]),
+            14
+        );
         assert_eq!(bytes[36], 1); // registered
         assert_eq!(&bytes[37..40], &[0u8; 3]); // padding
     }
@@ -362,12 +365,14 @@ mod map_serializer_tests {
         let bytes = pos_validation_to_bytes(0x01, true, 0xDEAD_BEEF_u64);
         assert_eq!(bytes.len(), 24);
         assert_eq!(bytes[0], 0x01); // algorithm = FALCON
-        // `reserved` @4..8 is always zero — no difficulty is carried.
-        assert_eq!(u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]), 0);
+                                    // `reserved` @4..8 is always zero — no difficulty is carried.
+        assert_eq!(
+            u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            0
+        );
         assert_eq!(bytes[8], 1); // validated
         let ts = u64::from_le_bytes([
-            bytes[16], bytes[17], bytes[18], bytes[19],
-            bytes[20], bytes[21], bytes[22], bytes[23],
+            bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21], bytes[22], bytes[23],
         ]);
         assert_eq!(ts, 0xDEAD_BEEF);
     }
@@ -385,7 +390,13 @@ mod map_serializer_tests {
         assert_eq!(strict.len(), 16);
         // strict => requires_pos=1, validate_asset_hash=1,
         // check_matrix_routing=1, privacy_tier=2.
-        assert_eq!(u32::from_le_bytes([strict[0], strict[1], strict[2], strict[3]]), 1);
-        assert_eq!(u32::from_le_bytes([strict[12], strict[13], strict[14], strict[15]]), 2);
+        assert_eq!(
+            u32::from_le_bytes([strict[0], strict[1], strict[2], strict[3]]),
+            1
+        );
+        assert_eq!(
+            u32::from_le_bytes([strict[12], strict[13], strict[14], strict[15]]),
+            2
+        );
     }
 }

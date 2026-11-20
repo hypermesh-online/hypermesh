@@ -9,6 +9,7 @@ pub mod connect;
 pub mod dns;
 pub mod domain;
 mod node_bringup;
-mod services;
+mod node_transport;
 pub mod ping;
+mod services;
 pub mod store;

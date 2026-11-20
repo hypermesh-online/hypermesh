@@ -44,9 +44,7 @@ use crate::gateway::asset_transfer::TransferReceipt;
 #[derive(Debug, Error)]
 pub enum CrossChainError {
     /// No receipt found for the given (source_chain_id, source_block_hash).
-    #[error(
-        "no receipt for source chain {source_chain_id} block {source_block_hash}"
-    )]
+    #[error("no receipt for source chain {source_chain_id} block {source_block_hash}")]
     ReceiptNotFound {
         /// Source chain identifier.
         source_chain_id: String,
@@ -55,9 +53,7 @@ pub enum CrossChainError {
     },
 
     /// Receipt found but its target_chain_id mismatches the requested target.
-    #[error(
-        "receipt target chain mismatch: expected {expected}, found {actual}"
-    )]
+    #[error("receipt target chain mismatch: expected {expected}, found {actual}")]
     TargetChainMismatch {
         /// Requested target chain.
         expected: String,
@@ -66,9 +62,7 @@ pub enum CrossChainError {
     },
 
     /// Receipt found but its target_block_hash mismatches the requested target.
-    #[error(
-        "receipt target block mismatch: expected {expected}, found {actual}"
-    )]
+    #[error("receipt target block mismatch: expected {expected}, found {actual}")]
     TargetBlockMismatch {
         /// Requested target block hash.
         expected: String,
@@ -198,15 +192,8 @@ impl CrossChainReceiptValidator {
     }
 
     /// Look up a receipt by `transfer_id`.
-    pub async fn get_by_transfer_id(
-        &self,
-        transfer_id: &str,
-    ) -> Option<TransferReceipt> {
-        self.by_transfer_id
-            .read()
-            .await
-            .get(transfer_id)
-            .cloned()
+    pub async fn get_by_transfer_id(&self, transfer_id: &str) -> Option<TransferReceipt> {
+        self.by_transfer_id.read().await.get(transfer_id).cloned()
     }
 
     /// Validate that a claimed cross-chain link matches a recorded receipt.
@@ -294,8 +281,10 @@ mod tests {
     #[tokio::test]
     async fn validates_correct_link() {
         let v = CrossChainReceiptValidator::new();
-        v.insert(sample_receipt("t-1", "chain-A", "hashA", "chain-B", "hashB"))
-            .await;
+        v.insert(sample_receipt(
+            "t-1", "chain-A", "hashA", "chain-B", "hashB",
+        ))
+        .await;
         v.validate_cross_chain("chain-A", "hashA", "chain-B", "hashB")
             .await
             .expect("test: link should validate");
@@ -314,8 +303,10 @@ mod tests {
     #[tokio::test]
     async fn target_chain_mismatch_errors() {
         let v = CrossChainReceiptValidator::new();
-        v.insert(sample_receipt("t-1", "chain-A", "hashA", "chain-B", "hashB"))
-            .await;
+        v.insert(sample_receipt(
+            "t-1", "chain-A", "hashA", "chain-B", "hashB",
+        ))
+        .await;
         let err = v
             .validate_cross_chain("chain-A", "hashA", "chain-X", "hashB")
             .await
@@ -326,8 +317,10 @@ mod tests {
     #[tokio::test]
     async fn target_hash_mismatch_errors() {
         let v = CrossChainReceiptValidator::new();
-        v.insert(sample_receipt("t-1", "chain-A", "hashA", "chain-B", "hashB"))
-            .await;
+        v.insert(sample_receipt(
+            "t-1", "chain-A", "hashA", "chain-B", "hashB",
+        ))
+        .await;
         let err = v
             .validate_cross_chain("chain-A", "hashA", "chain-B", "hashWRONG")
             .await
@@ -339,8 +332,10 @@ mod tests {
     async fn lookup_by_target_anchor_works() {
         // Auditor holding only the target side can still find the link.
         let v = CrossChainReceiptValidator::new();
-        v.insert(sample_receipt("t-1", "chain-A", "hashA", "chain-B", "hashB"))
-            .await;
+        v.insert(sample_receipt(
+            "t-1", "chain-A", "hashA", "chain-B", "hashB",
+        ))
+        .await;
         let got = v
             .get_by_source("chain-B", "hashB")
             .await

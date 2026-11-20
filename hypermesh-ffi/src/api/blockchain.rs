@@ -1,10 +1,10 @@
 // Copyright 2026 Hypermesh Foundation. All rights reserved.
 // Licensed under the Business Source License 1.1.
 
+use super::to_json_ptr;
 use crate::error_state;
 use crate::handle::{borrow_handle, HypermeshClientHandle};
 use crate::json_to_cstring;
-use super::to_json_ptr;
 use std::os::raw::c_char;
 
 /// Get the current blockchain height as a JSON number.

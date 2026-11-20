@@ -46,4 +46,8 @@ items = [
 ]
 
 [features.planned]
-items = []
+items = [
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Rename security/reputation.rs → publisher_authenticator (W2-5) — the module file survives the ReputationSystem→PublisherAuthenticator rename and re-introduces the banned 'reputation' concept at every import site (catalog::security::reputation::PublisherAuthenticator)",
+    "Wire the catalog↔blockmatrix registry seam in a real binary (W2-87) — both halves (wire_catalog_registry + CatalogRegistryAdapter) are built but no deployable binary connects them, so catalog.dependencies/catalog.search return the alpha 'registry not wired' response on every shipped node",
+]

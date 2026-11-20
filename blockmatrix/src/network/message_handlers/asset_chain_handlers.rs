@@ -43,9 +43,7 @@ use tracing::{info, warn};
 
 use crate::blockchain::PresentedAssetChain;
 
-use super::super::asset_chain_wire::{
-    decode_presented_asset_chain, encode_presented_asset_chain,
-};
+use super::super::asset_chain_wire::{decode_presented_asset_chain, encode_presented_asset_chain};
 use super::super::PeerContext;
 
 /// Handle a received `ASSET_CHAIN_TAG` message (tag 0x55).
@@ -56,11 +54,7 @@ use super::super::PeerContext;
 /// Returns `true` when the chain was adopted. Failures are logged and swallowed
 /// — this is a fire-and-forget presentation, and a peer learns nothing from our
 /// silence that it could not learn by re-reading the rules.
-pub(super) async fn handle_asset_chain(
-    data: &[u8],
-    peer_node_id: &str,
-    ctx: &PeerContext,
-) -> bool {
+pub(super) async fn handle_asset_chain(data: &[u8], peer_node_id: &str, ctx: &PeerContext) -> bool {
     let short_id = &peer_node_id[..8.min(peer_node_id.len())];
 
     let chain = match decode_presented_asset_chain(data) {

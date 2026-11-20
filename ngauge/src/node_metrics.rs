@@ -121,9 +121,7 @@ pub struct PeerMetrics {
 
 impl PeerMetrics {
     /// Create from a regional aggregate.
-    pub fn from_aggregate(
-        agg: &crate::streaming::RegionalAggregate,
-    ) -> Self {
+    pub fn from_aggregate(agg: &crate::streaming::RegionalAggregate) -> Self {
         Self {
             timestamp: SystemTime::now(),
             peer_count: agg.node_count,

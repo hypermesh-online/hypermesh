@@ -739,9 +739,7 @@ mod tests {
         let bank_network = NetworkId([1u8; 16]);
         let dealer_network = NetworkId([2u8; 16]);
 
-        use crate::proof_of_state::{
-            SpaceProof, StakeProof, TimeProof, WorkProof,
-        };
+        use crate::proof_of_state::{SpaceProof, StakeProof, TimeProof, WorkProof};
         use std::time::SystemTime;
 
         let proof = StateProof {
@@ -757,7 +755,6 @@ mod tests {
                 stake_holder: "test".to_string(),
                 stake_holder_id: "test-id".to_string(),
                 stake_timestamp: SystemTime::now(),
-
             },
             work_proof: WorkProof {
                 owner_id: "test-owner".to_string(),

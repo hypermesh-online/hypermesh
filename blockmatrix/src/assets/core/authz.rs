@@ -53,12 +53,13 @@ pub fn verify_grant(grant: &Grant) -> bool {
     hasher.update(&grant.signature.nonce);
     let digest = hasher.finalize();
 
-    let verified = <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::verify_signature(
-        &grant.signature.signer_pubkey,
-        digest.as_bytes(),
-        &grant.signature.signature,
-    )
-    .unwrap_or(false);
+    let verified =
+        <crate::identity::FalconIdentity as hypermesh_lib::NodeSigner>::verify_signature(
+            &grant.signature.signer_pubkey,
+            digest.as_bytes(),
+            &grant.signature.signature,
+        )
+        .unwrap_or(false);
     if !verified {
         return false;
     }
@@ -95,10 +96,7 @@ pub fn default_authorize(
     }
 
     let covered = auth.grants.iter().any(|g| {
-        g.grantee == actor
-            && !g.is_expired(now)
-            && scope_covers(g.scope, action)
-            && verify_grant(g)
+        g.grantee == actor && !g.is_expired(now) && scope_covers(g.scope, action) && verify_grant(g)
     });
 
     if covered {
@@ -224,7 +222,11 @@ mod tests {
         base.hash(&mut h1);
         let mut h2 = DefaultHasher::new();
         owned.hash(&mut h2);
-        assert_eq!(h1.finish(), h2.finish(), "authorization must not affect hash");
+        assert_eq!(
+            h1.finish(),
+            h2.finish(),
+            "authorization must not affect hash"
+        );
 
         // content_hash field itself is byte-stable across authorization change.
         assert_eq!(

@@ -593,7 +593,9 @@ impl SecurityVerifier {
                 let sig_path = if path.is_dir() {
                     path.join(sig_file)
                 } else {
-                    path.parent().expect("file path should have a parent directory").join(sig_file)
+                    path.parent()
+                        .expect("file path should have a parent directory")
+                        .join(sig_file)
                 };
 
                 if !sig_path.exists() {
@@ -728,13 +730,17 @@ mod tests {
 
         let so_path = PathBuf::from("extension.so");
         assert_eq!(
-            loader.determine_loading_method(&so_path).expect("test: expected success"),
+            loader
+                .determine_loading_method(&so_path)
+                .expect("test: expected success"),
             LoadingMethod::SharedLibrary
         );
 
         let wasm_path = PathBuf::from("extension.wasm");
         assert_eq!(
-            loader.determine_loading_method(&wasm_path).expect("test: expected success"),
+            loader
+                .determine_loading_method(&wasm_path)
+                .expect("test: expected success"),
             LoadingMethod::WebAssembly
         );
     }
@@ -756,7 +762,10 @@ mod tests {
 
         // Test operation limit
         for _ in 0..5 {
-            sandbox.start_operation().await.expect("test: async operation");
+            sandbox
+                .start_operation()
+                .await
+                .expect("test: async operation");
         }
 
         // Should fail when at limit

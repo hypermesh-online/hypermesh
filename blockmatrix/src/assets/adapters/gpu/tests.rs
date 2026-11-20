@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::assets::core::{
-    AssetAdapter, AssetAllocationRequest, AssetType, StateProof, GpuRequirements, PrivacyMode,
+    AssetAdapter, AssetAllocationRequest, AssetType, GpuRequirements, PrivacyMode, StateProof,
 };
 use std::collections::HashMap;
 use std::time::Duration;

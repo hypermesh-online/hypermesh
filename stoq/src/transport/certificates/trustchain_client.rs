@@ -18,7 +18,7 @@ use tracing::{debug, info, warn};
 use super::types::StoqNodeCertificate;
 use crate::protocol::STOQ_ALPN;
 use crate::transport::falcon::{
-    self, FalconEngine, FalconSignature, FalconVariant, verify_certificate_signature,
+    self, verify_certificate_signature, FalconEngine, FalconSignature, FalconVariant,
 };
 
 /// TrustChain client for certificate operations

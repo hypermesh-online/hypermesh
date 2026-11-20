@@ -230,8 +230,7 @@ pub fn test_space_proof() -> SpaceProof {
         100 * 1024 * 1024 * 1024,
     );
     p.total_size = 50 * 1024 * 1024 * 1024;
-    p.file_hash =
-        "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
+    p.file_hash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2".to_string();
     p
 }
 

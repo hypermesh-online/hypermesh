@@ -7,10 +7,10 @@
 //! STOQ transport events (latency, throughput, connection health) into
 //! Capacity and Congestion [`MetricsFrame`]s for streaming to the mesh.
 
+use hypermesh_ebpf::metrics::HyperMeshMetrics;
 use ngauge::streaming::protocol::{CongestionSnapshot, RoutingSnapshot};
 use ngauge::streaming::{MetricsFrame, MetricsPublisher};
 use ngauge::CapacityMetrics;
-use hypermesh_ebpf::metrics::HyperMeshMetrics;
 
 /// Bridge that converts STOQ transport metrics into ngauge MetricsFrames.
 ///
@@ -201,9 +201,9 @@ fn routing_from_ebpf(ebpf: &HyperMeshMetrics) -> RoutingSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ngauge::streaming::MetricsPayload;
     use hypermesh_lib::types::NodeId;
     use hypermesh_lib::PrivacyMode;
+    use ngauge::streaming::MetricsPayload;
 
     fn test_publisher(privacy: PrivacyMode) -> MetricsPublisher {
         MetricsPublisher::new(
@@ -238,7 +238,10 @@ mod tests {
         let mut bridge = MetricsFrameBridge::new(publisher);
 
         let count = bridge.publish_transport_metrics(&test_snapshot());
-        assert_eq!(count, 3, "Public should produce Capacity + Congestion + Routing");
+        assert_eq!(
+            count, 3,
+            "Public should produce Capacity + Congestion + Routing"
+        );
         assert_eq!(bridge.outbound_count(), 3);
 
         let frames = bridge.drain_outbound();
@@ -285,10 +288,7 @@ mod tests {
         let has_routing = frames
             .iter()
             .any(|f| matches!(f.payload, MetricsPayload::Routing(_)));
-        assert!(
-            !has_routing,
-            "Private should NOT include Routing frame"
-        );
+        assert!(!has_routing, "Private should NOT include Routing frame");
     }
 
     fn test_ebpf_metrics() -> HyperMeshMetrics {

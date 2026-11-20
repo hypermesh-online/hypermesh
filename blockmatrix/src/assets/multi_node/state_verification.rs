@@ -22,7 +22,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use crate::assets::core::{
-    AssetError, AssetResult, StateProof, SpaceProof, StakeProof, TimeProof, WorkProof,
+    AssetError, AssetResult, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
 };
 
 use super::PeerIdentity;
@@ -196,10 +196,7 @@ impl StateVerificationManager {
             let peers = self.peers.read().await;
             if !peers.contains_key(peer_id) {
                 return Err(AssetError::StateProofValidationFailed {
-                    reason: format!(
-                        "Unknown peer: {}",
-                        hex::encode(&peer_id.id[..8])
-                    ),
+                    reason: format!("Unknown peer: {}", hex::encode(&peer_id.id[..8])),
                 });
             }
         }
@@ -292,10 +289,7 @@ impl StateVerificationManager {
     // --- Private helpers ---
 
     /// Record an authentic verification result.
-    async fn record_authentic(
-        &self,
-        peer_id: &PeerIdentity,
-    ) -> AssetResult<VerificationResult> {
+    async fn record_authentic(&self, peer_id: &PeerIdentity) -> AssetResult<VerificationResult> {
         let result = VerificationResult {
             is_authentic: true,
             failed_proof: None,
@@ -452,11 +446,7 @@ mod tests {
     }
 
     fn test_coordinate() -> super::super::multi_network_coordinator::IntegerMatrixPosition {
-        super::super::multi_network_coordinator::IntegerMatrixPosition {
-            x: 0,
-            y: 0,
-            z: 0,
-        }
+        super::super::multi_network_coordinator::IntegerMatrixPosition { x: 0, y: 0, z: 0 }
     }
 
     #[tokio::test]
@@ -489,20 +479,25 @@ mod tests {
     #[tokio::test]
     async fn test_verify_authentic_proof() {
         let node = create_test_node();
-        let manager = StateVerificationManager::new(node.clone(), StateVerificationConfig::default());
+        let manager =
+            StateVerificationManager::new(node.clone(), StateVerificationConfig::default());
 
         let peer = create_test_peer();
         manager.add_peer(peer.clone(), test_coordinate()).await;
 
         // Build a proof from the peer's perspective
-        let peer_manager = StateVerificationManager::new(peer.clone(), StateVerificationConfig::default());
+        let peer_manager =
+            StateVerificationManager::new(peer.clone(), StateVerificationConfig::default());
         let chain_hash = blake3::hash(b"test-chain-head").as_bytes().to_owned();
         let mut hash_array = [0u8; 32];
         hash_array.copy_from_slice(&chain_hash);
         let proof = peer_manager.build_local_proof(hash_array).await;
 
         // Verify bilaterally
-        let result = manager.verify_peer_state(&peer, &proof).await.expect("test: verification should succeed");
+        let result = manager
+            .verify_peer_state(&peer, &proof)
+            .await
+            .expect("test: verification should succeed");
         assert!(result.is_authentic);
         assert!(result.failed_proof.is_none());
 
@@ -597,7 +592,10 @@ mod tests {
             generated_at: SystemTime::now(),
         };
 
-        let result = manager.verify_peer_state(&peer, &proof).await.expect("test: should return result");
+        let result = manager
+            .verify_peer_state(&peer, &proof)
+            .await
+            .expect("test: should return result");
         assert!(!result.is_authentic);
         assert_eq!(result.failed_proof, Some(hypermesh_lib::ProofType::Stake));
     }

@@ -250,7 +250,11 @@ mod tests {
         let proc = default_processor();
 
         let result = proc
-            .process_handoff(&mut pkt, NodeId::from_public_key(b"relay-1"), GoldGrams(dec!(2)))
+            .process_handoff(
+                &mut pkt,
+                NodeId::from_public_key(b"relay-1"),
+                GoldGrams(dec!(2)),
+            )
             .expect("test: handoff should succeed");
 
         assert_eq!(result.remaining_value, GoldGrams(dec!(98)));
@@ -263,7 +267,11 @@ mod tests {
         let proc = default_processor();
 
         let result = proc
-            .process_handoff(&mut pkt, NodeId::from_public_key(b"relay-1"), GoldGrams(dec!(1)))
+            .process_handoff(
+                &mut pkt,
+                NodeId::from_public_key(b"relay-1"),
+                GoldGrams(dec!(1)),
+            )
             .expect("test: handoff should succeed");
 
         assert_eq!(result.hop_count, 1);
@@ -275,7 +283,11 @@ mod tests {
         let mut pkt = mint_packet(GoldGrams(dec!(100)), GoldGrams(dec!(5)));
         let proc = default_processor();
 
-        let err = proc.process_handoff(&mut pkt, NodeId::from_public_key(b"relay-1"), GoldGrams(dec!(10)));
+        let err = proc.process_handoff(
+            &mut pkt,
+            NodeId::from_public_key(b"relay-1"),
+            GoldGrams(dec!(10)),
+        );
         assert!(
             matches!(err, Err(ProcessorError::FeeBudgetExceeded { .. })),
             "expected FeeBudgetExceeded, got {err:?}"
@@ -292,7 +304,11 @@ mod tests {
         let proc = PacketProcessor::new(config);
 
         let result = proc
-            .process_handoff(&mut pkt, NodeId::from_public_key(b"relay-1"), GoldGrams(dec!(10)))
+            .process_handoff(
+                &mut pkt,
+                NodeId::from_public_key(b"relay-1"),
+                GoldGrams(dec!(10)),
+            )
             .expect("test: should succeed without budget enforcement");
 
         assert_eq!(result.remaining_value, GoldGrams(dec!(90)));
@@ -338,10 +354,18 @@ mod tests {
         let mut pkt = mint_packet(GoldGrams(dec!(100)), GoldGrams(dec!(10)));
         let proc = default_processor();
 
-        proc.process_handoff(&mut pkt, NodeId::from_public_key(b"relay-1"), GoldGrams(dec!(1)))
-            .expect("test: first handoff");
-        proc.process_handoff(&mut pkt, NodeId::from_public_key(b"relay-2"), GoldGrams(dec!(1)))
-            .expect("test: second handoff");
+        proc.process_handoff(
+            &mut pkt,
+            NodeId::from_public_key(b"relay-1"),
+            GoldGrams(dec!(1)),
+        )
+        .expect("test: first handoff");
+        proc.process_handoff(
+            &mut pkt,
+            NodeId::from_public_key(b"relay-2"),
+            GoldGrams(dec!(1)),
+        )
+        .expect("test: second handoff");
 
         assert_eq!(pkt.route.len(), 2);
         assert_eq!(pkt.route[0], NodeId::from_public_key(b"relay-1"));
@@ -365,7 +389,11 @@ mod tests {
                 GoldGrams(dec!(1)),
             ),
             // Invalid -- terminal state
-            (settled, NodeId::from_public_key(b"relay-2"), GoldGrams(dec!(1))),
+            (
+                settled,
+                NodeId::from_public_key(b"relay-2"),
+                GoldGrams(dec!(1)),
+            ),
             // Valid
             (
                 mint_packet(GoldGrams(dec!(75)), GoldGrams(dec!(10))),

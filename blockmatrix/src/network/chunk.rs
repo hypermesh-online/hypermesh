@@ -150,10 +150,15 @@ mod tests {
         samples.push(PeerProximity::new("wan-outlier", 80_000));
         let provider = LocalityProvider::from_samples(samples);
 
-        let cells: Vec<MatrixCoordinate> =
-            provider.placement_coordinates().into_iter().map(cell).collect();
+        let cells: Vec<MatrixCoordinate> = provider
+            .placement_coordinates()
+            .into_iter()
+            .map(cell)
+            .collect();
         let chunk = Chunk::from_coords(cells);
-        let centroid = chunk.centroid().expect("test: populated chunk has a centroid");
+        let centroid = chunk
+            .centroid()
+            .expect("test: populated chunk has a centroid");
 
         // The dense LAN band sits ~5 units from origin (0.5 ms / 0.1 ms); the
         // outlier ~800. Nine members, one outlier ⇒ mean well under a quarter of
@@ -182,12 +187,24 @@ mod tests {
         // geometric center is chosen over the two edges — and over an arbitrary
         // lexical order (here the center id is NOT the lexical minimum).
         let candidates = vec![
-            ("z-left".to_string(), MatrixCoordinate::new(-100, 0, 0).expect("test: coord")),
-            ("m-center".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: coord")),
-            ("a-right".to_string(), MatrixCoordinate::new(100, 0, 0).expect("test: coord")),
+            (
+                "z-left".to_string(),
+                MatrixCoordinate::new(-100, 0, 0).expect("test: coord"),
+            ),
+            (
+                "m-center".to_string(),
+                MatrixCoordinate::new(0, 0, 0).expect("test: coord"),
+            ),
+            (
+                "a-right".to_string(),
+                MatrixCoordinate::new(100, 0, 0).expect("test: coord"),
+            ),
         ];
         let chosen = most_central(&candidates).expect("test: coordinates present");
-        assert_eq!(chosen, "m-center", "central provider wins, not the lexical min");
+        assert_eq!(
+            chosen, "m-center",
+            "central provider wins, not the lexical min"
+        );
     }
 
     #[test]

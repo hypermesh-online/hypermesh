@@ -22,13 +22,10 @@ pub use types::*;
 mod tests {
     use super::*;
     use crate::assets::core::{
-        AssetAdapter, AssetAllocationRequest, AssetType, StateProof, CpuRequirements,
-        PrivacyMode,
+        AssetAdapter, AssetAllocationRequest, AssetType, CpuRequirements, PrivacyMode, StateProof,
     };
     #[allow(unused_imports)]
-    use crate::assets::core::{
-        SpaceProof, StakeProof, TimeProof, WorkProof,
-    };
+    use crate::assets::core::{SpaceProof, StakeProof, TimeProof, WorkProof};
     use std::collections::HashMap;
     use std::time::Duration;
 

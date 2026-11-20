@@ -11,8 +11,8 @@ use std::time::{Duration, SystemTime};
 use tracing::{debug, info, warn};
 
 use super::types::*;
-use crate::proof_of_state::FourProofValidator;
 use crate::errors::Result as TrustChainResult;
+use crate::proof_of_state::FourProofValidator;
 
 /// HyperMesh trust validator with Byzantine fault detection
 pub struct HyperMeshTrustValidator {
@@ -110,10 +110,7 @@ impl HyperMeshTrustValidator {
         node: &AuthenticatedNode,
     ) -> TrustChainResult<ByzantineReport> {
         debug!("Analyzing node for Byzantine behavior: {:?}", node);
-        let behavior_analysis = self
-            .byzantine_detector
-            .analyze_node_behavior(node)
-            .await?;
+        let behavior_analysis = self.byzantine_detector.analyze_node_behavior(node).await?;
 
         if behavior_analysis.is_byzantine {
             let report = ByzantineReport {

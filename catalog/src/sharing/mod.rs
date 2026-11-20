@@ -26,7 +26,7 @@ pub use protocols::{BandwidthAllocation, SharePermission, SharingProtocol};
 pub use synchronization::{SyncManager, SyncState, SyncStrategy};
 pub use topology::{NetworkTopology, NodeLocation, RoutingStrategy};
 
-use crate::{PackageSpecMetadata, AssetPackage, AssetRegistration};
+use crate::{AssetPackage, AssetRegistration, PackageSpecMetadata};
 
 /// Sharing configuration for decentralized library operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -658,7 +658,9 @@ mod tests {
         ));
 
         let config = SharingConfig::default();
-        let _manager = SharingManager::new(config, registry).await.expect("test: async operation");
+        let _manager = SharingManager::new(config, registry)
+            .await
+            .expect("test: async operation");
 
         // Test connecting to a peer (would need mock in real test)
         // let node_id = manager.connect_peer("peer.hypermesh.online").await;

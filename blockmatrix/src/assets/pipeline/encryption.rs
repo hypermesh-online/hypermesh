@@ -341,11 +341,12 @@ impl Encryptor {
         let cipher = Aes256Gcm::new(key);
         let nonce = aes_gcm::Nonce::from_slice(&nonce_bytes);
 
-        let ciphertext = cipher
-            .encrypt(nonce, segment_data.as_ref())
-            .map_err(|_| PipelineError::EncryptionFailed(
-                format!("AES-GCM segment encryption failed for segment {}", segment_index)
-            ))?;
+        let ciphertext = cipher.encrypt(nonce, segment_data.as_ref()).map_err(|_| {
+            PipelineError::EncryptionFailed(format!(
+                "AES-GCM segment encryption failed for segment {}",
+                segment_index
+            ))
+        })?;
 
         let encrypted_size = ciphertext.len();
         let duration = start.elapsed();
@@ -358,13 +359,16 @@ impl Encryptor {
             (segment_data.len() as f64 / (1024.0 * 1024.0)) / 0.001
         };
 
-        Ok((ciphertext, EncryptionStats {
-            original_size: segment_data.len(),
-            encrypted_size,
-            duration_ms,
-            throughput_mbps: throughput,
-            quantum_resistant: true, // Key derived from Kyber KEM shared secret
-        }))
+        Ok((
+            ciphertext,
+            EncryptionStats {
+                original_size: segment_data.len(),
+                encrypted_size,
+                duration_ms,
+                throughput_mbps: throughput,
+                quantum_resistant: true, // Key derived from Kyber KEM shared secret
+            },
+        ))
     }
 
     /// Decrypt a single segment with a derived key from the master key + segment index.
@@ -382,9 +386,12 @@ impl Encryptor {
 
         cipher
             .decrypt(nonce, encrypted_segment.as_ref())
-            .map_err(|_| PipelineError::EncryptionFailed(
-                format!("AES-GCM segment decryption failed for segment {}", segment_index)
-            ))
+            .map_err(|_| {
+                PipelineError::EncryptionFailed(format!(
+                    "AES-GCM segment decryption failed for segment {}",
+                    segment_index
+                ))
+            })
     }
 
     /// Get encryption configuration
@@ -575,7 +582,10 @@ mod tests {
             .encrypt_segment(data, &master_key, 1)
             .expect("test: encrypt seg 1");
 
-        assert_ne!(encrypted_0, encrypted_1, "Different indices must produce different ciphertext");
+        assert_ne!(
+            encrypted_0, encrypted_1,
+            "Different indices must produce different ciphertext"
+        );
     }
 
     #[test]
@@ -605,7 +615,10 @@ mod tests {
             .encrypt_segment(data, &master_key, 5)
             .expect("test: encrypt 2");
 
-        assert_eq!(encrypted_1, encrypted_2, "Same input+key+index must produce same ciphertext");
+        assert_eq!(
+            encrypted_1, encrypted_2,
+            "Same input+key+index must produce same ciphertext"
+        );
     }
 
     #[test]
@@ -626,14 +639,26 @@ mod tests {
         let data_1 = b"Segment one has different data";
         let data_2 = b"Final segment with more content";
 
-        let (enc_0, _) = encryptor.encrypt_segment(data_0, &master_key, 0).expect("test: seg 0");
-        let (enc_1, _) = encryptor.encrypt_segment(data_1, &master_key, 1).expect("test: seg 1");
-        let (enc_2, _) = encryptor.encrypt_segment(data_2, &master_key, 2).expect("test: seg 2");
+        let (enc_0, _) = encryptor
+            .encrypt_segment(data_0, &master_key, 0)
+            .expect("test: seg 0");
+        let (enc_1, _) = encryptor
+            .encrypt_segment(data_1, &master_key, 1)
+            .expect("test: seg 1");
+        let (enc_2, _) = encryptor
+            .encrypt_segment(data_2, &master_key, 2)
+            .expect("test: seg 2");
 
         // Decrypt in any order (random access)
-        let dec_2 = encryptor.decrypt_segment(&enc_2, &master_key, 2).expect("test: dec 2");
-        let dec_0 = encryptor.decrypt_segment(&enc_0, &master_key, 0).expect("test: dec 0");
-        let dec_1 = encryptor.decrypt_segment(&enc_1, &master_key, 1).expect("test: dec 1");
+        let dec_2 = encryptor
+            .decrypt_segment(&enc_2, &master_key, 2)
+            .expect("test: dec 2");
+        let dec_0 = encryptor
+            .decrypt_segment(&enc_0, &master_key, 0)
+            .expect("test: dec 0");
+        let dec_1 = encryptor
+            .decrypt_segment(&enc_1, &master_key, 1)
+            .expect("test: dec 1");
 
         assert_eq!(dec_0, data_0);
         assert_eq!(dec_1, data_1);

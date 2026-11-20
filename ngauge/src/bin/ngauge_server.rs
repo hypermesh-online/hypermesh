@@ -65,7 +65,9 @@ async fn main() -> Result<()> {
                 println!();
                 println!("Options:");
                 println!("  --bind, -b <ADDR>           QUIC bind address (default: [::1]:9296)");
-                println!("  --udp-bind <ADDR>           UDP metrics bind address (default: [::1]:9297)");
+                println!(
+                    "  --udp-bind <ADDR>           UDP metrics bind address (default: [::1]:9297)"
+                );
                 println!("  --service-name, -s <NAME>   Service name (default: ngauge)");
                 println!("  --help, -h                  Show this help message");
                 return Ok(());

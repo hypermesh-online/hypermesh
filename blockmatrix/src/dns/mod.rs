@@ -22,7 +22,6 @@ pub mod cache;
 pub mod domain;
 pub mod grant;
 pub mod invitation;
-pub mod popularity;
 pub mod pools;
 pub mod records;
 pub mod registration;
@@ -44,7 +43,6 @@ pub use registration::{DnsBlockEntry, DnsRegistrar, DnsRegistration, Registratio
 pub use reserved::{is_reserved, reserved_count, reserved_list};
 pub use resolver::{DnsQuery, DnsResolutionTier, DnsResolver, DnsResponse};
 pub use trustchain::{TrustChainDnsClient, TrustChainDnsService};
-pub use popularity::DnsPopularityTracker;
 pub use validation::{DnsValidator, ValidationResult};
 
 use anyhow::Result;
@@ -191,7 +189,10 @@ impl Domain {
             });
         }
 
-        let root = parts.last().expect("parts is non-empty after length check").to_string();
+        let root = parts
+            .last()
+            .expect("parts is non-empty after length check")
+            .to_string();
         let subdomains: Vec<String> = parts[..parts.len() - 1]
             .iter()
             .map(|s| s.to_string())

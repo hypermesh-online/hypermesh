@@ -526,7 +526,9 @@ mod tests {
     #[tokio::test]
     async fn test_client_metrics() {
         let config = HyperMeshClientConfig::localhost_testing();
-        let client = HyperMeshStateProofClient::new(config).await.expect("test: async operation");
+        let client = HyperMeshStateProofClient::new(config)
+            .await
+            .expect("test: async operation");
 
         let metrics = client.get_metrics().await;
         assert_eq!(metrics.total_requests, 0);
@@ -552,7 +554,8 @@ mod tests {
                 "test-owner".to_string(),
                 "test-operation".to_string(),
                 b"the registration work",
-            ));
+            ),
+        );
 
         // PoStake answers WHO via a bound identity — never a magnitude.
         assert!(proof_set.stake_proof.is_structurally_valid());
@@ -563,4 +566,3 @@ mod tests {
         assert!(proof_set.space_proof.is_structurally_valid());
     }
 }
-

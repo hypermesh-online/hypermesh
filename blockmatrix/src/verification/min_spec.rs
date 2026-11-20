@@ -183,7 +183,7 @@ mod tests {
             shard_count: 14,
             shard_size_bytes: 10 * 1024 * 1024, // 10 MB each
             rs_overhead: 1.4,
-            transfer_timeout_secs: 3600, // 1 hour
+            transfer_timeout_secs: 3600,               // 1 hour
             storage_required_bytes: 200 * 1024 * 1024, // 200 MB
         };
 
@@ -257,9 +257,15 @@ mod tests {
     #[test]
     fn test_helper_shard_fits_in_ram() {
         // 2 GB * 1.4 = 2.8 GB < 4 GB -> fits.
-        assert!(MinSpecValidator::shard_fits_in_ram(2 * 1024 * 1024 * 1024, 1.4));
+        assert!(MinSpecValidator::shard_fits_in_ram(
+            2 * 1024 * 1024 * 1024,
+            1.4
+        ));
         // 3 GB * 1.4 = 4.2 GB > 4 GB -> does not fit.
-        assert!(!MinSpecValidator::shard_fits_in_ram(3 * 1024 * 1024 * 1024, 1.4));
+        assert!(!MinSpecValidator::shard_fits_in_ram(
+            3 * 1024 * 1024 * 1024,
+            1.4
+        ));
     }
 
     #[test]

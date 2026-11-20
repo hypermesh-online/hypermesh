@@ -87,17 +87,11 @@ pub enum GatewayError {
 
     /// Phase G.1: transfer transport (broadcast/send) failed.
     #[error("Transfer transport failed for {transfer_id}: {detail}")]
-    TransportFailure {
-        transfer_id: String,
-        detail: String,
-    },
+    TransportFailure { transfer_id: String, detail: String },
 
     /// Phase G.1: target peer rejected the registration request.
     #[error("Target rejected transfer {transfer_id}: {reason}")]
-    TargetRejected {
-        transfer_id: String,
-        reason: String,
-    },
+    TargetRejected { transfer_id: String, reason: String },
 
     /// Phase G.1: coordinator not configured on this daemon (alpha-default
     /// inert behaviour preserved from Phase F).
@@ -158,10 +152,7 @@ impl GatewayManager {
     /// node's chain, providing an auditable record of cross-scope transfers.
     pub fn with_blockchain(blockchain: Arc<NodeBlockchain>) -> Self {
         Self {
-            bridge: ScopeBridge::with_blockchain(
-                Arc::new(DefaultTransferValidator),
-                blockchain,
-            ),
+            bridge: ScopeBridge::with_blockchain(Arc::new(DefaultTransferValidator), blockchain),
             next_id: Arc::new(tokio::sync::Mutex::new(1)),
         }
     }

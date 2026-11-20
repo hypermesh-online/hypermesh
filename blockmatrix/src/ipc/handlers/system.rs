@@ -36,8 +36,8 @@ use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{
-    protocol_versions_compatible, RpcError, INTERNAL_ERROR, INVALID_PARAMS,
-    IPC_PROTOCOL_VERSION, PROTOCOL_VERSION_MISMATCH,
+    protocol_versions_compatible, RpcError, INTERNAL_ERROR, INVALID_PARAMS, IPC_PROTOCOL_VERSION,
+    PROTOCOL_VERSION_MISMATCH,
 };
 use crate::ipc::state::DaemonState;
 use crate::release_feed::{
@@ -137,10 +137,7 @@ pub(crate) fn stage_and_swap(
     }
 
     let dir = target.parent().unwrap_or_else(|| Path::new("."));
-    let staging = dir.join(format!(
-        ".hypermesh-upgrade-staging-{}",
-        std::process::id()
-    ));
+    let staging = dir.join(format!(".hypermesh-upgrade-staging-{}", std::process::id()));
 
     // Write → fsync → set executable → atomic rename over the target.
     write_and_sync(&staging, candidate_bytes)
@@ -150,7 +147,10 @@ pub(crate) fn stage_and_swap(
     std::fs::rename(&staging, target).map_err(|e| {
         // Best-effort cleanup of the staging file on rename failure.
         let _ = std::fs::remove_file(&staging);
-        ApplyUpdateError::Io(format!("atomic rename over {} failed: {e}", target.display()))
+        ApplyUpdateError::Io(format!(
+            "atomic rename over {} failed: {e}",
+            target.display()
+        ))
     })?;
 
     schedule_restart();
@@ -221,9 +221,7 @@ fn register_check_update(handler: &mut RequestHandler, state: &Arc<DaemonState>)
                 let channel = parse_channel(&params)?;
                 let current_version = IPC_PROTOCOL_VERSION.to_string();
 
-                let subscriber: Arc<ReleaseFeedSubscriber> = match s
-                    .release_feed_subscriber
-                    .clone()
+                let subscriber: Arc<ReleaseFeedSubscriber> = match s.release_feed_subscriber.clone()
                 {
                     Some(sub) => sub,
                     None => {
@@ -281,8 +279,7 @@ fn apply_error_to_rpc(e: ApplyUpdateError) -> RpcError {
     match e {
         ApplyUpdateError::SignatureInvalid => RpcError {
             code: INVALID_PARAMS,
-            message: "release signature failed FALCON-1024 verification; refusing to apply"
-                .into(),
+            message: "release signature failed FALCON-1024 verification; refusing to apply".into(),
             data: None,
         },
         ApplyUpdateError::NoFoundationKey => RpcError {
@@ -413,16 +410,11 @@ async fn apply_update_impl(
                 })?;
 
             let shutdown_tx = s.shutdown_tx.clone();
-            let outcome = stage_and_swap(
-                &candidate,
-                &expected_hash,
-                &target_path,
-                move || {
-                    // Signal graceful shutdown; the process supervisor re-execs
-                    // the freshly-swapped binary. Durable state is untouched.
-                    let _ = shutdown_tx.send(true);
-                },
-            )
+            let outcome = stage_and_swap(&candidate, &expected_hash, &target_path, move || {
+                // Signal graceful shutdown; the process supervisor re-execs
+                // the freshly-swapped binary. Durable state is untouched.
+                let _ = shutdown_tx.send(true);
+            })
             .map_err(apply_error_to_rpc)?;
 
             Ok(serde_json::json!({
@@ -472,9 +464,7 @@ mod tests {
     use std::time::{Instant, SystemTime};
     use trustchain::FalconIdentity;
 
-    async fn make_state(
-        subscriber: Option<Arc<ReleaseFeedSubscriber>>,
-    ) -> Arc<DaemonState> {
+    async fn make_state(subscriber: Option<Arc<ReleaseFeedSubscriber>>) -> Arc<DaemonState> {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let bc = Arc::new(NodeBlockchain::new(coord));
         let config = PersistenceConfig {
@@ -495,12 +485,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "system-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -567,9 +557,7 @@ mod tests {
             breaking_changes: false,
             issued_at: SystemTime::now(),
         };
-        entry.signature = signer
-            .sign(&entry.signing_payload())
-            .expect("test: sign");
+        entry.signature = signer.sign(&entry.signing_payload()).expect("test: sign");
         entry
     }
 
@@ -577,10 +565,7 @@ mod tests {
     /// a release version with the SAME major so version-compat passes; a distinct
     /// minor keeps `check_update` "newer" logic meaningful.
     fn compat_version() -> String {
-        let major = IPC_PROTOCOL_VERSION
-            .split('.')
-            .next()
-            .unwrap_or("1");
+        let major = IPC_PROTOCOL_VERSION.split('.').next().unwrap_or("1");
         format!("{major}.999.0")
     }
 
@@ -724,8 +709,15 @@ mod tests {
         );
         let resp = h.dispatch(req).await;
         let err = resp.error.expect("test: expected hash-mismatch error");
-        assert!(err.message.contains("does not match"), "got: {}", err.message);
-        assert!(!target.exists(), "target must not be swapped on hash mismatch");
+        assert!(
+            err.message.contains("does not match"),
+            "got: {}",
+            err.message
+        );
+        assert!(
+            !target.exists(),
+            "target must not be swapped on hash mismatch"
+        );
     }
 
     #[tokio::test]

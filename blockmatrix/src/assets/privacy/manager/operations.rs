@@ -11,8 +11,8 @@ use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use super::super::{
-    allocation_types::PrivacyAllocationType, StateProofRequirementConfig, PrivacyAllocationResult,
-    ProxyConfiguration, ResourceAllocationConfig,
+    allocation_types::PrivacyAllocationType, PrivacyAllocationResult, ProxyConfiguration,
+    ResourceAllocationConfig, StateProofRequirementConfig,
 };
 use crate::assets::core::{AssetError, AssetRegistration, AssetResult, PrivacyMode};
 use crate::assets::proxy::RemoteProxyManager;

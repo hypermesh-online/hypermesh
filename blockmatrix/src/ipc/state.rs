@@ -5,7 +5,6 @@
 
 use crate::blockchain::node_chain::NodeBlockchain;
 use crate::bootstrap::DnsResolver;
-use crate::dns::DnsPopularityTracker;
 use crate::matrix::coordinate::MatrixCoordinate;
 use crate::network::consumer_provider::ConsumerProviderManager;
 use crate::network::shard_store::ShardStore;
@@ -33,6 +32,12 @@ pub struct DaemonState {
     pub coordinate: MatrixCoordinate,
     /// Unique node identifier derived from the coordinate.
     pub node_id: String,
+    /// The node's network label (the CLI `--network-id`). Converted to a
+    /// canonical [`hypermesh_lib::NetworkId`] via `from_wire_str` wherever the
+    /// daemon keys a network-scoped index (e.g. the shard-fetch live-mirror
+    /// lookup), so IPC reads hit the same network the shard-announce handler and
+    /// replication loops write under.
+    pub network_id: String,
     /// On-disk data directory for this node.
     pub data_dir: PathBuf,
     /// Current privacy mode as a display string.
@@ -43,9 +48,6 @@ pub struct DaemonState {
     pub shutdown_tx: tokio::sync::watch::Sender<bool>,
     /// Bootstrap DNS resolver for name resolution.
     pub dns_resolver: DnsResolver,
-    /// DNS popularity tracker for ngauge-driven replication.
-    /// Records resolution frequency so popular names get replicated to more nodes.
-    pub dns_popularity_tracker: Option<Arc<DnsPopularityTracker>>,
     /// Shard location index — same instance shared with PeerContext so
     /// TAG_SHARD_ANNOUNCE updates from peers and provider registrations from
     /// local fetches converge on a single canonical view.

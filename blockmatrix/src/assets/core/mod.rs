@@ -158,7 +158,7 @@ pub enum AssetError {
 
 // Import Proof of State Four-Proof validation system
 pub use crate::proof_of_state::proof_of_state_integration::{
-    ClientCredentials, StateProof, Proof, SpaceProof, StakeProof, TimeProof, WorkProof,
+    ClientCredentials, Proof, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
 };
 
 // WorkloadType is a DESCRIPTIVE workload label (lib::types), not a proof field.
@@ -262,8 +262,7 @@ impl AssetManager {
         request: AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
         // Validate state proof first
-        self.validate_state_proof(&request.state_proof)
-            .await?;
+        self.validate_state_proof(&request.state_proof).await?;
 
         // Get appropriate adapter
         let adapters = self.adapters.read().await;
@@ -484,9 +483,7 @@ impl AssetManager {
 
             // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
             // location; capacity is descriptive and never gates admission.
-            if proof.space_proof.node_id.is_empty()
-                && proof.space_proof.storage_path.is_empty()
-            {
+            if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
                 return Err(AssetError::StateProofValidationFailed {
                     reason: "PoSpace has no bound location (WHERE)".to_string(),
                 });
@@ -517,9 +514,9 @@ impl AssetManager {
                     BaseSystemType::Transmission => stats.transmission_assets += 1,
                     BaseSystemType::Dashboard => stats.dashboard_assets += 1,
                     BaseSystemType::Identity => stats.identity_assets += 1,
-                    BaseSystemType::KeyRotation => { /* counted in identity_assets */ },
-                    BaseSystemType::Invitation => { /* share invitations */ },
-                    BaseSystemType::Message => { /* direct messages */ },
+                    BaseSystemType::KeyRotation => { /* counted in identity_assets */ }
+                    BaseSystemType::Invitation => { /* share invitations */ }
+                    BaseSystemType::Message => { /* direct messages */ }
                 },
                 AssetCategory::Application(_) => {
                     // Application assets not tracked separately yet

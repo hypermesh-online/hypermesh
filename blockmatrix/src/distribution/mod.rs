@@ -161,8 +161,14 @@ where
     C: pos_validator::StateAuthenticator,
 {
     // Step 1: Query PoS validation for eligible nodes
-    let eligible_nodes =
-        get_eligible_nodes(asset_id, asset_privacy_level, shards, all_nodes, state_proof).await?;
+    let eligible_nodes = get_eligible_nodes(
+        asset_id,
+        asset_privacy_level,
+        shards,
+        all_nodes,
+        state_proof,
+    )
+    .await?;
 
     if eligible_nodes.is_empty() {
         return Err(AssetError::ValidationError {
@@ -208,9 +214,14 @@ mod tests {
 
         let state_proof = DefaultStateAuthenticator::for_testing();
 
-        let result =
-            distribute_shards_pos_aware(&shards, "test-asset", "PrivateNetwork", &nodes, &state_proof)
-                .await;
+        let result = distribute_shards_pos_aware(
+            &shards,
+            "test-asset",
+            "PrivateNetwork",
+            &nodes,
+            &state_proof,
+        )
+        .await;
 
         assert!(result.is_ok());
         let distribution = result.expect("test: expected result");

@@ -507,7 +507,10 @@ mod tests {
         let mut topology = NetworkTopology::new(converter);
 
         // Add nodes
-        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let node1 = TopologyNode::new(
+            "node1".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
         let node2 = TopologyNode::new(
             "node2".to_string(),
             MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"),
@@ -532,7 +535,10 @@ mod tests {
     fn test_duplicate_prevention() {
         let mut topology = NetworkTopology::default();
 
-        let node1 = TopologyNode::new("node1".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let node1 = TopologyNode::new(
+            "node1".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
         topology.add_node(node1).expect("test: insertion");
 
         // Duplicate ID
@@ -543,7 +549,10 @@ mod tests {
         assert!(topology.add_node(node2).is_err());
 
         // Duplicate coordinate
-        let node3 = TopologyNode::new("node3".to_string(), MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"));
+        let node3 = TopologyNode::new(
+            "node3".to_string(),
+            MatrixCoordinate::new(0, 0, 0).expect("test: valid coordinate"),
+        );
         assert!(topology.add_node(node3).is_err());
     }
 
@@ -598,7 +607,9 @@ mod tests {
         ];
 
         for (i, gps) in gps_coords.iter().enumerate() {
-            let matrix = converter.gps_to_matrix(gps).expect("test: expected success");
+            let matrix = converter
+                .gps_to_matrix(gps)
+                .expect("test: expected success");
             let mut node = TopologyNode::new(format!("node{i}"), matrix);
             node.set_gps(*gps);
             topology.add_node(node).expect("test: insertion");

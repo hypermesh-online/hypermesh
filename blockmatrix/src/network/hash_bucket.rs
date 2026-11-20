@@ -122,9 +122,9 @@ impl SpatialBucketAssigner {
         // Use our neighborhood radius as an approximation for the peer's radius.
         // In a uniform distribution, peers at similar density have similar radii.
         let peer_radius = self.neighborhood_radius;
-        block_shard_positions.iter().any(|pos| {
-            peer_coordinate.is_within_distance(pos, peer_radius)
-        })
+        block_shard_positions
+            .iter()
+            .any(|pos| peer_coordinate.is_within_distance(pos, peer_radius))
     }
 }
 
@@ -140,7 +140,8 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        // W1-4: match the canonical bincode `to_bytes()` preimage used by producers.
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,
@@ -175,8 +176,8 @@ mod tests {
         // 4 peers at distances 3, 5, 10, 20
         // k = sqrt(4) = 2, so radius = distance to 2nd nearest = 5
         let peers = vec![
-            MatrixCoordinate::new(3, 0, 0).expect("test: coord"),  // dist 3
-            MatrixCoordinate::new(0, 5, 0).expect("test: coord"),  // dist 5
+            MatrixCoordinate::new(3, 0, 0).expect("test: coord"), // dist 3
+            MatrixCoordinate::new(0, 5, 0).expect("test: coord"), // dist 5
             MatrixCoordinate::new(10, 0, 0).expect("test: coord"), // dist 10
             MatrixCoordinate::new(20, 0, 0).expect("test: coord"), // dist 20
         ];
@@ -283,7 +284,11 @@ mod tests {
             placements: vec![MatrixCoordinate::new(3, 0, 0).expect("test: coord")],
         });
 
-        let block = Block::new(1, vec![local_entry, far_entry, near_entry], "prev".to_string());
+        let block = Block::new(
+            1,
+            vec![local_entry, far_entry, near_entry],
+            "prev".to_string(),
+        );
         assert!(assigner.block_in_our_neighborhood(&block));
     }
 
@@ -309,9 +314,7 @@ mod tests {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let mut assigner = SpatialBucketAssigner::new(coord);
         // Set a small radius by providing close peers
-        assigner.update_peers(vec![
-            MatrixCoordinate::new(1, 0, 0).expect("test: coord"),
-        ]);
+        assigner.update_peers(vec![MatrixCoordinate::new(1, 0, 0).expect("test: coord")]);
         // radius should be ~1.0
 
         // Shard at (0,0,0), peer at (100,100,100) — far beyond radius
@@ -342,9 +345,7 @@ mod tests {
         let coord = MatrixCoordinate::new(0, 0, 0).expect("test: coord");
         let mut assigner = SpatialBucketAssigner::new(coord);
         // Small radius
-        assigner.update_peers(vec![
-            MatrixCoordinate::new(2, 0, 0).expect("test: coord"),
-        ]);
+        assigner.update_peers(vec![MatrixCoordinate::new(2, 0, 0).expect("test: coord")]);
 
         let shard_positions = vec![
             MatrixCoordinate::new(500, 500, 500).expect("test: coord"), // far

@@ -78,8 +78,13 @@ impl TransportSyncDriver {
                 // Re-fetch the reflector from the pool each iteration
                 // since health may have changed.
                 let reflector = {
-                    let candidates = reflector_pool.get_best_reflectors(ref_net_id, MAX_REFLECTOR_RETRIES);
-                    match candidates.iter().find(|r| r.node_id == *ref_node_id).cloned() {
+                    let candidates =
+                        reflector_pool.get_best_reflectors(ref_net_id, MAX_REFLECTOR_RETRIES);
+                    match candidates
+                        .iter()
+                        .find(|r| r.node_id == *ref_node_id)
+                        .cloned()
+                    {
                         Some(r) => r,
                         None => continue,
                     }
@@ -95,18 +100,13 @@ impl TransportSyncDriver {
                 )
                 .await;
 
-                let reflector_label = reflector.node_id
-                    [..8.min(reflector.node_id.len())]
-                    .to_string();
+                let reflector_label =
+                    reflector.node_id[..8.min(reflector.node_id.len())].to_string();
 
                 match sync_result {
                     Ok((blocks, peer_height)) => {
                         // Health feedback: success
-                        reflector_pool.update_reflector_health(
-                            ref_node_id,
-                            ref_net_id,
-                            true,
-                        );
+                        reflector_pool.update_reflector_health(ref_node_id, ref_net_id, true);
 
                         let response = SyncMessage::Response {
                             network_id: network_id.clone(),
@@ -132,11 +132,7 @@ impl TransportSyncDriver {
                     }
                     Err(e) => {
                         // Health feedback: failure
-                        reflector_pool.update_reflector_health(
-                            ref_node_id,
-                            ref_net_id,
-                            false,
-                        );
+                        reflector_pool.update_reflector_health(ref_node_id, ref_net_id, false);
 
                         debug!(
                             network = %network_id,
@@ -201,8 +197,7 @@ impl TransportSyncDriver {
         let connection = connect_to_peer(transport, addr).await?;
 
         // Step 1: Send SyncRequest, get SyncResponse
-        let (block_hashes, peer_height) =
-            send_sync_request(&connection, request).await?;
+        let (block_hashes, peer_height) = send_sync_request(&connection, request).await?;
 
         // Step 2: Filter to hashes we don't have
         let missing: Vec<String> = filter_missing_hashes(&block_hashes, blockchain).await;

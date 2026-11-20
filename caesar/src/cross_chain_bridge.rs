@@ -504,11 +504,7 @@ impl CrossChainBridge {
 #[async_trait::async_trait]
 pub trait ChainBridge: Send + Sync {
     /// Lock funds on the source chain, returning a lock proof (tx hash).
-    async fn lock_funds(
-        &self,
-        amount: Decimal,
-        recipient: &str,
-    ) -> Result<String>;
+    async fn lock_funds(&self, amount: Decimal, recipient: &str) -> Result<String>;
 
     /// Verify that a lock transaction completed successfully.
     async fn verify_lock(&self, tx_hash: &str) -> Result<bool>;
@@ -603,11 +599,31 @@ impl ChainBridge for InternalBridge {
         &self,
         amount: Decimal,
         recipient: &str,
-        _source_tx: &str,
+        source_tx: &str,
     ) -> Result<String> {
         if amount <= Decimal::ZERO {
             return Err(anyhow!("Release amount must be positive"));
         }
+
+        // Validate source lock record if present
+        let locks = self.lock_records.read().await;
+        if let Some(record) = locks.get(source_tx) {
+            if record.amount != amount {
+                return Err(anyhow!(
+                    "Release amount {} does not match locked amount {}",
+                    amount,
+                    record.amount
+                ));
+            }
+            if record.recipient != recipient {
+                return Err(anyhow!(
+                    "Release recipient {} does not match locked recipient {}",
+                    recipient,
+                    record.recipient
+                ));
+            }
+        }
+        drop(locks);
 
         let mut balances = self.balances.write().await;
         *balances.entry(recipient.to_string()).or_insert(dec!(0)) += amount;
@@ -789,15 +805,16 @@ mod tests {
         let verified = mock.verify_lock(&tx).await.expect("test: mock verify");
         assert!(verified);
 
-        let balance = mock.query_balance("0xabc").await.expect("test: mock balance");
+        let balance = mock
+            .query_balance("0xabc")
+            .await
+            .expect("test: mock balance");
         assert_eq!(balance, dec!(300));
     }
 
     #[tokio::test]
     async fn test_cross_chain_bridge_initiate() {
-        let bridge = CrossChainBridge::new()
-            .await
-            .expect("test: create bridge");
+        let bridge = CrossChainBridge::new().await.expect("test: create bridge");
 
         let op = BridgeOperation::Lock {
             amount: dec!(100),

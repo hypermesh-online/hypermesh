@@ -27,13 +27,23 @@ impl<'a> SyncDispatcher<'a> {
             .map(|d| d.as_secs())
             .unwrap_or(0);
 
+        // Record the reflector under the REAL privacy mode this node joined the
+        // network with, rather than a hardcoded PUBLIC. Under the default PUBLIC
+        // networks this is byte-identical; it stops mislabelling reflectors on a
+        // Private/Anonymous network. Falls back to PUBLIC when we are not a
+        // member of `network_id` (we have no membership to read the mode from).
+        let privacy_mode = self
+            .sync_manager
+            .network_privacy_mode(network_id)
+            .unwrap_or(PrivacyMode::PUBLIC);
+
         let reflector = Reflector {
             node_id: sender_node_id.to_string(),
             position: sender_position,
             last_seen: now_secs,
             block_height,
             health_score: health_score.clamp(0.0, 1.0),
-            privacy_mode: PrivacyMode::PUBLIC,
+            privacy_mode,
         };
 
         self.reflector_pool

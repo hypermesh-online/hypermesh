@@ -1,0 +1,56 @@
+HyperMesh engineering demo | A STOQ exchange observed by Linux XDP
+45-second captioned replay of captured output (not a live screen recording)
+
+00:00–00:07  Can Linux see a HyperMesh message?
+A client sends a fresh message through HyperMesh's STOQ transport. The experiment
+checks the application's byte-for-byte echo and a separate observation from the
+Linux kernel. The footage presents one independently repeated run in an isolated
+virtual machine.
+
+00:07–00:15  One guest. Two ports.
+STOQ used QUIC over IPv6 loopback in a Linux KVM guest. The test harness used
+libbpf to attach the project's XDP program. Port 9292 is the target and port
+9293 is the comparison.
+
+00:15–00:25  Target: 21 to 23.
+The server received the client's fresh 41-byte message and echoed it. Both
+sides checked the bytes. The program's port-9292 packet count was 21 after the
+handshake and 23 after the echoed payload.
+
+00:25–00:35  Comparison: 25 to 25.
+A second, independent, 41-byte STOQ echo succeeded on port 9293. From just
+after that handshake until just after its echo, the port-9292 count stayed
+at 25; there was no port-9293 entry. These are packet counts; QUIC ACKs and
+other control frames may contribute. They are not payload-byte counters.
+
+00:35–00:45  What this proves.
+The kernel saw actual STOQ traffic on the intended port. The program detached
+and the post-detach query returned ID 0. The test did not demonstrate production-
+managed acceleration, a public alpha, two independently installed nodes, or
+Proof-of-State authorization of a distributed Catalog-backed BlockMatrix asset.
+
+Captured guest output (in original order; trailing VM shutdown line omitted):
+GUEST: trial_start
+GUEST: loopback_up=0
+GUEST: kernel_load=0
+GUEST: program_id=6 type=6 connection_map_id=7
+GUEST: attach=0
+GUEST: attached_query=0 attached_id=6
+GUEST: child STOQ_STAGE:ON_HANDSHAKE
+GUEST: map phase=ON_HANDSHAKE entries=2 on9292=21 off9293=0
+GUEST: child STOQ_ROUNDTRIP:ON:bytes=41:blake3=217ecdc9c10ee13dc458a718e55dc4a860f2c961a8fb871d9aba4b27997a08df
+GUEST: child STOQ_STAGE:ON_PAYLOAD
+GUEST: map phase=ON_PAYLOAD entries=2 on9292=23 off9293=0
+GUEST: child STOQ_STAGE:OFF_HANDSHAKE
+GUEST: map phase=OFF_HANDSHAKE entries=2 on9292=25 off9293=0
+GUEST: child STOQ_ROUNDTRIP:OFF:bytes=41:blake3=7b1e0f072be8c5998ddc5083c62e0c9fa131c4c752c749681dabd6f32e562da7
+GUEST: child STOQ_STAGE:OFF_PAYLOAD
+GUEST: map phase=OFF_PAYLOAD entries=2 on9292=25 off9293=0
+GUEST: child STOQ_RESULT:PASS
+GUEST: stages=4 child_pass=1 on_echo=1 off_echo=1
+GUEST: stoq_exit=0
+GUEST: detach=0 post_query=0 post_id=0
+GUEST: result=PASS code=0
+
+Reproduction recipe (pinned source, requirements and scope):
+https://github.com/hypermesh-online/hypermesh/blob/2cca6bac249214e6b6179dc271f4e96269eb9326/tools/demo_gate/stoq_guest/README.md

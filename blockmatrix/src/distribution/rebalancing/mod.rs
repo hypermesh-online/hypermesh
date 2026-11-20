@@ -372,10 +372,12 @@ impl RebalanceManager {
                         Some(d) => d.clone(),
                         None => {
                             // Try fetching from the source node via transport
-                            let source_id =
-                                hypermesh_lib::NodeId::from_bytes(blake3::hash(from_node.as_bytes()).into());
-                            let content_hash =
-                                hypermesh_lib::ContentHash(blake3::hash(shard_id.as_bytes()).into());
+                            let source_id = hypermesh_lib::NodeId::from_bytes(
+                                blake3::hash(from_node.as_bytes()).into(),
+                            );
+                            let content_hash = hypermesh_lib::ContentHash(
+                                blake3::hash(shard_id.as_bytes()).into(),
+                            );
                             match transport.fetch_shard(&source_id, &content_hash).await {
                                 Ok(d) => d,
                                 Err(_) => {
@@ -827,8 +829,7 @@ mod tests {
         let mut mgr = make_manager();
         mgr.register_shard("shard-move".to_string(), "node-a", &coord(10, 10, 10));
         mgr.register_shard("shard-move".to_string(), "node-b", &coord(-10, 10, 10));
-        mgr.nodes
-            .insert("node-c".to_string(), coord(-10, -10, -10));
+        mgr.nodes.insert("node-c".to_string(), coord(-10, -10, -10));
 
         let transport = MockShardTransport::new();
 
@@ -885,8 +886,7 @@ mod tests {
         let transport = MockShardTransport::new();
 
         // Mark the target node as unreachable in the transport
-        let target_id =
-            hypermesh_lib::NodeId::from_bytes(blake3::hash(b"node-unreachable").into());
+        let target_id = hypermesh_lib::NodeId::from_bytes(blake3::hash(b"node-unreachable").into());
         transport.set_unreachable(&target_id).await;
 
         let mut shard_data = HashMap::new();

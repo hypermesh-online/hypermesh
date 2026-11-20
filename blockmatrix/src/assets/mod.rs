@@ -21,8 +21,7 @@ pub mod storage;
 // Re-export main types for easy access
 pub use core::{
     AssetAdapter, AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetStatistics,
-    AssetType, StateProof, PrivacyMode, SpaceProof, StakeProof, TimeProof, WorkProof,
-    WorkloadType,
+    AssetType, PrivacyMode, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof, WorkloadType,
 };
 
 pub use adapters::{CpuAssetAdapter, GpuAssetAdapter, MemoryAssetAdapter, StorageAssetAdapter};
@@ -32,9 +31,7 @@ pub use proxy::{ProxyAddress, ProxyNetworkConfig, RemoteProxyManager};
 pub use privacy::{PrivacyManager, ResourceAllocation};
 
 #[cfg(feature = "multi-node")]
-pub use multi_node::{
-    MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo,
-};
+pub use multi_node::{MultiNodeCoordinator, NetworkTopology, NodeCapabilities, NodeInfo};
 
 pub use blockchain::{AssetBlockchainManager, AssetRecordType, HyperMeshAssetRecord};
 

@@ -16,7 +16,6 @@ use tracing::debug;
 
 use super::LogEntry;
 use crate::errors::{CTError, Result as TrustChainResult};
-use crate::proof_of_state::StateProofOps;
 
 /// Simplified merkle tree-based CT log
 pub struct MerkleLog {
@@ -335,7 +334,7 @@ impl MerklePath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::proof_of_state::StateProof;
+    use crate::proof_of_state::{StateProof, StateProofOps};
     use std::time::SystemTime;
 
     async fn create_test_entry(seq_num: u64) -> anyhow::Result<LogEntry> {
@@ -354,14 +353,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_merkle_log_creation() {
-        let log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
         assert_eq!(log.log_id, "test-log");
         assert_eq!(log.get_tree_size(), 0);
     }
 
     #[tokio::test]
     async fn test_entry_addition() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
 
         let entry = create_test_entry(0).await.expect("test: async operation");
         let added_entry = log.add_entry(entry).await.expect("test: async operation");
@@ -373,7 +376,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_merkle_tree_update() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
 
         // Add entries
         for i in 0..5 {
@@ -382,7 +387,9 @@ mod tests {
         }
 
         // Update merkle tree
-        log.update_merkle_tree().await.expect("test: async operation");
+        log.update_merkle_tree()
+            .await
+            .expect("test: async operation");
 
         assert_eq!(log.stats.tree_size, 5);
         assert_ne!(log.stats.root_hash, [0u8; 32]);
@@ -391,7 +398,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_inclusion_proof() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
 
         // Add entries
         let mut test_entries = Vec::new();
@@ -402,42 +411,61 @@ mod tests {
         }
 
         // Update merkle tree
-        log.update_merkle_tree().await.expect("test: async operation");
+        log.update_merkle_tree()
+            .await
+            .expect("test: async operation");
 
         // Get inclusion proof
-        let proof = log.get_inclusion_proof(&test_entries[2]).await.expect("test: async operation");
+        let proof = log
+            .get_inclusion_proof(&test_entries[2])
+            .await
+            .expect("test: async operation");
         assert!(!proof.is_empty());
 
         // Verify inclusion
-        let is_included = log.verify_entry_inclusion(&test_entries[2]).await.expect("test: async operation");
+        let is_included = log
+            .verify_entry_inclusion(&test_entries[2])
+            .await
+            .expect("test: async operation");
         assert!(is_included);
     }
 
     #[tokio::test]
     async fn test_consistency_proof() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
 
         // Add entries in two batches
         for i in 0..3 {
             let entry = create_test_entry(i).await.expect("test: async operation");
             log.add_entry(entry).await.expect("test: async operation");
         }
-        log.update_merkle_tree().await.expect("test: async operation");
+        log.update_merkle_tree()
+            .await
+            .expect("test: async operation");
 
         for i in 3..5 {
             let entry = create_test_entry(i).await.expect("test: async operation");
             log.add_entry(entry).await.expect("test: async operation");
         }
-        log.update_merkle_tree().await.expect("test: async operation");
+        log.update_merkle_tree()
+            .await
+            .expect("test: async operation");
 
         // Get consistency proof
-        let proof = log.get_consistency_proof(3, 5).await.expect("test: async operation");
+        let proof = log
+            .get_consistency_proof(3, 5)
+            .await
+            .expect("test: async operation");
         assert!(!proof.is_empty());
     }
 
     #[tokio::test]
     async fn test_log_capacity() {
-        let mut log = MerkleLog::new("test-log".to_string(), 2).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 2)
+            .await
+            .expect("test: async operation");
 
         // Add entries up to capacity
         log.add_entry(create_test_entry(0).await.expect("test: async operation"))
@@ -450,13 +478,17 @@ mod tests {
         assert!(log.is_full());
 
         // Adding beyond capacity should fail
-        let result = log.add_entry(create_test_entry(2).await.expect("test: async operation")).await;
+        let result = log
+            .add_entry(create_test_entry(2).await.expect("test: async operation"))
+            .await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_entry_retrieval() {
-        let mut log = MerkleLog::new("test-log".to_string(), 1000).await.expect("test: async operation");
+        let mut log = MerkleLog::new("test-log".to_string(), 1000)
+            .await
+            .expect("test: async operation");
 
         // Add entries
         for i in 0..5 {

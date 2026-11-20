@@ -7,7 +7,9 @@
 use anyhow::{Context, Result};
 use tracing::{info, warn};
 
-use blockmatrix::assets::core::{AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope};
+use blockmatrix::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use blockmatrix::bootstrap::{NodeBootstrap, PrivacyMode};
 use blockmatrix::dns::domain::DomainRegistration;
 use blockmatrix::dns::invitation;
@@ -22,10 +24,7 @@ fn domain_registrations_path(data_dir: &std::path::Path, node_id: &str) -> std::
 }
 
 /// Load domain registrations from disk.
-fn load_domain_registrations(
-    data_dir: &std::path::Path,
-    node_id: &str,
-) -> Vec<DomainRegistration> {
+fn load_domain_registrations(data_dir: &std::path::Path, node_id: &str) -> Vec<DomainRegistration> {
     let path = domain_registrations_path(data_dir, node_id);
     if !path.exists() {
         return Vec::new();
@@ -189,9 +188,7 @@ pub async fn run_domain(
                     println!("  Domain: {}", d.domain_name);
                     println!("  Network ID: {}", d.network_id);
                     println!("  Owner: {}", d.owner_node_id);
-                    println!(
-                        "  Members: (local node only -- connect for network view)"
-                    );
+                    println!("  Members: (local node only -- connect for network view)");
                     println!();
                 }
                 None => {

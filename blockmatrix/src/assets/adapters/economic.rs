@@ -165,9 +165,7 @@ impl EconomicAssetAdapter {
 
             // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
             // location; capacity is descriptive and never gates admission.
-            if proof.space_proof.node_id.is_empty()
-                && proof.space_proof.storage_path.is_empty()
-            {
+            if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
                 return Err(AssetError::StateProofValidationFailed {
                     reason: "Economic operation has no bound location (WHERE)".to_string(),
                 });
@@ -182,8 +180,7 @@ impl EconomicAssetAdapter {
             }
 
             // Validate time proof for economic operation ordering
-            if proof.time_proof.network_time_offset > self.state_requirements.validation_timeout
-            {
+            if proof.time_proof.network_time_offset > self.state_requirements.validation_timeout {
                 return Err(AssetError::StateProofValidationFailed {
                     reason: "Time synchronization required for economic state proof".to_string(),
                 });
@@ -225,9 +222,24 @@ impl AssetAdapter for EconomicAssetAdapter {
                 reason: "Economic requirements not specified".to_string(),
             })?;
 
-        // Generate asset ID with real content-based hash
+        // Generate asset ID with content-based hash using economic configuration
+        let mut config_bytes = Vec::new();
+        if let Some(cost) = requirements.max_cost_per_hour {
+            config_bytes.extend_from_slice(&cost.to_le_bytes());
+        }
+        if let Some(ref method) = requirements.payment_method {
+            config_bytes.extend_from_slice(method.as_bytes());
+        }
+        if let Some(budget) = requirements.budget_limit {
+            config_bytes.extend_from_slice(&budget.to_le_bytes());
+        }
+
         let data = AssetData {
-            config: vec![1, 2, 3], // Test data
+            config: if config_bytes.is_empty() {
+                vec![1, 2, 3]
+            } else {
+                config_bytes
+            },
             definition: vec![4, 5, 6],
             metadata: vec![7, 8, 9],
         };
@@ -238,9 +250,13 @@ impl AssetAdapter for EconomicAssetAdapter {
         );
 
         // Create economic asset state
+        let balance = requirements
+            .budget_limit
+            .map(|b| Decimal::new(b as i64, 0))
+            .unwrap_or(Decimal::ZERO);
         let usage = EconomicUsage {
-            // Opening balance. Allocation carries no stake magnitude.
-            balance: Decimal::ZERO,
+            // Opening balance initialized from budget limit if provided.
+            balance,
             staked_amount: Decimal::ZERO,
             pending_rewards: Decimal::ZERO,
             tx_volume_24h: Decimal::ZERO,

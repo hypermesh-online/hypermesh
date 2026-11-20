@@ -512,7 +512,10 @@ mod tests {
             parser.parse("<2.0.0").expect("test: expected success"),
             VersionConstraint::Less(_)
         ));
-        assert!(matches!(parser.parse("*").expect("test: assertion value"), VersionConstraint::Any));
+        assert!(matches!(
+            parser.parse("*").expect("test: assertion value"),
+            VersionConstraint::Any
+        ));
         assert!(matches!(
             parser.parse("1.0.0").expect("test: expected success"),
             VersionConstraint::Exact(_)

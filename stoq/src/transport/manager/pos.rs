@@ -115,11 +115,7 @@ impl StoqTransport {
 
         // Perform PoS validation
         let is_valid = self
-            .validate_connection_with_pos(
-                connection_id.to_string(),
-                network_type,
-                pos_token,
-            )
+            .validate_connection_with_pos(connection_id.to_string(), network_type, pos_token)
             .await?;
 
         // Update connection's PoS gate state

@@ -14,6 +14,15 @@ use crate::transport::connection::{Connection, Endpoint};
 
 use super::StoqTransport;
 
+fn accepted_endpoint(remote_addr: SocketAddr) -> Result<Endpoint> {
+    let SocketAddr::V6(addr) = remote_addr else {
+        return Err(anyhow!(
+            "IPv4 connections are not supported - STOQ is IPv6-only"
+        ));
+    };
+    Ok(Endpoint::new(*addr.ip(), remote_addr.port()))
+}
+
 impl StoqTransport {
     /// Connect to a remote endpoint with connection pooling for performance
     pub async fn connect(&self, endpoint: &Endpoint) -> Result<Arc<Connection>> {
@@ -160,27 +169,23 @@ impl StoqTransport {
         }
     }
 
-    /// Accept incoming connections
+    /// Accept an incoming connection, returning an error if the endpoint is closed.
     pub async fn accept(&self) -> Result<Arc<Connection>> {
-        let incoming = self
-            .endpoint
-            .accept()
-            .await
-            .ok_or_else(|| anyhow!("No incoming connection"))?;
+        self.accept_next()
+            .await?
+            .ok_or_else(|| anyhow!("No incoming connection"))
+    }
+
+    /// Accept the next connection, or return `None` when the endpoint is closed.
+    /// A failed peer handshake returns an error without terminating the endpoint.
+    pub async fn accept_next(&self) -> Result<Option<Arc<Connection>>> {
+        let Some(incoming) = self.endpoint.accept().await else {
+            return Ok(None);
+        };
         let quinn_conn = incoming.await?;
 
         let remote_addr = quinn_conn.remote_address();
-        let endpoint = Endpoint::new(
-            match remote_addr {
-                SocketAddr::V6(addr) => *addr.ip(),
-                SocketAddr::V4(_) => {
-                    return Err(anyhow!(
-                        "IPv4 connections are not supported - STOQ is IPv6-only"
-                    ))
-                }
-            },
-            remote_addr.port(),
-        );
+        let endpoint = accepted_endpoint(remote_addr)?;
 
         let connection = Arc::new(Connection::new_optimized(
             quinn_conn,
@@ -195,7 +200,7 @@ impl StoqTransport {
         self.metrics.record_connection_established();
 
         info!("Accepted connection from {}", remote_addr);
-        Ok(connection)
+        Ok(Some(connection))
     }
 
     /// Close all connections and connection pools

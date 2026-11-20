@@ -508,7 +508,10 @@ mod tests {
             status: ProxyNodeStatus::Healthy,
         };
 
-        selector.register_proxy(proxy.clone()).await.expect("test: async operation");
+        selector
+            .register_proxy(proxy.clone())
+            .await
+            .expect("test: async operation");
 
         // Verify proxy is registered
         let nodes = selector.proxy_nodes.read().await;

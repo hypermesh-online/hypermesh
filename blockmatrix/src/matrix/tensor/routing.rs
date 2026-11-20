@@ -364,8 +364,14 @@ mod tests {
 
         // Both (10,0,0) and (10,1,0) are aligned: similarity ~1.0 and ~0.995 respectively
         assert_eq!(aligned.len(), 2);
-        assert_eq!(aligned[0], MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate"));
-        assert_eq!(aligned[1], MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate"));
+        assert_eq!(
+            aligned[0],
+            MatrixCoordinate::new(10, 0, 0).expect("test: valid coordinate")
+        );
+        assert_eq!(
+            aligned[1],
+            MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate")
+        );
 
         let more_aligned = find_aligned_nodes(&source, &target_direction, &candidates, 0.5);
         assert_eq!(more_aligned.len(), 2);

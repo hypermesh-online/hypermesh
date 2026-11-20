@@ -117,7 +117,10 @@ async fn d1_author(
         .with_persistence(store.clone());
     // Genesis was minted before the sink was attached — persist it through.
     let genesis = chain.get_block(0).await.expect("test: genesis");
-    store.save_block(&genesis).await.expect("test: persist genesis");
+    store
+        .save_block(&genesis)
+        .await
+        .expect("test: persist genesis");
 
     // A distinct, Private-scoped asset (not the blockchain-genesis asset), so D4
     // exercises the resolver's non-Global inherit branch. One registration reused
@@ -158,7 +161,10 @@ async fn reload_chain(
         blocks.push(block);
         idx += 1;
     }
-    assert!(blocks.len() >= 2, "test: migrated chain must carry genesis + authored blocks");
+    assert!(
+        blocks.len() >= 2,
+        "test: migrated chain must carry genesis + authored blocks"
+    );
     NodeBlockchain::from_blocks(coord_a, blocks).expect("test: reconstruct from migrated blocks")
 }
 
@@ -171,9 +177,21 @@ async fn d_exit_capstone_node_is_asset_is_index_end_to_end() {
     // ── D1: an asset is its own chain ──────────────────────────────────────
     let (legacy_key, a_node_id, asset, lineage_a) = d1_author(data_dir, coord_a).await;
 
-    assert_eq!(lineage_a.entries.len(), 2, "D1: lineage must have been extended");
-    assert_eq!(lineage_a.sequence(), vec![0, 1], "D1: asset_seq must progress 0→1");
-    assert_eq!(lineage_a.verify(), Ok(()), "D1: the authored lineage must verify");
+    assert_eq!(
+        lineage_a.entries.len(),
+        2,
+        "D1: lineage must have been extended"
+    );
+    assert_eq!(
+        lineage_a.sequence(),
+        vec![0, 1],
+        "D1: asset_seq must progress 0→1"
+    );
+    assert_eq!(
+        lineage_a.verify(),
+        Ok(()),
+        "D1: the authored lineage must verify"
+    );
     assert!(
         lineage_a.entries.iter().all(|e| e.signed_proof.is_some()),
         "D1: every authored entry must carry a FALCON envelope"
@@ -206,7 +224,10 @@ async fn d_exit_capstone_node_is_asset_is_index_end_to_end() {
         before_b,
         "D2 INVARIANT: receiving an asset chain must not move B's spine"
     );
-    assert!(!chain_b.has_ever_seen_asset(&asset).await, "D2: the asset is off-spine on B");
+    assert!(
+        !chain_b.has_ever_seen_asset(&asset).await,
+        "D2: the asset is off-spine on B"
+    );
 
     // ── D4: validated per-network through the resolver ─────────────────────
     let service = ValidationService::new();
@@ -274,5 +295,9 @@ async fn d_exit_capstone_node_is_asset_is_index_end_to_end() {
         lineage_after.entries, lineage_a.entries,
         "D5: the asset chain A authored in D1 must survive the re-key byte-for-byte"
     );
-    assert_eq!(lineage_after.verify(), Ok(()), "D5: the survived lineage still verifies");
+    assert_eq!(
+        lineage_after.verify(),
+        Ok(()),
+        "D5: the survived lineage still verifies"
+    );
 }

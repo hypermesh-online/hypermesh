@@ -16,9 +16,7 @@ use crate::policy_maps::PolicyManager;
 use crate::validation::ProofOfStateValidator;
 
 #[cfg(feature = "kernel-attach")]
-use super::validation::{
-    asset_hash_entry_to_bytes, policy_to_bytes, pos_validation_to_bytes,
-};
+use super::validation::{asset_hash_entry_to_bytes, policy_to_bytes, pos_validation_to_bytes};
 
 use super::types::*;
 
@@ -498,14 +496,10 @@ impl XdpManager {
                 if let Some(map) = bpf.map_mut("asset_hash_map") {
                     match BpfHashMap::<_, [u8; 32], [u8; 40]>::try_from(map) {
                         Ok(mut m) => {
-                            let value = asset_hash_entry_to_bytes(
-                                &content_hash,
-                                shard_count,
-                                registered,
-                            );
-                            m.insert(&content_hash, &value, 0).map_err(|e| {
-                                anyhow!("Failed to write asset_hash_map: {}", e)
-                            })?;
+                            let value =
+                                asset_hash_entry_to_bytes(&content_hash, shard_count, registered);
+                            m.insert(&content_hash, &value, 0)
+                                .map_err(|e| anyhow!("Failed to write asset_hash_map: {}", e))?;
                             tracing::debug!(
                                 "asset_hash_map[{}] registered={}",
                                 hex::encode(&content_hash[..8]),
@@ -547,15 +541,10 @@ impl XdpManager {
                             // bpf_ktime_get_ns() directly, so we approximate
                             // with CLOCK_MONOTONIC which shares the same base.
                             let now_ns = monotonic_now_ns();
-                            let value =
-                                pos_validation_to_bytes(algorithm, validated, now_ns);
-                            m.insert(&src_ip, &value, 0).map_err(|e| {
-                                anyhow!("Failed to write pos_header_map: {}", e)
-                            })?;
-                            tracing::debug!(
-                                "pos_header_map[src] validated={}",
-                                validated
-                            );
+                            let value = pos_validation_to_bytes(algorithm, validated, now_ns);
+                            m.insert(&src_ip, &value, 0)
+                                .map_err(|e| anyhow!("Failed to write pos_header_map: {}", e))?;
+                            tracing::debug!("pos_header_map[src] validated={}", validated);
                         }
                         Err(e) => tracing::warn!("pos_header_map access failed: {}", e),
                     }
@@ -589,11 +578,9 @@ impl XdpManager {
                         Ok(mut m) => {
                             let mut value = [0u8; 8];
                             value[0..4].copy_from_slice(&egress_ifindex.to_le_bytes());
-                            value[4..8]
-                                .copy_from_slice(&(active as u32).to_le_bytes());
-                            m.insert(&position_bytes, &value, 0).map_err(|e| {
-                                anyhow!("Failed to write routing_map: {}", e)
-                            })?;
+                            value[4..8].copy_from_slice(&(active as u32).to_le_bytes());
+                            m.insert(&position_bytes, &value, 0)
+                                .map_err(|e| anyhow!("Failed to write routing_map: {}", e))?;
                             tracing::debug!(
                                 "routing_map[pos] egress_if={} active={}",
                                 egress_ifindex,

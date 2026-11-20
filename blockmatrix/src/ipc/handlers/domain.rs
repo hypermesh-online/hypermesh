@@ -20,14 +20,13 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             Arc::new(move |params| {
                 let s = s.clone();
                 Box::pin(async move {
-                    let name = params
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| crate::ipc::protocol::RpcError {
+                    let name = params.get("name").and_then(|v| v.as_str()).ok_or_else(|| {
+                        crate::ipc::protocol::RpcError {
                             code: INVALID_PARAMS,
                             message: "missing 'name' parameter".into(),
                             data: None,
-                        })?;
+                        }
+                    })?;
 
                     let privacy_str = params
                         .get("privacy")
@@ -67,20 +66,16 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     let asset_data = crate::assets::core::AssetData {
                         config: dns_data_str.as_bytes().to_vec(),
                         definition: format!("domain-registration:{name}").into_bytes(),
-                        metadata: format!(
-                            "network_id={},privacy={privacy_str}",
-                            reg.network_id
-                        )
-                        .into_bytes(),
+                        metadata: format!("network_id={},privacy={privacy_str}", reg.network_id)
+                            .into_bytes(),
                     };
-                    let registration =
-                        crate::assets::core::AssetRegistration::from_asset_data(
-                            &asset_data,
-                            crate::assets::core::NetworkScope::Global,
-                            crate::assets::core::AssetCategory::BaseSystem(
-                                crate::assets::core::BaseSystemType::Dns,
-                            ),
-                        );
+                    let registration = crate::assets::core::AssetRegistration::from_asset_data(
+                        &asset_data,
+                        crate::assets::core::NetworkScope::Global,
+                        crate::assets::core::AssetCategory::BaseSystem(
+                            crate::assets::core::BaseSystemType::Dns,
+                        ),
+                    );
                     let state_proof =
                         trustchain::proof_of_state::StateProof::generate_from_network(&s.node_id)
                             .await
@@ -105,9 +100,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     if let Some(parent) = domains_path.parent() {
                         let _ = std::fs::create_dir_all(parent);
                     }
-                    if let Err(e) =
-                        crate::dns::domain::save_domains(&domains, &domains_path)
-                    {
+                    if let Err(e) = crate::dns::domain::save_domains(&domains, &domains_path) {
                         tracing::warn!("Failed to persist domain registration: {e}");
                     }
 
@@ -172,14 +165,15 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             Arc::new(move |params| {
                 let s = s.clone();
                 Box::pin(async move {
-                    let domain = params
-                        .get("domain")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| crate::ipc::protocol::RpcError {
-                            code: INVALID_PARAMS,
-                            message: "missing 'domain' parameter".into(),
-                            data: None,
-                        })?;
+                    let domain =
+                        params
+                            .get("domain")
+                            .and_then(|v| v.as_str())
+                            .ok_or_else(|| crate::ipc::protocol::RpcError {
+                                code: INVALID_PARAMS,
+                                message: "missing 'domain' parameter".into(),
+                                data: None,
+                            })?;
 
                     let network_id = crate::dns::domain::derive_network_id(domain);
 
@@ -231,12 +225,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "domain-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir,
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -300,10 +294,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "domain.join",
-            serde_json::json!({"domain": "my.domain"}),
-        );
+        let req = RpcRequest::new("domain.join", serde_json::json!({"domain": "my.domain"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

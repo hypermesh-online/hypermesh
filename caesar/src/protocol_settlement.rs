@@ -317,7 +317,9 @@ mod tests {
     }
 
     fn make_criteria() -> settlement::acceptance::AcceptanceCriteria {
-        settlement::acceptance::AcceptanceCriteria::new(hypermesh_lib::NodeId::from_public_key(b"recipient"))
+        settlement::acceptance::AcceptanceCriteria::new(hypermesh_lib::NodeId::from_public_key(
+            b"recipient",
+        ))
     }
 
     /// Helper: mint a packet and force it to a specific state with a route.

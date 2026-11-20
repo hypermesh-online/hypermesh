@@ -12,19 +12,19 @@ export const crateStats: CrateStats[] = [
   {
     "id": "base",
     "files": 11,
-    "linesOfCode": 1296,
+    "linesOfCode": 1308,
     "testCount": 14
   },
   {
     "id": "block-matrix",
-    "files": 491,
-    "linesOfCode": 177345,
-    "testCount": 2471
+    "files": 480,
+    "linesOfCode": 168002,
+    "testCount": 2227
   },
   {
     "id": "caesar",
     "files": 37,
-    "linesOfCode": 13784,
+    "linesOfCode": 13804,
     "testCount": 276
   },
   {
@@ -35,9 +35,9 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "catalog",
-    "files": 90,
-    "linesOfCode": 33179,
-    "testCount": 326
+    "files": 92,
+    "linesOfCode": 34057,
+    "testCount": 338
   },
   {
     "id": "desktop",
@@ -48,13 +48,13 @@ export const crateStats: CrateStats[] = [
   {
     "id": "gateway",
     "files": 28,
-    "linesOfCode": 10697,
+    "linesOfCode": 10714,
     "testCount": 285
   },
   {
     "id": "hypermesh-ebpf",
     "files": 19,
-    "linesOfCode": 8372,
+    "linesOfCode": 8373,
     "testCount": 135
   },
   {
@@ -65,9 +65,9 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "hypermesh-lib",
-    "files": 17,
-    "linesOfCode": 6128,
-    "testCount": 178
+    "files": 18,
+    "linesOfCode": 7416,
+    "testCount": 194
   },
   {
     "id": "hypermesh-sdk",
@@ -83,9 +83,9 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "ngauge",
-    "files": 36,
-    "linesOfCode": 12190,
-    "testCount": 237
+    "files": 41,
+    "linesOfCode": 13642,
+    "testCount": 260
   },
   {
     "id": "sdk",
@@ -95,14 +95,14 @@ export const crateStats: CrateStats[] = [
   },
   {
     "id": "stoq",
-    "files": 65,
-    "linesOfCode": 22065,
-    "testCount": 380
+    "files": 64,
+    "linesOfCode": 21457,
+    "testCount": 375
   },
   {
     "id": "trustchain",
     "files": 99,
-    "linesOfCode": 41735,
+    "linesOfCode": 41731,
     "testCount": 443
   },
   {
@@ -114,8 +114,8 @@ export const crateStats: CrateStats[] = [
 ];
 
 export const totalStats = {
-  "totalFiles": 1160,
-  "totalLines": 362406,
-  "totalTests": 4835,
+  "totalFiles": 1156,
+  "totalLines": 356119,
+  "totalTests": 4637,
   "crateCount": 17
 };

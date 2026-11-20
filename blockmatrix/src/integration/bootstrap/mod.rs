@@ -317,8 +317,9 @@ impl BootstrapManager {
             self.config.network_usage.hypermesh_bind,
             None,
         ));
-        *self.state_proof.write().await =
-            Box::new(FullStateProof::new(self.config.network_usage.hypermesh_bind));
+        *self.state_proof.write().await = Box::new(FullStateProof::new(
+            self.config.network_usage.hypermesh_bind,
+        ));
         self.update_component_phases(BootstrapPhase::FullFederation)
             .await;
         self.enable_advanced_features().await?;

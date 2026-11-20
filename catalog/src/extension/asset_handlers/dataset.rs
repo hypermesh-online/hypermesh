@@ -4,9 +4,9 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, StateProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
-    OperationResult, RwLock,
+    AssetExtensionHandler, AssetOperation, AssetQuery, AssetRegistration, AssetType, AssetUpdate,
+    ExtensionAssetRecord, ExtensionError, ExtensionResult, HashMap, NetworkScope, OperationResult,
+    RwLock, StateProof,
 };
 
 /// Handler for Dataset assets (ML datasets, scientific data)
@@ -206,9 +206,7 @@ impl AssetExtensionHandler for DatasetHandler {
         }
         // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
         // location; capacity is descriptive and never gates admission.
-        if proof.space_proof.node_id.is_empty()
-            && proof.space_proof.storage_path.is_empty()
-        {
+        if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
             tracing::warn!("dataset asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }

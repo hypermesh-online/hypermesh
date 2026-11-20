@@ -820,7 +820,8 @@ mod tests {
         };
 
         let serialized = bincode::serialize(&submission).expect("test: expected success");
-        let deserialized: StoqCtSubmission = bincode::deserialize(&serialized).expect("test: expected success");
+        let deserialized: StoqCtSubmission =
+            bincode::deserialize(&serialized).expect("test: expected success");
 
         assert_eq!(submission.certificate, deserialized.certificate);
         assert_eq!(submission.chain, deserialized.chain);

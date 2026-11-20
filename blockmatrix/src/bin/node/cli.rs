@@ -9,6 +9,14 @@ use clap::{Parser, Subcommand};
 use blockmatrix::bootstrap::PrivacyMode;
 use blockmatrix::light_client::LightMode;
 
+#[path = "cli_actions.rs"]
+mod cli_actions;
+pub use cli_actions::{GatewayAction, MessageAction, ShareAction};
+
+#[cfg(test)]
+#[path = "tests/cli_bind.rs"]
+mod cli_bind_tests;
+
 #[derive(Parser, Debug)]
 #[clap(name = "blockmatrix-node")]
 #[clap(about = "BlockMatrix node with unified TrustChain bootstrap")]
@@ -60,6 +68,10 @@ pub struct Cli {
     /// STOQ port
     #[clap(short = 's', long, default_value = "9292")]
     pub stoq_port: u16,
+
+    /// Local IPv6 address for the STOQ listener (not an advertised peer address).
+    #[clap(long, default_value = "::")]
+    pub stoq_bind_address: std::net::Ipv6Addr,
 
     /// Run as a reflector (public peer that accepts and relays)
     #[clap(long)]
@@ -479,98 +491,4 @@ pub enum CatalogAction {
     },
     /// Show registry statistics
     Stats,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum GatewayAction {
-    /// Transfer an asset between blockchain scopes (Device <-> Network)
-    Transfer {
-        /// Asset ID to transfer
-        asset_id: String,
-        /// Source scope (device or network)
-        #[arg(long, default_value = "device")]
-        from: String,
-        /// Target scope (device or network)
-        #[arg(long, default_value = "network")]
-        to: String,
-    },
-    /// Get the status of a transfer by ID
-    Status {
-        /// Transfer ID (e.g., "gw-tx-1")
-        transfer_id: String,
-    },
-    /// List all transfers
-    List,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum ShareAction {
-    /// Send a share invite for an asset to a peer
-    Send {
-        /// Asset ID to share
-        asset_id: String,
-        /// Recipient node ID or DNS name
-        #[arg(long)]
-        with: String,
-    },
-    /// List received share invites
-    Inbox {
-        /// Maximum number of invites to show
-        #[arg(long, default_value = "50")]
-        limit: u64,
-    },
-    /// Accept a received share invite
-    Accept {
-        /// Invite ID to accept
-        invite_id: String,
-    },
-    /// Reject a received share invite
-    Reject {
-        /// Invite ID to reject
-        invite_id: String,
-    },
-    /// Show this node's public keys (FALCON + Kyber)
-    Pubkey,
-    /// Look up a peer's public key by node ID
-    PeerPubkey {
-        /// Peer node ID
-        node_id: String,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-pub enum MessageAction {
-    /// Send a message to a peer
-    Send {
-        /// Recipient name or node ID
-        #[arg(long)]
-        to: String,
-        /// Message body
-        body: String,
-        /// Content type
-        #[arg(long, default_value = "text/plain")]
-        content_type: String,
-        /// Reply to message ID
-        #[arg(long)]
-        reply_to: Option<String>,
-    },
-    /// List received messages
-    Inbox {
-        /// Maximum number of messages to show
-        #[arg(long, default_value = "20")]
-        limit: usize,
-    },
-    /// Message history with a peer
-    History {
-        /// Peer name or node ID
-        peer: String,
-        /// Maximum number of messages to show
-        #[arg(long, default_value = "50")]
-        limit: usize,
-    },
-    /// Read a specific message
-    Read {
-        /// Message ID
-        message_id: String,
-    },
 }

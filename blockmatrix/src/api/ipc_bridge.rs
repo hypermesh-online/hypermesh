@@ -64,10 +64,7 @@ impl ApiHandler for IpcBridgeHandler {
                 .map_err(|e| ApiError::InvalidRequest(format!("invalid JSON params: {e}")))?
         };
 
-        debug!(
-            "IPC bridge: {} -> {}",
-            self.stoq_path, self.ipc_method
-        );
+        debug!("IPC bridge: {} -> {}", self.stoq_path, self.ipc_method);
 
         // Build an RPC request and dispatch through the IPC handler
         let rpc_request = RpcRequest::new(&self.ipc_method, params);
@@ -112,7 +109,10 @@ pub fn register_ipc_bridge(api_server: &StoqApiServer, handler: Arc<RequestHandl
 
     for method in methods {
         let bridge = IpcBridgeHandler::new(method, handler.clone());
-        debug!("Bridging IPC method '{}' -> STOQ '{}'", method, bridge.stoq_path);
+        debug!(
+            "Bridging IPC method '{}' -> STOQ '{}'",
+            method, bridge.stoq_path
+        );
         api_server.register_handler(Arc::new(bridge));
     }
 
@@ -130,15 +130,11 @@ mod tests {
         let mut h = RequestHandler::new();
         h.register(
             "ping",
-            Arc::new(|_params| {
-                Box::pin(async { Ok(serde_json::json!("pong")) })
-            }),
+            Arc::new(|_params| Box::pin(async { Ok(serde_json::json!("pong")) })),
         );
         h.register(
             "blockchain.height",
-            Arc::new(|_params| {
-                Box::pin(async { Ok(serde_json::json!(42)) })
-            }),
+            Arc::new(|_params| Box::pin(async { Ok(serde_json::json!(42)) })),
         );
         h.register(
             "dns.resolve",

@@ -47,8 +47,8 @@ pub mod trust_signals;
 pub mod udp_ingest;
 
 // Re-export primary types at crate root for convenience.
-pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
 pub use caesar_tracker::CaesarTracker;
+pub use capacity::{CapacityMetrics, CapacityReport, CapacityScore};
 pub use collective_intel::CollectiveIntelligence;
 pub use compliance::{AttestationLevel, ComplianceChecker, ComplianceResult, KycAttestation};
 pub use ingestion::MetricsIngestionPipeline;
@@ -64,7 +64,11 @@ pub use node_metrics::{
 pub use organic_detection::{
     ClassifierConfig, TrafficClassification, TrafficClassifier, TrafficPattern,
 };
-pub use placement::{LocalityProvider, PeerProximity, PlacementLease};
+pub use placement::{
+    order_by_proximity, DmsDriver, DmsError, DmsPlan, FallbackStrategy, LocalityProvider,
+    MirrorAction, MirrorExecutor, PeerProximity, PlacementLease, ReflectAction, ReflectExecutor,
+    ReplicaCandidate, ReplicaSelector, SelectionCriteria, ShardCandidates,
+};
 pub use receipt::{ContentReceipt, ReceiptBundle, VerificationResult, WorkUnits};
 pub use routing_intel::{
     EbpfPolicyFeedback, EbpfPrivacyAction, EbpfRoutingRule, PathAdvisor, PathPolicyRecommendation,

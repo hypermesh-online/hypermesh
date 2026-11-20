@@ -133,11 +133,9 @@ impl SubstrateAdapter for RtnetlinkLinuxAdapter {
         let handle = open_handle()?;
         let mut links = handle.link().get().match_index(iface.index).execute();
 
-        match links
-            .try_next()
-            .await
-            .map_err(|e| SubstrateError::Backend(format!("RTM_GETLINK({}) failed: {e}", iface.name)))?
-        {
+        match links.try_next().await.map_err(|e| {
+            SubstrateError::Backend(format!("RTM_GETLINK({}) failed: {e}", iface.name))
+        })? {
             Some(msg) => Ok(link_state_from(&msg)),
             None => Err(SubstrateError::InterfaceNotFound(iface.name.clone())),
         }
@@ -164,8 +162,7 @@ impl SubstrateAdapter for RtnetlinkLinuxAdapter {
 
     async fn detect_reachability(&self) -> SubstrateResult<Reachability> {
         Err(SubstrateError::Unsupported(
-            "reachability discovery arrives with the STOQ reflector extension"
-                .to_string(),
+            "reachability discovery arrives with the STOQ reflector extension".to_string(),
         ))
     }
 }

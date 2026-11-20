@@ -343,9 +343,7 @@ impl StoqBridge {
             GatewayError::Config("perform_pos_handshake called without a NodeSigner".into())
         })?;
         let proof_provider = self.proof_provider.as_ref().ok_or_else(|| {
-            GatewayError::Config(
-                "perform_pos_handshake called without a StateProofProvider".into(),
-            )
+            GatewayError::Config("perform_pos_handshake called without a StateProofProvider".into())
         })?;
 
         let handshake = async {

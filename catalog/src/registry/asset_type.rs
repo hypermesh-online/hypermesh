@@ -276,8 +276,11 @@ mod tests {
 
         let stake_proof = StakeProof::new("test-holder".to_string(), "test-id".to_string());
         let space_proof = SpaceProof::new("test-node".to_string(), "/test".to_string(), 1024);
-        let work_proof =
-            WorkProof::from_work("test-owner".to_string(), "test-workload".to_string(), b"work");
+        let work_proof = WorkProof::from_work(
+            "test-owner".to_string(),
+            "test-workload".to_string(),
+            b"work",
+        );
         let time_proof = TimeProof::new(Duration::from_secs(10));
 
         StateProof::new(stake_proof, time_proof, space_proof, work_proof)
@@ -324,7 +327,9 @@ mod tests {
             "model": "Accord"
         });
 
-        let result = type_def.validate_instance(&instance).expect("test: validation");
+        let result = type_def
+            .validate_instance(&instance)
+            .expect("test: validation");
         assert!(result.valid);
     }
 }

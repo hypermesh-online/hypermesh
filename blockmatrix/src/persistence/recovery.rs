@@ -559,7 +559,9 @@ mod tests {
         let mut manager =
             RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        manager.detect_incomplete_writes().expect("test: expected success");
+        manager
+            .detect_incomplete_writes()
+            .expect("test: expected success");
 
         // Temp files should be cleaned up
         assert!(!node_dir.join(".tmp_test").exists());
@@ -590,7 +592,10 @@ mod tests {
         let mut manager =
             RecoveryManager::new(temp_dir.path().to_path_buf(), "test_node".to_string());
 
-        let valid = manager.verify_integrity().await.expect("test: async operation");
+        let valid = manager
+            .verify_integrity()
+            .await
+            .expect("test: async operation");
         assert!(valid); // Should be valid with no data
     }
 

@@ -225,11 +225,12 @@ async fn register_sharded_asset_onchain(
         },
         registration,
     );
-    let block = state
-        .blockchain
-        .add_block(vec![entry])
-        .await
-        .map_err(|e| rpc_err(INTERNAL_ERROR, format!("on-chain shard registration failed: {e}")))?;
+    let block = state.blockchain.add_block(vec![entry]).await.map_err(|e| {
+        rpc_err(
+            INTERNAL_ERROR,
+            format!("on-chain shard registration failed: {e}"),
+        )
+    })?;
 
     Ok(block.index)
 }
@@ -263,7 +264,10 @@ async fn store_shards_locally(
     for shard in &processed.shards {
         let hash_bytes = *blake3::hash(&shard.data).as_bytes();
         let content_hash = ContentHash(hash_bytes);
-        state.shard_store.store(content_hash, shard.data.clone()).await;
+        state
+            .shard_store
+            .store(content_hash, shard.data.clone())
+            .await;
         hashes.push((hash_bytes, hex::encode(hash_bytes)));
     }
     hashes
@@ -283,8 +287,7 @@ fn persist_shard_map(
     privacy_mode: PrivacyMode,
 ) -> Result<(), String> {
     let maps_dir = state.data_dir.join("shard_maps");
-    std::fs::create_dir_all(&maps_dir)
-        .map_err(|e| format!("create shard_maps dir: {e}"))?;
+    std::fs::create_dir_all(&maps_dir).map_err(|e| format!("create shard_maps dir: {e}"))?;
 
     // Wrap the decryption key for self-custody when the asset is encrypted.
     // The identity is loaded from the node's on-disk keystore (never held in
@@ -293,11 +296,9 @@ fn persist_shard_map(
         let identity_dir = state.data_dir.join(&state.node_id).join("identity");
         let identity = crate::identity::FalconIdentity::load_or_create(&identity_dir)
             .map_err(|e| format!("load node identity for key self-custody: {e}"))?;
-        let env = KeyEnvelope::wrap_for(
-            &processed.decryption_key,
-            identity.encryption_public_key(),
-        )
-        .map_err(|e| format!("wrap key for self-custody: {e}"))?;
+        let env =
+            KeyEnvelope::wrap_for(&processed.decryption_key, identity.encryption_public_key())
+                .map_err(|e| format!("wrap key for self-custody: {e}"))?;
         Some(env)
     } else {
         None
@@ -309,24 +310,26 @@ fn persist_shard_map(
         key_envelope,
         shard_count: processed.shards.len(),
         original_size: processed.stats.original_size,
-        shard_metadata: processed.shards.iter().map(|s| s.metadata.clone()).collect(),
+        shard_metadata: processed
+            .shards
+            .iter()
+            .map(|s| s.metadata.clone())
+            .collect(),
     };
 
     let map_path = maps_dir.join(format!("{}.json", processed.asset_id));
-    let map_json = serde_json::to_string_pretty(&map)
-        .map_err(|e| format!("serialize shard map: {e}"))?;
+    let map_json =
+        serde_json::to_string_pretty(&map).map_err(|e| format!("serialize shard map: {e}"))?;
     std::fs::write(&map_path, &map_json)
         .map_err(|e| format!("write {}: {e}", map_path.display()))?;
 
     // Persist raw shard data files
     let shards_dir = maps_dir.join(&processed.asset_id);
-    std::fs::create_dir_all(&shards_dir)
-        .map_err(|e| format!("create shards dir: {e}"))?;
+    std::fs::create_dir_all(&shards_dir).map_err(|e| format!("create shards dir: {e}"))?;
 
     for (hash_hex, shard) in shard_hashes.iter().zip(processed.shards.iter()) {
         let shard_path = shards_dir.join(hash_hex);
-        std::fs::write(&shard_path, &shard.data)
-            .map_err(|e| format!("write shard: {e}"))?;
+        std::fs::write(&shard_path, &shard.data).map_err(|e| format!("write shard: {e}"))?;
     }
 
     Ok(())
@@ -411,7 +414,10 @@ mod tests {
         let shard_hashes = result["shard_hashes"]
             .as_array()
             .expect("test: shard_hashes array present");
-        assert!(!shard_hashes.is_empty(), "asset must produce at least one shard");
+        assert!(
+            !shard_hashes.is_empty(),
+            "asset must produce at least one shard"
+        );
 
         // Every returned shard hash must now be authorized on-chain — this is
         // the exact gate the serve + re-seed paths call. Assert for all of them.

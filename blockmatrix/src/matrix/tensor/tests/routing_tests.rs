@@ -136,8 +136,8 @@ fn test_find_aligned_nodes_with_tolerance() {
     let target_direction = Vector3D::new(1.0, 0.0, 0.0);
 
     let candidates = vec![
-        MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate"),  // Slightly off
-        MatrixCoordinate::new(10, 3, 0).expect("test: valid coordinate"),  // More off
+        MatrixCoordinate::new(10, 1, 0).expect("test: valid coordinate"), // Slightly off
+        MatrixCoordinate::new(10, 3, 0).expect("test: valid coordinate"), // More off
         MatrixCoordinate::new(10, 10, 0).expect("test: valid coordinate"), // 45 degrees
     ];
 
@@ -153,14 +153,17 @@ fn test_find_aligned_nodes_excludes_source() {
     let target_direction = Vector3D::new(1.0, 0.0, 0.0);
 
     let candidates = vec![
-        MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"),  // Source itself
+        MatrixCoordinate::new(5, 5, 5).expect("test: valid coordinate"), // Source itself
         MatrixCoordinate::new(10, 5, 5).expect("test: valid coordinate"), // Valid candidate
     ];
 
     let aligned = find_aligned_nodes(&source, &target_direction, &candidates, 0.5);
 
     assert_eq!(aligned.len(), 1);
-    assert_eq!(aligned[0], MatrixCoordinate::new(10, 5, 5).expect("test: valid coordinate"));
+    assert_eq!(
+        aligned[0],
+        MatrixCoordinate::new(10, 5, 5).expect("test: valid coordinate")
+    );
 }
 
 #[test]

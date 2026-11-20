@@ -118,7 +118,7 @@ mod tests {
     use super::*;
     use crate::protocol::pos_fast_validator::FastValidationConfig;
     use crate::protocol::pos_validator::PosTokenValidator;
-    use std::time::{Duration, SystemTime};
+    use std::time::Duration;
 
     use crate::protocol::pos_validator::test_support::signed_test_token;
 

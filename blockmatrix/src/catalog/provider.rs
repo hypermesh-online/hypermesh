@@ -259,9 +259,7 @@ pub(crate) mod test_support {
             let q = query.to_lowercase();
             let mut out: Vec<CatalogTypeInfo> = by_hash
                 .values()
-                .filter(|d| {
-                    q.is_empty() || d.info.type_name.to_lowercase().contains(&q)
-                })
+                .filter(|d| q.is_empty() || d.info.type_name.to_lowercase().contains(&q))
                 .map(|d| d.info.clone())
                 .collect();
             // Deterministic ordering so tests don't flap.

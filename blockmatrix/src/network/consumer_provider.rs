@@ -12,7 +12,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{ContentHash, NetworkId};
 use tracing::{debug, info, warn};
 
 use crate::network::shard_dedup::DedupPolicy;
@@ -42,19 +42,26 @@ pub struct ConsumerProviderManager {
     shard_store: Arc<ShardStore>,
     shard_location_index: Arc<ShardLocationIndex>,
     local_node_id: String,
+    /// The network this node's fetched shards belong to. Provider registration
+    /// is keyed on this network — the same canonical NetworkId the shard-announce
+    /// handler and replication loops use — so consumer-becomes-provider records
+    /// never silently flatten to the default network.
+    network_id: NetworkId,
 }
 
 impl ConsumerProviderManager {
-    /// Create a new consumer-provider manager.
+    /// Create a new consumer-provider manager scoped to `network_id`.
     pub fn new(
         shard_store: Arc<ShardStore>,
         shard_location_index: Arc<ShardLocationIndex>,
         local_node_id: String,
+        network_id: NetworkId,
     ) -> Self {
         Self {
             shard_store,
             shard_location_index,
             local_node_id,
+            network_id,
         }
     }
 
@@ -79,6 +86,34 @@ impl ConsumerProviderManager {
     /// payload is generated — preserving Anonymous privacy guarantees.
     pub async fn process_fetched_shards_with_policy(
         &self,
+        shards: Vec<(ContentHash, Vec<u8>)>,
+        policy: DedupPolicy,
+    ) -> ConsumerProviderResult {
+        self.process_in_network_with_policy(self.network_id, shards, policy)
+            .await
+    }
+
+    /// R12 with an EXPLICIT network — used by the DMS handoff seeder to register
+    /// a freshly-published version's shards under the ASSET's network (the
+    /// `(NetworkId, ContentHash)` key half), which in the single-network model
+    /// equals `self.network_id` but is passed explicitly so seed writes and the
+    /// analytics/mirror reads stay keyed on the same network. Defaults to the
+    /// `Full` dedup policy (a published seed is never Anonymous).
+    pub async fn process_fetched_shards_in_network(
+        &self,
+        network: NetworkId,
+        shards: Vec<(ContentHash, Vec<u8>)>,
+    ) -> ConsumerProviderResult {
+        self.process_in_network_with_policy(network, shards, DedupPolicy::Full)
+            .await
+    }
+
+    /// Shared worker: store + (for `Full`) register-provider-in-`network` +
+    /// announce. `process_fetched_shards_with_policy` and
+    /// `process_fetched_shards_in_network` are thin callers.
+    async fn process_in_network_with_policy(
+        &self,
+        network: NetworkId,
         shards: Vec<(ContentHash, Vec<u8>)>,
         policy: DedupPolicy,
     ) -> ConsumerProviderResult {
@@ -126,9 +161,11 @@ impl ConsumerProviderManager {
             );
             None
         } else {
-            // Register ourselves as a provider for all shards
+            // Register ourselves as a provider for all shards, in the target
+            // network (self's network by default; the asset's network for the
+            // DMS handoff seed).
             self.shard_location_index
-                .register_provider(&self.local_node_id, &announced_hashes)
+                .register_provider_in_network(network, &self.local_node_id, &announced_hashes)
                 .await;
 
             // Build announcement payload
@@ -175,10 +212,7 @@ impl ConsumerProviderManager {
 /// Wire format: payload begins with `TAG_SHARD_ANNOUNCE` (0x04) followed by
 /// the count and shard hashes — produced by `build_shard_announce_payload`
 /// or `ConsumerProviderManager::process_fetched_shards`.
-pub async fn broadcast_announcement(
-    payload: &[u8],
-    peers: &[Arc<stoq::Connection>],
-) -> usize {
+pub async fn broadcast_announcement(payload: &[u8], peers: &[Arc<stoq::Connection>]) -> usize {
     if payload.is_empty() || peers.is_empty() {
         return 0;
     }
@@ -279,6 +313,7 @@ mod tests {
             Arc::new(ShardStore::new()),
             Arc::new(ShardLocationIndex::new()),
             "local-node-001".to_string(),
+            hypermesh_lib::DEFAULT_NETWORK,
         )
     }
 
@@ -298,9 +333,7 @@ mod tests {
         let hash = test_hash(0xAA);
         let data = vec![0xDE, 0xAD, 0xBE, 0xEF];
 
-        let result = mgr
-            .process_fetched_shards(vec![(hash, data.clone())])
-            .await;
+        let result = mgr.process_fetched_shards(vec![(hash, data.clone())]).await;
 
         assert_eq!(result.shards_stored, 1);
         assert_eq!(result.shards_deduped, 0);
@@ -322,9 +355,7 @@ mod tests {
         let hash_b = test_hash(0xCC);
 
         // Pre-store hash_a so it will be deduplicated
-        mgr.shard_store
-            .store(hash_a, vec![1, 2, 3])
-            .await;
+        mgr.shard_store.store(hash_a, vec![1, 2, 3]).await;
 
         let shards = vec![
             (hash_a, vec![1, 2, 3]), // already exists -> dedup
@@ -367,10 +398,7 @@ mod tests {
         let hash_x = test_hash(0xDD);
         let hash_y = test_hash(0xEE);
 
-        let shards = vec![
-            (hash_x, vec![10, 20]),
-            (hash_y, vec![30, 40]),
-        ];
+        let shards = vec![(hash_x, vec![10, 20]), (hash_y, vec![30, 40])];
 
         mgr.process_fetched_shards(shards).await;
 
@@ -396,10 +424,7 @@ mod tests {
         let data = vec![0xAA, 0xBB, 0xCC];
 
         let result = mgr
-            .process_fetched_shards_with_policy(
-                vec![(hash, data.clone())],
-                DedupPolicy::HashOnly,
-            )
+            .process_fetched_shards_with_policy(vec![(hash, data.clone())], DedupPolicy::HashOnly)
             .await;
 
         // Shard should be stored
@@ -423,10 +448,7 @@ mod tests {
         let hash = test_hash(0xF2);
 
         let result = mgr
-            .process_fetched_shards_with_policy(
-                vec![(hash, vec![1, 2, 3])],
-                DedupPolicy::HashOnly,
-            )
+            .process_fetched_shards_with_policy(vec![(hash, vec![1, 2, 3])], DedupPolicy::HashOnly)
             .await;
 
         assert!(
@@ -441,10 +463,7 @@ mod tests {
         let hash = test_hash(0xF3);
 
         let result = mgr
-            .process_fetched_shards_with_policy(
-                vec![(hash, vec![4, 5, 6])],
-                DedupPolicy::Full,
-            )
+            .process_fetched_shards_with_policy(vec![(hash, vec![4, 5, 6])], DedupPolicy::Full)
             .await;
 
         assert_eq!(result.shards_stored, 1);

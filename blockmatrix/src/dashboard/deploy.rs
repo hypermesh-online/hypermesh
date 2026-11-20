@@ -39,10 +39,7 @@ pub fn collect_dashboard_files(
     access: &super::DashboardAccess,
 ) -> std::io::Result<BTreeMap<String, Vec<u8>>> {
     let mut all = BTreeMap::new();
-    for (scope, rel_opt) in [
-        ("public", &access.public),
-        ("private", &access.private),
-    ] {
+    for (scope, rel_opt) in [("public", &access.public), ("private", &access.private)] {
         if let Some(rel) = rel_opt {
             let scope_dir = base_dir.join(rel);
             for (path, content) in collect_dir_files(&scope_dir)? {
@@ -151,9 +148,7 @@ pub fn unbundle_files(bundle: &[u8]) -> Option<BTreeMap<String, Vec<u8>>> {
 ///
 /// Returns `Vec<(content_hash, block_index)>` ordered by block index
 /// (most recent last).
-pub fn find_dashboard_assets(
-    blocks: &[crate::blockchain::block::Block],
-) -> Vec<([u8; 32], u64)> {
+pub fn find_dashboard_assets(blocks: &[crate::blockchain::block::Block]) -> Vec<([u8; 32], u64)> {
     use crate::assets::core::{AssetCategory, BaseSystemType};
 
     let mut results = Vec::new();
@@ -228,11 +223,11 @@ pub fn list_dashboards(data_dir: &Path) -> Vec<String> {
 /// Load a dashboard manifest from `<data_dir>/dashboards/<name>/dashboard.toml`.
 ///
 /// **Deprecated**: prefer `load_dashboard_bundle`.
-pub fn load_dashboard_manifest(
-    data_dir: &Path,
-    name: &str,
-) -> Option<super::DashboardManifest> {
-    let path = data_dir.join("dashboards").join(name).join("dashboard.toml");
+pub fn load_dashboard_manifest(data_dir: &Path, name: &str) -> Option<super::DashboardManifest> {
+    let path = data_dir
+        .join("dashboards")
+        .join(name)
+        .join("dashboard.toml");
     let content = std::fs::read_to_string(&path).ok()?;
     super::parse_manifest(&content).ok()
 }
@@ -245,8 +240,7 @@ mod tests {
     #[test]
     fn test_collect_dir_files_empty() {
         let tmp = TempDir::new().expect("test: tmpdir");
-        let files = collect_dir_files(&tmp.path().join("nonexistent"))
-            .expect("test: collect");
+        let files = collect_dir_files(&tmp.path().join("nonexistent")).expect("test: collect");
         assert!(files.is_empty());
     }
 
@@ -362,8 +356,7 @@ public = "dist/public/"
         let hash = blake3_hash(&bundle);
         let manifest = "[dashboard]\nname = \"test\"\nversion = \"1.0.0\"\n";
 
-        store_dashboard_bundle(tmp.path(), &hash, manifest, &bundle)
-            .expect("test: store bundle");
+        store_dashboard_bundle(tmp.path(), &hash, manifest, &bundle).expect("test: store bundle");
 
         let (loaded_manifest, loaded_bundle) =
             load_dashboard_bundle(tmp.path(), &hash).expect("test: load bundle");

@@ -757,7 +757,9 @@ mod tests {
             },
         };
 
-        let controller = ServiceMeshController::new(config).await.expect("test: async operation");
+        let controller = ServiceMeshController::new(config)
+            .await
+            .expect("test: async operation");
 
         // Register a test endpoint
         let endpoint = ServiceEndpoint {

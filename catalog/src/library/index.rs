@@ -568,7 +568,10 @@ mod tests {
         let index = LibraryIndex::new();
 
         let package = create_test_package();
-        index.index_package(&package).await.expect("test: async operation");
+        index
+            .index_package(&package)
+            .await
+            .expect("test: async operation");
 
         // Search by text
         let query = SearchQuery {
@@ -605,14 +608,20 @@ mod tests {
         let package = create_test_package();
         let package_id = Arc::clone(&package.id);
 
-        index.index_package(&package).await.expect("test: async operation");
+        index
+            .index_package(&package)
+            .await
+            .expect("test: async operation");
 
         // Verify it's indexed
         let stats = index.get_stats().await.expect("test: async operation");
         assert_eq!(stats.total_packages, 1);
 
         // Remove it
-        index.remove_package(&package_id).await.expect("test: async operation");
+        index
+            .remove_package(&package_id)
+            .await
+            .expect("test: async operation");
 
         // Verify it's gone
         let stats = index.get_stats().await.expect("test: async operation");

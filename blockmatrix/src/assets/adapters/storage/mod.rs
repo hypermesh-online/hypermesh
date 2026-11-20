@@ -32,7 +32,7 @@ pub use self::sharding::{ShardingAlgorithm, ShardingConfig};
 mod tests {
     use super::*;
     use crate::assets::core::{
-        AssetAllocationRequest, AssetType, StateProof, PrivacyMode, SpaceProof, StakeProof,
+        AssetAllocationRequest, AssetType, PrivacyMode, SpaceProof, StakeProof, StateProof,
         StorageRequirements, StorageType, TimeProof, WorkProof,
     };
     use std::collections::HashMap;
@@ -73,7 +73,6 @@ mod tests {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),
                     stake_timestamp: SystemTime::now(),
-
                 },
                 TimeProof {
                     network_time_offset,
@@ -116,7 +115,10 @@ mod tests {
         let adapter = StorageAssetAdapter::new().await;
         let request = create_test_storage_request().await;
 
-        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
+        let allocation = adapter
+            .allocate_asset(&request)
+            .await
+            .expect("test: async operation");
         assert!(matches!(
             allocation.asset_id.category,
             AssetCategory::BaseSystem(BaseSystemType::Storage)

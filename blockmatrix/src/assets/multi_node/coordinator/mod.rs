@@ -317,7 +317,10 @@ impl MultiNodeCoordinator {
                                 if let Some((target_node, _)) = node_loads
                                     .iter()
                                     .filter(|(_, l)| **l < avg_load)
-                                    .min_by(|a, b| a.1.partial_cmp(b.1).expect("load values should be valid for comparison"))
+                                    .min_by(|a, b| {
+                                        a.1.partial_cmp(b.1)
+                                            .expect("load values should be valid for comparison")
+                                    })
                                 {
                                     let _ = event_sender.send(MultiNodeEvent::MigrationStarted {
                                         asset_id: asset_id.clone(),
@@ -356,7 +359,9 @@ impl MultiNodeCoordinator {
             .max_by(|a, b| {
                 let score_a = self.calculate_node_score(a.1);
                 let score_b = self.calculate_node_score(b.1);
-                score_a.partial_cmp(&score_b).expect("node scores should be valid for comparison")
+                score_a
+                    .partial_cmp(&score_b)
+                    .expect("node scores should be valid for comparison")
             })
             .map(|(id, _)| (*id).clone())
             .ok_or_else(|| AssetError::AllocationFailed {

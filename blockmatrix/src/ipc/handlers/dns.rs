@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::dns::FoundationGrant;
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::{INTERNAL_ERROR, INVALID_PARAMS, RpcError};
+use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
 use hypermesh_lib::NodeSigner;
 
@@ -22,19 +22,13 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
             Arc::new(move |params| {
                 let s = s.clone();
                 Box::pin(async move {
-                    let name = params
-                        .get("name")
-                        .and_then(|v| v.as_str())
-                        .ok_or_else(|| crate::ipc::protocol::RpcError {
+                    let name = params.get("name").and_then(|v| v.as_str()).ok_or_else(|| {
+                        crate::ipc::protocol::RpcError {
                             code: INVALID_PARAMS,
                             message: "missing 'name' parameter".into(),
                             data: None,
-                        })?;
-
-                    // Record resolution for popularity tracking (ngauge).
-                    if let Some(ref tracker) = s.dns_popularity_tracker {
-                        tracker.record_resolution(name).await;
-                    }
+                        }
+                    })?;
 
                     match s.dns_resolver.resolve(name).await {
                         Some(addr) => Ok(serde_json::json!({
@@ -114,9 +108,8 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         None => {
                             return Err(RpcError {
                                 code: INTERNAL_ERROR,
-                                message:
-                                    "foundation root key not configured (alpha-default inert)"
-                                        .into(),
+                                message: "foundation root key not configured (alpha-default inert)"
+                                    .into(),
                                 data: None,
                             });
                         }
@@ -171,8 +164,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         .get("dues_paid_until_secs")
                         .and_then(|v| v.as_u64())
                         .unwrap_or(valid_until_secs);
-                    let dues_paid_until =
-                        UNIX_EPOCH + Duration::from_secs(dues_paid_until_secs);
+                    let dues_paid_until = UNIX_EPOCH + Duration::from_secs(dues_paid_until_secs);
 
                     // Build unsigned grant, sign canonical payload.
                     let mut grant = FoundationGrant::new_unsigned(
@@ -195,12 +187,11 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     // catalog crate; for alpha we return the serialized
                     // grant + verifier metadata so the operator can
                     // distribute the grant out-of-band and audit later.
-                    let grant_json =
-                        serde_json::to_value(&grant).map_err(|e| RpcError {
-                            code: INTERNAL_ERROR,
-                            message: format!("serialize grant: {e}"),
-                            data: None,
-                        })?;
+                    let grant_json = serde_json::to_value(&grant).map_err(|e| RpcError {
+                        code: INTERNAL_ERROR,
+                        message: format!("serialize grant: {e}"),
+                        data: None,
+                    })?;
                     let issued_at_secs = grant
                         .issued_at
                         .duration_since(UNIX_EPOCH)
@@ -257,12 +248,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "dns-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -295,10 +286,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "dns.resolve",
-            serde_json::json!({"name": "nonexistent"}),
-        );
+        let req = RpcRequest::new("dns.resolve", serde_json::json!({"name": "nonexistent"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
@@ -320,10 +308,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "dns.resolve",
-            serde_json::json!({"name": "mynode"}),
-        );
+        let req = RpcRequest::new("dns.resolve", serde_json::json!({"name": "mynode"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

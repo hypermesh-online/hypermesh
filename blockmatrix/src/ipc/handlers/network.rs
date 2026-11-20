@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::{RpcError, INVALID_PARAMS, INTERNAL_ERROR};
+use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
 
 /// Register network-related IPC methods.
@@ -138,9 +138,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 ///
 /// Loads keys from the identity files in `data_dir`. If the identity
 /// directory does not contain key files, returns an error.
-fn handle_identity_pubkey(
-    state: &DaemonState,
-) -> Result<serde_json::Value, RpcError> {
+fn handle_identity_pubkey(state: &DaemonState) -> Result<serde_json::Value, RpcError> {
     let identity_dir = state.data_dir.join("identity");
     let falcon_pk_path = identity_dir.join("falcon_pubkey.der");
     let kyber_pk_path = identity_dir.join("kyber_pubkey.der");
@@ -247,10 +245,7 @@ async fn handle_peer_pubkey(
             let short = &target_node_id[..8.min(target_node_id.len())];
             Err(RpcError {
                 code: INVALID_PARAMS,
-                message: format!(
-                    "peer '{}...' not found in authenticated peers",
-                    short
-                ),
+                message: format!("peer '{}...' not found in authenticated peers", short),
                 data: None,
             })
         }
@@ -290,12 +285,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "net-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -341,10 +336,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "network.connect",
-            serde_json::json!({"address": "::1"}),
-        );
+        let req = RpcRequest::new("network.connect", serde_json::json!({"address": "::1"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
@@ -401,12 +393,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "pk-test-node".into(),
+            network_id: "trustnet-test".into(),
             data_dir: dir.path().to_path_buf(),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -453,10 +445,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "peer.pubkey",
-            serde_json::json!({"node_id": "abc123"}),
-        );
+        let req = RpcRequest::new("peer.pubkey", serde_json::json!({"node_id": "abc123"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some());
         let err = resp.error.expect("test: error");

@@ -20,7 +20,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use crate::assets::core::{
     AssetAllocation, AssetAllocationRequest, AssetManager, AssetRegistration, AssetType,
-    StateProof, PrivacyMode, ResourceRequirements,
+    PrivacyMode, ResourceRequirements, StateProof,
 };
 use crate::container::runtime::ContainerHandle;
 use crate::container::{ContainerId, ContainerRuntime, ContainerSpec, CreateOptions};

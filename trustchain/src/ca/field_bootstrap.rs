@@ -175,11 +175,11 @@ impl FieldBootstrap {
         common_name: &str,
     ) -> TrustChainResult<EnrollmentRequest> {
         let mut devices = self.devices.write().await;
-        let record = devices.get_mut(device_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
+        let record = devices
+            .get_mut(device_id)
+            .ok_or_else(|| TrustChainError::InvalidRequest {
                 reason: format!("Device '{}' not registered for bootstrap", device_id),
-            }
-        })?;
+            })?;
 
         if record.state == BootstrapState::Enrolled {
             return Err(TrustChainError::InvalidRequest {
@@ -215,11 +215,11 @@ impl FieldBootstrap {
         signed_certificate: Vec<u8>,
     ) -> TrustChainResult<()> {
         let mut devices = self.devices.write().await;
-        let record = devices.get_mut(device_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
+        let record = devices
+            .get_mut(device_id)
+            .ok_or_else(|| TrustChainError::InvalidRequest {
                 reason: format!("Device '{}' not registered for bootstrap", device_id),
-            }
-        })?;
+            })?;
 
         if record.state != BootstrapState::Enrolling {
             return Err(TrustChainError::InvalidRequest {
@@ -242,16 +242,13 @@ impl FieldBootstrap {
     ///
     /// Reverts from Enrolling back to Provisional so the device can retry.
     /// Increments the retry counter.
-    pub async fn handle_connectivity_loss(
-        &self,
-        device_id: &str,
-    ) -> TrustChainResult<()> {
+    pub async fn handle_connectivity_loss(&self, device_id: &str) -> TrustChainResult<()> {
         let mut devices = self.devices.write().await;
-        let record = devices.get_mut(device_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
+        let record = devices
+            .get_mut(device_id)
+            .ok_or_else(|| TrustChainError::InvalidRequest {
                 reason: format!("Device '{}' not registered", device_id),
-            }
-        })?;
+            })?;
 
         if record.state != BootstrapState::Enrolling {
             return Err(TrustChainError::InvalidRequest {
@@ -464,9 +461,7 @@ mod tests {
             .expect("test: enroll 3");
 
         // Third connectivity loss exceeds limit
-        let err = bootstrap
-            .handle_connectivity_loss("device-retry")
-            .await;
+        let err = bootstrap.handle_connectivity_loss("device-retry").await;
         assert!(err.is_err(), "Should exceed max retries");
     }
 

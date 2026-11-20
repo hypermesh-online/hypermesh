@@ -42,8 +42,8 @@ impl Default for GracePeriodConfig {
     fn default() -> Self {
         Self {
             anonymous_grace: Duration::ZERO,
-            private_grace: Duration::from_secs(7 * 24 * 60 * 60),  // 7 days
-            public_grace: Duration::from_secs(30 * 24 * 60 * 60),  // 30 days
+            private_grace: Duration::from_secs(7 * 24 * 60 * 60), // 7 days
+            public_grace: Duration::from_secs(30 * 24 * 60 * 60), // 30 days
             max_renewals_per_cert: 3,
         }
     }
@@ -122,11 +122,7 @@ impl GracePeriodManager {
     ///
     /// Returns `true` if the certificate expired recently enough to qualify
     /// for grace period renewal.
-    pub fn is_within_grace_period(
-        &self,
-        expired_at: SystemTime,
-        scope: &GraceScope,
-    ) -> bool {
+    pub fn is_within_grace_period(&self, expired_at: SystemTime, scope: &GraceScope) -> bool {
         let grace = self.grace_duration(scope);
         if grace.is_zero() {
             return false;
@@ -153,20 +149,14 @@ impl GracePeriodManager {
         let grace = self.grace_duration(scope);
         if grace.is_zero() {
             return Err(TrustChainError::InvalidRequest {
-                reason: format!(
-                    "No grace period for {:?} scope",
-                    scope
-                ),
+                reason: format!("No grace period for {:?} scope", scope),
             });
         }
 
         // Check within grace window
         if !self.is_within_grace_period(expired_at, scope) {
             return Err(TrustChainError::InvalidRequest {
-                reason: format!(
-                    "Certificate '{}' is past its grace period",
-                    serial_number
-                ),
+                reason: format!("Certificate '{}' is past its grace period", serial_number),
             });
         }
 
@@ -222,11 +212,11 @@ impl GracePeriodManager {
     /// Validate that a renewal token is still active and not expired.
     pub async fn validate_token(&self, token_id: &str) -> TrustChainResult<RenewalToken> {
         let tokens = self.active_tokens.read().await;
-        let token = tokens.get(token_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
+        let token = tokens
+            .get(token_id)
+            .ok_or_else(|| TrustChainError::InvalidRequest {
                 reason: format!("Renewal token '{}' not found", token_id),
-            }
-        })?;
+            })?;
 
         let now = SystemTime::now();
         if now > token.expires_at {

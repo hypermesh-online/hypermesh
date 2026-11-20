@@ -313,8 +313,7 @@ impl AssetStatus {
 
     /// Check if state proofs are valid
     pub fn validate_state_proofs(&self) -> bool {
-        !self.state_proofs.is_empty()
-            && self.state_proofs.iter().all(|proof| proof.validate())
+        !self.state_proofs.is_empty() && self.state_proofs.iter().all(|proof| proof.validate())
     }
 }
 

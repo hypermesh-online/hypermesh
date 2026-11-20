@@ -18,8 +18,8 @@ pub mod http;
 pub mod proof;
 pub mod protocol;
 pub mod runtime;
-pub mod sharding_types;
 pub mod sdk;
+pub mod sharding_types;
 pub mod types;
 pub mod validation;
 

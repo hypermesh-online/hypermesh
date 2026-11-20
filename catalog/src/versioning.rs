@@ -159,9 +159,21 @@ impl SemanticVersion {
             .captures(version_str)
             .ok_or_else(|| anyhow::anyhow!("Invalid semantic version format: {version_str}"))?;
 
-        let major = captures.name("major").expect("regex matched so major group exists").as_str().parse()?;
-        let minor = captures.name("minor").expect("regex matched so minor group exists").as_str().parse()?;
-        let patch = captures.name("patch").expect("regex matched so patch group exists").as_str().parse()?;
+        let major = captures
+            .name("major")
+            .expect("regex matched so major group exists")
+            .as_str()
+            .parse()?;
+        let minor = captures
+            .name("minor")
+            .expect("regex matched so minor group exists")
+            .as_str()
+            .parse()?;
+        let patch = captures
+            .name("patch")
+            .expect("regex matched so patch group exists")
+            .as_str()
+            .parse()?;
 
         let pre_release = captures.name("prerelease").map(|m| m.as_str().to_string());
         let build = captures
@@ -577,7 +589,8 @@ mod tests {
         let pre_version = SemanticVersion::parse("1.2.3-alpha.1").expect("test: expected success");
         assert_eq!(pre_version.pre_release, Some("alpha.1".to_string()));
 
-        let build_version = SemanticVersion::parse("1.2.3+build.1").expect("test: expected success");
+        let build_version =
+            SemanticVersion::parse("1.2.3+build.1").expect("test: expected success");
         assert_eq!(build_version.build, Some("build.1".to_string()));
     }
 
@@ -621,7 +634,9 @@ mod tests {
 
         manager.register_versions("test-package".to_string(), versions);
 
-        let latest = manager.get_latest_version("test-package").expect("test: expected success");
+        let latest = manager
+            .get_latest_version("test-package")
+            .expect("test: expected success");
         assert_eq!(*latest, SemanticVersion::new(2, 0, 0));
 
         let constraint = VersionConstraint::parse("^1.0.0").expect("test: expected success");
@@ -638,14 +653,12 @@ mod tests {
         let mut resolver = DependencyResolver::new();
 
         // Register versions for the packages
-        resolver.version_manager().register_versions(
-            "pkg-a".to_string(),
-            vec![SemanticVersion::new(1, 0, 0)],
-        );
-        resolver.version_manager().register_versions(
-            "pkg-b".to_string(),
-            vec![SemanticVersion::new(2, 0, 0)],
-        );
+        resolver
+            .version_manager()
+            .register_versions("pkg-a".to_string(), vec![SemanticVersion::new(1, 0, 0)]);
+        resolver
+            .version_manager()
+            .register_versions("pkg-b".to_string(), vec![SemanticVersion::new(2, 0, 0)]);
 
         let deps = vec![
             AssetDependency {
@@ -677,7 +690,10 @@ mod tests {
             .await
             .expect("test: resolution should succeed");
 
-        assert!(result.success, "resolution should succeed with no conflicts");
+        assert!(
+            result.success,
+            "resolution should succeed with no conflicts"
+        );
         assert_eq!(result.resolved.len(), 2, "should resolve both packages");
         assert!(result.conflicts.is_empty(), "no conflicts expected");
         assert!(result.missing.is_empty(), "no missing deps expected");
@@ -710,7 +726,10 @@ mod tests {
             .expect("test: should not crash on self-ref");
 
         // Self-referencing dep resolves to itself (visited prevents re-entry)
-        assert!(!result.resolved.is_empty(), "should resolve at least the root dep");
+        assert!(
+            !result.resolved.is_empty(),
+            "should resolve at least the root dep"
+        );
     }
 
     #[test]

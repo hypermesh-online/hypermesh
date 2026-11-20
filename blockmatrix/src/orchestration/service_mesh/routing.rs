@@ -694,10 +694,14 @@ mod tests {
     #[tokio::test]
     async fn test_traditional_vs_alm_routing() {
         // Test traditional routing
-        let traditional_engine = AlmRoutingEngine::new(false).await.expect("test: async operation");
+        let traditional_engine = AlmRoutingEngine::new(false)
+            .await
+            .expect("test: async operation");
 
         // Test ALM-enhanced routing
-        let alm_engine = AlmRoutingEngine::new(true).await.expect("test: async operation");
+        let alm_engine = AlmRoutingEngine::new(true)
+            .await
+            .expect("test: async operation");
 
         // Setup test topology
         let mut nodes = HashMap::new();
@@ -759,7 +763,10 @@ mod tests {
 
         let mut edges = HashMap::new();
         edges.insert(
-            (NodeId::from_public_key(b"node1"), NodeId::from_public_key(b"node2")),
+            (
+                NodeId::from_public_key(b"node1"),
+                NodeId::from_public_key(b"node2"),
+            ),
             EdgeMetrics {
                 latency_us: 50000, // 50ms cross-country
                 bandwidth_mbps: 1000.0,
@@ -773,7 +780,10 @@ mod tests {
             .update_topology(nodes.clone(), edges.clone())
             .await
             .expect("test: expected success");
-        alm_engine.update_topology(nodes, edges).await.expect("test: async operation");
+        alm_engine
+            .update_topology(nodes, edges)
+            .await
+            .expect("test: async operation");
 
         // Test routing performance
         let source = "service1".to_string();

@@ -166,11 +166,6 @@ pub mod blockchain;
 /// zero data loss recovery mechanisms
 pub mod persistence;
 
-// Privacy System - Sprint 2.2: Four Privacy Tiers
-/// Revolutionary privacy system with four tiers (Anonymous, Private P2P, Federated, Public)
-/// and flexibility matrix for independent network/asset privacy settings
-pub mod privacy;
-
 // Phase 2 Intelligence Layer - Sprint 2.6: Integration
 /// Unified intelligence layer integrating all Phase 2 revolutionary concepts:
 /// STOQ Protocol Intelligence, Privacy Tiers, Multi-Network Participation,
@@ -193,11 +188,6 @@ pub mod network;
 
 // OS Integration Layer - Sprint 2: Cross-platform abstraction for hardware detection and eBPF
 pub mod os_integration;
-
-// Instruction-Based Retrieval System - Sprint 3.1: Revolutionary Concept #6
-/// Revolutionary retrieval system that sends compact instruction maps (<1KB)
-/// instead of transferring entire files, enabling clients to fetch shards directly
-pub mod retrieval;
 
 // Matrix-Aware Shard Distribution - Sprint 3.2: PoS-driven Architecture
 /// PoS-driven shard distribution with matrix-aware optimization
@@ -238,7 +228,7 @@ pub mod auth;
 // Re-export main asset types for easy access
 pub use assets::core::{
     AssetAllocation, AssetError, AssetManager, AssetRegistration, AssetResult, AssetState,
-    AssetStatus, AssetType, StateProof, StateRequirements, PrivacyMode,
+    AssetStatus, AssetType, PrivacyMode, StateProof, StateRequirements,
 };
 
 pub use assets::adapters::{
@@ -264,13 +254,6 @@ pub use persistence::{
     PersistenceConfig, PersistenceManager, RecoveryManager, RecoveryReport, RecoveryStatus,
     SerializationFormat, SnapshotManager, SnapshotMetadata, SnapshotSchedule, StorageStats,
     TopologyBackup,
-};
-
-// Re-export privacy types for easy access
-pub use privacy::{
-    AssetSharing, NetworkVisibility, PolicyAction, PolicyDecision, PolicyManager, PrivacyConfig,
-    PrivacyFlexibilityMatrix, PrivacyPresets, PrivacySystem, TierSwitcher, TrustLevel,
-    ValidationRequirements,
 };
 
 // Real hardware metrics collection from /proc filesystem
@@ -418,7 +401,14 @@ mod tests {
             1024 * 1024, // 1MB
         );
 
-        let work_proof = WorkProof::new("owner-1".to_string(), "workload-1".to_string(), *blake3::hash(format!("{}:{}", "owner-1".to_string(), "workload-1".to_string()).as_bytes()).as_bytes());
+        let work_proof = WorkProof::new(
+            "owner-1".to_string(),
+            "workload-1".to_string(),
+            *blake3::hash(
+                format!("{}:{}", "owner-1".to_string(), "workload-1".to_string()).as_bytes(),
+            )
+            .as_bytes(),
+        );
 
         let time_proof = TimeProof::new(Duration::from_secs(10));
 

@@ -370,9 +370,12 @@ impl TransferCoordinator {
             .await;
 
         let send_started_at = std::time::Instant::now();
-        let send_result =
-            tokio::time::timeout(timeout, self.transport.send_register_request(&target_peer, req, timeout))
-                .await;
+        let send_result = tokio::time::timeout(
+            timeout,
+            self.transport
+                .send_register_request(&target_peer, req, timeout),
+        )
+        .await;
 
         let ack = match send_result {
             Ok(Ok(ack)) => ack,
@@ -388,12 +391,10 @@ impl TransferCoordinator {
             }
             Err(_elapsed) => {
                 let elapsed_ms = send_started_at.elapsed().as_millis() as u64;
-                self.mark_state(&transfer_id, CoordinatorState::TimedOut).await;
-                self.rollback(
-                    &transfer_id,
-                    RollbackReason::RegisterTimeout { elapsed_ms },
-                )
-                .await?;
+                self.mark_state(&transfer_id, CoordinatorState::TimedOut)
+                    .await;
+                self.rollback(&transfer_id, RollbackReason::RegisterTimeout { elapsed_ms })
+                    .await?;
                 return Err(GatewayError::RegisterTimeout {
                     transfer_id,
                     elapsed_ms,
@@ -403,7 +404,8 @@ impl TransferCoordinator {
 
         if !ack.accepted {
             let detail = ack.reason.unwrap_or_else(|| "unspecified".into());
-            self.mark_state(&transfer_id, CoordinatorState::Failed).await;
+            self.mark_state(&transfer_id, CoordinatorState::Failed)
+                .await;
             self.rollback(
                 &transfer_id,
                 RollbackReason::TargetRejected {
@@ -626,8 +628,7 @@ impl TransferCoordinator {
         // Collect everything keyed by transfer_id. Locks need to land
         // first because a single block may carry multiple entries.
         let mut locks: HashMap<String, (TransferLockEntry, String, StateProof)> = HashMap::new();
-        let mut releases: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
+        let mut releases: std::collections::HashSet<String> = std::collections::HashSet::new();
         // Optional registration / receipt hashes — recorded so resumed
         // transfers carry the same target_register_block_hash and
         // source_release_block_hash they had pre-restart.
@@ -667,15 +668,13 @@ impl TransferCoordinator {
                         continue;
                     }
                 }
-                if let Ok(reg) =
-                    serde_json::from_slice::<TransferRegistrationEntry>(payload_bytes)
+                if let Ok(reg) = serde_json::from_slice::<TransferRegistrationEntry>(payload_bytes)
                 {
                     if !reg.transfer_id.is_empty()
                         && reg.registered_at != 0
                         && payload_str.contains("\"registered_at\"")
                     {
-                        registrations
-                            .insert(reg.transfer_id.clone(), (reg, block_hash.clone()));
+                        registrations.insert(reg.transfer_id.clone(), (reg, block_hash.clone()));
                         continue;
                     }
                 }
@@ -707,15 +706,14 @@ impl TransferCoordinator {
                 // Terminal (either completed-with-release or rollback) — skip.
                 continue;
             }
-            let (target_register_block_hash, state) =
-                match registrations.get(&transfer_id) {
-                    Some((_, hash)) => {
-                        // Registration present but no release → ack was
-                        // received, release write was interrupted.
-                        (Some(hash.clone()), CoordinatorState::Registered)
-                    }
-                    None => (None, CoordinatorState::Locked),
-                };
+            let (target_register_block_hash, state) = match registrations.get(&transfer_id) {
+                Some((_, hash)) => {
+                    // Registration present but no release → ack was
+                    // received, release write was interrupted.
+                    (Some(hash.clone()), CoordinatorState::Registered)
+                }
+                None => (None, CoordinatorState::Locked),
+            };
 
             // Target chain id is best-effort: receipt has it explicitly,
             // otherwise we fall back to local_chain_id (single-chain
@@ -980,7 +978,8 @@ mod tests {
         pub locks: Arc<StdMutex<Vec<TransferLockMessage>>>,
         pub releases: Arc<StdMutex<Vec<TransferRelease>>>,
         pub rollbacks: Arc<StdMutex<Vec<TransferRollback>>>,
-        responder: Arc<StdMutex<Option<Box<dyn Fn(TransferRegisterRequest) -> RegisterReply + Send>>>>,
+        responder:
+            Arc<StdMutex<Option<Box<dyn Fn(TransferRegisterRequest) -> RegisterReply + Send>>>>,
     }
 
     pub enum RegisterReply {
@@ -1107,11 +1106,7 @@ mod tests {
 
         assert!(matches!(err, GatewayError::FederationRejected { .. }));
         // No wire traffic, no chain growth.
-        assert!(transport
-            .locks
-            .lock()
-            .expect("test: locks lock")
-            .is_empty());
+        assert!(transport.locks.lock().expect("test: locks lock").is_empty());
     }
 
     #[tokio::test]
@@ -1147,10 +1142,17 @@ mod tests {
 
         let locks = transport.locks.lock().expect("test: locks lock").clone();
         assert_eq!(locks.len(), 1);
-        let releases = transport.releases.lock().expect("test: releases lock").clone();
+        let releases = transport
+            .releases
+            .lock()
+            .expect("test: releases lock")
+            .clone();
         assert_eq!(releases.len(), 1);
 
-        let stored = coord.get_transfer(&outcome.transfer_id).await.expect("test: tracked");
+        let stored = coord
+            .get_transfer(&outcome.transfer_id)
+            .await
+            .expect("test: tracked");
         assert_eq!(stored.state, CoordinatorState::Released);
     }
 
@@ -1273,12 +1275,8 @@ mod tests {
     async fn test_resume_in_flight_empty_chain_returns_empty() {
         let bc = make_blockchain();
         let transport = Arc::new(MockTransport::new());
-        let coord = TransferCoordinator::new(
-            bc,
-            transport,
-            Arc::new(AllowAllFederation),
-            "any".into(),
-        );
+        let coord =
+            TransferCoordinator::new(bc, transport, Arc::new(AllowAllFederation), "any".into());
         let resumed = coord
             .resume_in_flight()
             .await

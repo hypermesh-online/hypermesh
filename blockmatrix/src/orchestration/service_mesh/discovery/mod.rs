@@ -589,7 +589,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_discovery_performance() {
-        let discovery = CpeServiceDiscovery::new(true).await.expect("test: async operation");
+        let discovery = CpeServiceDiscovery::new(true)
+            .await
+            .expect("test: async operation");
 
         // Register a test endpoint
         let endpoint = ServiceEndpoint {
@@ -610,7 +612,10 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        discovery.register_endpoint(endpoint).await.expect("test: async operation");
+        discovery
+            .register_endpoint(endpoint)
+            .await
+            .expect("test: async operation");
 
         // Test discovery performance
         let start = Instant::now();
@@ -639,10 +644,14 @@ mod tests {
     #[tokio::test]
     async fn test_cpe_enhanced_vs_traditional_discovery() {
         // Traditional discovery (CPE disabled)
-        let traditional_discovery = CpeServiceDiscovery::new(false).await.expect("test: async operation");
+        let traditional_discovery = CpeServiceDiscovery::new(false)
+            .await
+            .expect("test: async operation");
 
         // CPE-enhanced discovery
-        let cpe_discovery = CpeServiceDiscovery::new(true).await.expect("test: async operation");
+        let cpe_discovery = CpeServiceDiscovery::new(true)
+            .await
+            .expect("test: async operation");
 
         // Register same endpoint in both
         let endpoint = ServiceEndpoint {
@@ -667,7 +676,10 @@ mod tests {
             .register_endpoint(endpoint.clone())
             .await
             .expect("test: expected success");
-        cpe_discovery.register_endpoint(endpoint).await.expect("test: async operation");
+        cpe_discovery
+            .register_endpoint(endpoint)
+            .await
+            .expect("test: async operation");
 
         let service_id = "comparison-service".to_string();
 

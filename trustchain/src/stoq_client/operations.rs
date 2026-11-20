@@ -17,6 +17,44 @@ use stoq::{Connection, Endpoint, StoqTransport};
 
 use super::types::*;
 
+fn client_transport_config(config: &TrustChainStoqConfig) -> TransportConfig {
+    TransportConfig {
+        bind_address: config.bind_address,
+        port: 0,
+        connection_timeout: config.connection_timeout,
+        enable_migration: true,
+        enable_0rtt: true,
+        max_idle_timeout: Duration::from_secs(120),
+        max_concurrent_streams: 100,
+        send_buffer_size: 8 * 1024 * 1024,
+        receive_buffer_size: 8 * 1024 * 1024,
+        max_connections: Some(config.max_connections_per_service as u32),
+        connection_pool_size: 10,
+        enable_zero_copy: true,
+        max_datagram_size: 65507,
+        congestion_control: stoq::transport::CongestionControl::Bbr2,
+        health_check_interval: 10,
+        connection_idle_timeout: 30,
+        enable_memory_pool: true,
+        memory_pool_size: 512,
+        frame_batch_size: 32,
+        enable_cpu_affinity: false,
+        enable_large_send_offload: false,
+        cert_rotation_interval: Duration::from_secs(24 * 60 * 60),
+        enable_falcon_crypto: true,
+        falcon_variant: stoq::FalconVariant::Falcon1024,
+        enable_kernel_acceleration: true,
+        ebpf_interface: None,
+        interface: None,
+        ewma_alpha: 0.125,
+        mtu_probe_interval_secs: 30,
+        loss_window_size: 10,
+        wan_enabled: false,
+        public_ipv6: None,
+        connection_migration_timeout_ms: 3000,
+    }
+}
+
 /// TrustChain STOQ client for all network operations
 pub struct TrustChainStoqClient {
     /// STOQ transport instance
@@ -36,40 +74,7 @@ impl TrustChainStoqClient {
     pub async fn new(config: TrustChainStoqConfig) -> TrustChainResult<Self> {
         info!("Initializing TrustChain STOQ client");
 
-        let transport_config = TransportConfig {
-            bind_address: config.bind_address,
-            port: 0,
-            connection_timeout: config.connection_timeout,
-            enable_migration: true,
-            enable_0rtt: true,
-            max_idle_timeout: Duration::from_secs(120),
-            max_concurrent_streams: 100,
-            send_buffer_size: 8 * 1024 * 1024,
-            receive_buffer_size: 8 * 1024 * 1024,
-            max_connections: Some(config.max_connections_per_service as u32),
-            connection_pool_size: 10,
-            enable_zero_copy: true,
-            max_datagram_size: 65507,
-            congestion_control: stoq::transport::CongestionControl::Bbr2,
-            health_check_interval: 10,
-            connection_idle_timeout: 30,
-            enable_memory_pool: true,
-            memory_pool_size: 512,
-            frame_batch_size: 32,
-            enable_cpu_affinity: false,
-            enable_large_send_offload: false,
-            cert_rotation_interval: Duration::from_secs(24 * 60 * 60),
-            enable_falcon_crypto: true,
-            falcon_variant: stoq::FalconVariant::Falcon1024,
-            ebpf_interface: None,
-            interface: None,
-            ewma_alpha: 0.125,
-            mtu_probe_interval_secs: 30,
-            loss_window_size: 10,
-            wan_enabled: false,
-            public_ipv6: None,
-            connection_migration_timeout_ms: 3000,
-        };
+        let transport_config = client_transport_config(&config);
 
         let transport = Arc::new(StoqTransport::new(transport_config).await.map_err(|e| {
             TrustChainError::NetworkError {

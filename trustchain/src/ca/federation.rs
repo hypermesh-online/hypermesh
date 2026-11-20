@@ -277,10 +277,7 @@ impl FederationManager {
                         }
                         Some(PeerTrustBand::Conditional) => {
                             if peer.trust_level == FederationTrustLevel::Full {
-                                debug!(
-                                    "NGauge signals cap peer '{}' at Conditional",
-                                    peer.ca_id
-                                );
+                                debug!("NGauge signals cap peer '{}' at Conditional", peer.ca_id);
                                 peer.trust_level = FederationTrustLevel::Conditional;
                             }
                         }
@@ -528,18 +525,24 @@ impl FederationManager {
                 ),
             });
         }
-        self.held_key_shares.write().await.insert(ca_fingerprint, share);
+        self.held_key_shares
+            .write()
+            .await
+            .insert(ca_fingerprint, share);
         info!(
             "Stored key share for CA fingerprint {:02x}{:02x}..{:02x}{:02x}",
-            ca_fingerprint[0], ca_fingerprint[1],
-            ca_fingerprint[30], ca_fingerprint[31]
+            ca_fingerprint[0], ca_fingerprint[1], ca_fingerprint[30], ca_fingerprint[31]
         );
         Ok(())
     }
 
     /// Retrieve our key share for a specific CA.
     pub async fn get_key_share(&self, ca_fingerprint: &[u8; 32]) -> Option<KeyShare> {
-        self.held_key_shares.read().await.get(ca_fingerprint).cloned()
+        self.held_key_shares
+            .read()
+            .await
+            .get(ca_fingerprint)
+            .cloned()
     }
 
     /// List all CA fingerprints for which we hold shares.
@@ -731,12 +734,9 @@ mod tests {
     async fn test_add_peer_with_valid_proof_keeps_trust() {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         let proof = test_state_proof();
-        mgr.add_peer_with_proof(
-            make_peer("alpha", FederationTrustLevel::Full),
-            Some(&proof),
-        )
-        .await
-        .expect("test: add with proof");
+        mgr.add_peer_with_proof(make_peer("alpha", FederationTrustLevel::Full), Some(&proof))
+            .await
+            .expect("test: add with proof");
         let peer = mgr.get_peer("alpha").await.expect("test: peer exists");
         assert_eq!(
             peer.trust_level,
@@ -843,18 +843,12 @@ mod tests {
         let mgr = FederationManager::new("local-ca".into(), test_policy());
         let proof = test_state_proof();
         // Use add_peer_with_proof to preserve requested trust levels
-        mgr.add_peer_with_proof(
-            make_peer("a", FederationTrustLevel::Full),
-            Some(&proof),
-        )
-        .await
-        .expect("test: add a");
-        mgr.add_peer_with_proof(
-            make_peer("b", FederationTrustLevel::Full),
-            Some(&proof),
-        )
-        .await
-        .expect("test: add b");
+        mgr.add_peer_with_proof(make_peer("a", FederationTrustLevel::Full), Some(&proof))
+            .await
+            .expect("test: add a");
+        mgr.add_peer_with_proof(make_peer("b", FederationTrustLevel::Full), Some(&proof))
+            .await
+            .expect("test: add b");
         mgr.add_peer_with_proof(
             make_peer("c", FederationTrustLevel::Conditional),
             Some(&proof),
@@ -980,10 +974,7 @@ mod tests {
             .await
             .expect("test: store one share");
         let result = mgr.collect_shares_for_signing(&fingerprint, 3).await;
-        assert!(
-            result.is_err(),
-            "should fail: have 1 share but need 3"
-        );
+        assert!(result.is_err(), "should fail: have 1 share but need 3");
     }
 
     #[tokio::test]

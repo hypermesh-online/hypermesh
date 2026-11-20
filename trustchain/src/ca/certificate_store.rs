@@ -163,8 +163,7 @@ impl CertificateStore {
             reason: reason.clone(),
             revoked_at,
         };
-        self.revocations
-            .insert(serial_number.to_string(), entry);
+        self.revocations.insert(serial_number.to_string(), entry);
 
         self.metrics
             .revoked_certificates
@@ -254,8 +253,7 @@ impl CertificateStore {
                 Ok(entries) => {
                     let count = entries.len();
                     for entry in entries {
-                        self.revocations
-                            .insert(entry.serial_number.clone(), entry);
+                        self.revocations.insert(entry.serial_number.clone(), entry);
                     }
                     info!(
                         "Loaded {} revocation entries from {}",
@@ -264,19 +262,11 @@ impl CertificateStore {
                     );
                 }
                 Err(e) => {
-                    error!(
-                        "Failed to parse revocation file {}: {}",
-                        path.display(),
-                        e
-                    );
+                    error!("Failed to parse revocation file {}: {}", path.display(), e);
                 }
             },
             Err(e) => {
-                warn!(
-                    "Failed to read revocation file {}: {}",
-                    path.display(),
-                    e
-                );
+                warn!("Failed to read revocation file {}: {}", path.display(), e);
             }
         }
     }

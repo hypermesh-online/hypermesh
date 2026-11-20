@@ -544,7 +544,10 @@ mod tests {
     #[tokio::test]
     async fn test_pq_certificate_manager_initialization() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
+        let ca_keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
 
         let ca_config = PQCAConfig {
             ca_id: "test-ca".to_string(),
@@ -556,15 +559,23 @@ mod tests {
             enable_migration_support: true,
         };
 
-        let cert_manager = PQCertificateManager::new(ca_config).await.expect("test: async operation");
+        let cert_manager = PQCertificateManager::new(ca_config)
+            .await
+            .expect("test: async operation");
         assert_eq!(cert_manager.ca_config.ca_id, "test-ca");
     }
 
     #[tokio::test]
     async fn test_pq_csr_generation() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
-        let user_keypair = pqc.generate_asset_keypair().await.expect("test: async operation");
+        let ca_keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
+        let user_keypair = pqc
+            .generate_asset_keypair()
+            .await
+            .expect("test: async operation");
 
         let ca_config = PQCAConfig {
             ca_id: "test-ca".to_string(),
@@ -576,7 +587,9 @@ mod tests {
             enable_migration_support: true,
         };
 
-        let cert_manager = PQCertificateManager::new(ca_config).await.expect("test: async operation");
+        let cert_manager = PQCertificateManager::new(ca_config)
+            .await
+            .expect("test: async operation");
 
         let subject = CertificateSubject {
             common_name: "test.example.com".to_string(),
@@ -605,8 +618,14 @@ mod tests {
     #[tokio::test]
     async fn test_pq_certificate_issuance_and_verification() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
-        let user_keypair = pqc.generate_asset_keypair().await.expect("test: async operation");
+        let ca_keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
+        let user_keypair = pqc
+            .generate_asset_keypair()
+            .await
+            .expect("test: async operation");
 
         let ca_config = PQCAConfig {
             ca_id: "test-ca".to_string(),
@@ -618,7 +637,9 @@ mod tests {
             enable_migration_support: true,
         };
 
-        let cert_manager = PQCertificateManager::new(ca_config).await.expect("test: async operation");
+        let cert_manager = PQCertificateManager::new(ca_config)
+            .await
+            .expect("test: async operation");
 
         let subject = CertificateSubject {
             common_name: "test.example.com".to_string(),
@@ -642,7 +663,10 @@ mod tests {
             .expect("test: expected success");
 
         // Issue certificate
-        let certificate = cert_manager.issue_pq_certificate(csr).await.expect("test: async operation");
+        let certificate = cert_manager
+            .issue_pq_certificate(csr)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(certificate.common_name, "test.example.com");
         assert!(!certificate.certificate_der.is_empty());
@@ -658,7 +682,10 @@ mod tests {
     #[tokio::test]
     async fn test_ca_certificate_creation() {
         let pqc = PostQuantumCrypto::new().expect("test: creation");
-        let ca_keypair = pqc.generate_ca_keypair("test-ca").await.expect("test: async operation");
+        let ca_keypair = pqc
+            .generate_ca_keypair("test-ca")
+            .await
+            .expect("test: async operation");
 
         let ca_config = PQCAConfig {
             ca_id: "test-ca".to_string(),
@@ -670,14 +697,22 @@ mod tests {
             enable_migration_support: true,
         };
 
-        let cert_manager = PQCertificateManager::new(ca_config).await.expect("test: async operation");
+        let cert_manager = PQCertificateManager::new(ca_config)
+            .await
+            .expect("test: async operation");
 
-        let ca_cert = cert_manager.create_ca_certificate().await.expect("test: async operation");
+        let ca_cert = cert_manager
+            .create_ca_certificate()
+            .await
+            .expect("test: async operation");
 
         assert!(ca_cert.common_name.contains("TrustChain PQ-CA"));
         assert_eq!(ca_cert.pq_extensions.pq_cert_version, "CA-1.0");
 
-        let is_valid = cert_manager.verify_pq_certificate(&ca_cert).await.expect("test: async operation");
+        let is_valid = cert_manager
+            .verify_pq_certificate(&ca_cert)
+            .await
+            .expect("test: async operation");
         assert!(is_valid);
     }
 }

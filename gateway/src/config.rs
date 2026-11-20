@@ -513,9 +513,18 @@ mod tests {
 
     #[test]
     fn stoq_auth_mode_parse_variants() {
-        assert_eq!(StoqAuthMode::parse("http-proxy"), Some(StoqAuthMode::HttpProxy));
-        assert_eq!(StoqAuthMode::parse("HTTP_PROXY"), Some(StoqAuthMode::HttpProxy));
-        assert_eq!(StoqAuthMode::parse("passthrough"), Some(StoqAuthMode::HttpProxy));
+        assert_eq!(
+            StoqAuthMode::parse("http-proxy"),
+            Some(StoqAuthMode::HttpProxy)
+        );
+        assert_eq!(
+            StoqAuthMode::parse("HTTP_PROXY"),
+            Some(StoqAuthMode::HttpProxy)
+        );
+        assert_eq!(
+            StoqAuthMode::parse("passthrough"),
+            Some(StoqAuthMode::HttpProxy)
+        );
         assert_eq!(
             StoqAuthMode::parse("full-stoq-pos"),
             Some(StoqAuthMode::FullStoqPos),

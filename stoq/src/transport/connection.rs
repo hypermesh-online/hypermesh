@@ -370,9 +370,7 @@ impl Clone for Connection {
             frame_batch: self.frame_batch.clone(),
             last_activity: AtomicU64::new(self.last_activity.load(Ordering::Relaxed)),
             idle_timeout: self.idle_timeout,
-            pos_state: std::sync::atomic::AtomicU8::new(
-                self.pos_state.load(Ordering::Relaxed),
-            ),
+            pos_state: std::sync::atomic::AtomicU8::new(self.pos_state.load(Ordering::Relaxed)),
             last_local_addr: parking_lot::Mutex::new(*self.last_local_addr.lock()),
         }
     }

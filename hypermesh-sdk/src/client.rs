@@ -73,9 +73,9 @@ impl HyperMeshClient {
             }
         };
 
-        let stream = UnixStream::connect(&path).await.map_err(|e| {
-            SdkError::Connection(format!("{}: {}", path.display(), e))
-        })?;
+        let stream = UnixStream::connect(&path)
+            .await
+            .map_err(|e| SdkError::Connection(format!("{}: {}", path.display(), e)))?;
 
         let (reader, writer) = tokio::io::split(stream);
         let pair = (BufReader::new(reader), writer);
@@ -120,8 +120,8 @@ impl HyperMeshClient {
             params: &params,
         };
 
-        let mut line = serde_json::to_string(&request)
-            .map_err(|e| SdkError::Serialization(e.to_string()))?;
+        let mut line =
+            serde_json::to_string(&request).map_err(|e| SdkError::Serialization(e.to_string()))?;
         line.push('\n');
 
         let result = tokio::time::timeout(DEFAULT_TIMEOUT, async {
@@ -289,8 +289,7 @@ mod tests {
                 .await
                 .expect("test: read request");
 
-            let req: serde_json::Value =
-                serde_json::from_str(&line).expect("test: parse request");
+            let req: serde_json::Value = serde_json::from_str(&line).expect("test: parse request");
             let id = req["id"].as_u64().expect("test: id");
 
             let resp = serde_json::json!({
@@ -341,8 +340,7 @@ mod tests {
                 .await
                 .expect("test: read request");
 
-            let req: serde_json::Value =
-                serde_json::from_str(&line).expect("test: parse request");
+            let req: serde_json::Value = serde_json::from_str(&line).expect("test: parse request");
             let id = req["id"].as_u64().expect("test: id");
 
             let resp = serde_json::json!({
@@ -366,13 +364,7 @@ mod tests {
         .expect("test: connect");
 
         let result = client.raw_call("bad.method", serde_json::json!({})).await;
-        assert!(matches!(
-            result,
-            Err(SdkError::Rpc {
-                code: -32601,
-                ..
-            })
-        ));
+        assert!(matches!(result, Err(SdkError::Rpc { code: -32601, .. })));
 
         server.await.expect("test: server join");
     }

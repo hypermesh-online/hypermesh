@@ -23,8 +23,7 @@ mod tests {
     use super::*;
     use crate::assets::core::{
         AssetAdapter, AssetAllocationRequest, AssetCategory, AssetType, BaseSystemType,
-        StateProof, NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, TimeProof,
-        WorkProof,
+        NetworkRequirements, PrivacyMode, SpaceProof, StakeProof, StateProof, TimeProof, WorkProof,
     };
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
@@ -47,7 +46,6 @@ mod tests {
                     stake_holder: "test-holder".to_string(),
                     stake_holder_id: "test-holder-id".to_string(),
                     stake_timestamp: SystemTime::now(),
-
                 },
                 TimeProof {
                     network_time_offset: Duration::from_millis(500),
@@ -87,7 +85,10 @@ mod tests {
         let adapter = NetworkAssetAdapter::new().await;
         let request = create_test_network_request().await;
 
-        let allocation = adapter.allocate_asset(&request).await.expect("test: async operation");
+        let allocation = adapter
+            .allocate_asset(&request)
+            .await
+            .expect("test: async operation");
         assert!(matches!(
             allocation.asset_id.category,
             AssetCategory::BaseSystem(BaseSystemType::Network)

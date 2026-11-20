@@ -31,23 +31,21 @@ pub fn register(handler: &mut RequestHandler) {
         "config.get",
         Arc::new(|params| {
             Box::pin(async move {
-                let key = params
-                    .get("key")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| crate::ipc::protocol::RpcError {
+                let key = params.get("key").and_then(|v| v.as_str()).ok_or_else(|| {
+                    crate::ipc::protocol::RpcError {
                         code: INVALID_PARAMS,
                         message: "missing 'key' parameter".into(),
                         data: None,
-                    })?;
+                    }
+                })?;
 
                 let config = HypermeshConfig::load();
-                let value = serde_json::to_value(&config).map_err(|e| {
-                    crate::ipc::protocol::RpcError {
+                let value =
+                    serde_json::to_value(&config).map_err(|e| crate::ipc::protocol::RpcError {
                         code: INTERNAL_ERROR,
                         message: format!("failed to serialize config: {e}"),
                         data: None,
-                    }
-                })?;
+                    })?;
 
                 match get_dotpath(&value, key) {
                     Some(v) => Ok(v.clone()),
@@ -76,23 +74,23 @@ pub fn register(handler: &mut RequestHandler) {
                     })?
                     .to_string();
 
-                let new_value = params.get("value").ok_or_else(|| {
-                    crate::ipc::protocol::RpcError {
-                        code: INVALID_PARAMS,
-                        message: "missing 'value' parameter".into(),
-                        data: None,
-                    }
-                })?;
+                let new_value =
+                    params
+                        .get("value")
+                        .ok_or_else(|| crate::ipc::protocol::RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing 'value' parameter".into(),
+                            data: None,
+                        })?;
 
                 // Load, update, and save
                 let config = HypermeshConfig::load();
-                let mut json_value = serde_json::to_value(&config).map_err(|e| {
-                    crate::ipc::protocol::RpcError {
+                let mut json_value =
+                    serde_json::to_value(&config).map_err(|e| crate::ipc::protocol::RpcError {
                         code: INTERNAL_ERROR,
                         message: format!("failed to serialize config: {e}"),
                         data: None,
-                    }
-                })?;
+                    })?;
 
                 set_dotpath(&mut json_value, &key, new_value.clone()).map_err(|e| {
                     crate::ipc::protocol::RpcError {
@@ -103,14 +101,13 @@ pub fn register(handler: &mut RequestHandler) {
                 })?;
 
                 // Deserialize back and save
-                let updated: HypermeshConfig =
-                    serde_json::from_value(json_value).map_err(|e| {
-                        crate::ipc::protocol::RpcError {
-                            code: INTERNAL_ERROR,
-                            message: format!("invalid config after update: {e}"),
-                            data: None,
-                        }
-                    })?;
+                let updated: HypermeshConfig = serde_json::from_value(json_value).map_err(|e| {
+                    crate::ipc::protocol::RpcError {
+                        code: INTERNAL_ERROR,
+                        message: format!("invalid config after update: {e}"),
+                        data: None,
+                    }
+                })?;
                 updated.save().map_err(|e| crate::ipc::protocol::RpcError {
                     code: INTERNAL_ERROR,
                     message: e,
@@ -163,10 +160,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler);
 
-        let req = RpcRequest::new(
-            "config.get",
-            serde_json::json!({"key": "nonexistent.path"}),
-        );
+        let req = RpcRequest::new("config.get", serde_json::json!({"key": "nonexistent.path"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_some(), "should fail for missing key");
     }

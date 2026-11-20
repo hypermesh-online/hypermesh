@@ -4,9 +4,9 @@
 
 //! Configuration management for HyperMesh platform integration
 
-use crate::proof_of_state::StateProofConfig;
 use crate::container::config::ContainerConfig as ContainerRuntimeConfig;
 use crate::orchestration::HyperMeshIntegrationConfig as OrchestrationConfig;
+use crate::proof_of_state::StateProofConfig;
 use crate::security::config::SecurityConfig;
 use crate::transport::TransportConfig;
 use serde::{Deserialize, Serialize};

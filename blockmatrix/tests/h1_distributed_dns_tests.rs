@@ -9,8 +9,8 @@
 //! across multiple chains, and wire-format stability for the new
 //! `DistributedDnsQuery` / `DistributedDnsResponse` types.
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use blockmatrix::bootstrap::PrivacyMode;
 use blockmatrix::dns::{
@@ -89,12 +89,7 @@ async fn test_reserved_domain_rejected_without_grant() {
     let registrar = make_registrar();
     let proof = test_proof();
     let result = registrar
-        .register_domain(
-            "nike",
-            PrivacyMode::PUBLIC,
-            "test-owner".into(),
-            proof,
-        )
+        .register_domain("nike", PrivacyMode::PUBLIC, "test-owner".into(), proof)
         .await;
     match result {
         Err(DnsError::ReservedDomain { name }) => {
@@ -245,10 +240,7 @@ fn test_two_simultaneous_registrations_resolve_deterministically() {
 
     let responses = vec![r_node_a.clone(), r_node_b.clone()];
     let canonical = select_canonical(&responses).expect("test: non-empty");
-    assert_eq!(
-        canonical.chain_id, "chain-a",
-        "older registration must win"
-    );
+    assert_eq!(canonical.chain_id, "chain-a", "older registration must win");
 
     // And the result is order-independent.
     let responses_rev = vec![r_node_b, r_node_a];

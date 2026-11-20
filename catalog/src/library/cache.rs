@@ -539,16 +539,29 @@ mod tests {
         let key3: Arc<str> = Arc::from("pkg3");
 
         // Insert packages
-        cache.insert(key1.clone(), package1.clone()).await.expect("test: async operation");
-        cache.insert(key2.clone(), package2.clone()).await.expect("test: async operation");
-        cache.insert(key3.clone(), package3.clone()).await.expect("test: async operation");
+        cache
+            .insert(key1.clone(), package1.clone())
+            .await
+            .expect("test: async operation");
+        cache
+            .insert(key2.clone(), package2.clone())
+            .await
+            .expect("test: async operation");
+        cache
+            .insert(key3.clone(), package3.clone())
+            .await
+            .expect("test: async operation");
 
         // pkg3 should be in L1 (most recent)
         // pkg2 should be in L2 (evicted from L1)
         // pkg1 should be in L2 (evicted from L1)
 
         // Get pkg1 (should promote from L2 to L1)
-        assert!(cache.get(&key1).await.expect("test: async operation").is_some());
+        assert!(cache
+            .get(&key1)
+            .await
+            .expect("test: async operation")
+            .is_some());
 
         let stats = cache.get_stats().await.expect("test: async operation");
         assert_eq!(stats.l2_hits, 1);

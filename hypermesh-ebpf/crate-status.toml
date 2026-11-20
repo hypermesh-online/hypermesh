@@ -34,6 +34,8 @@ items = [
 
 [features.in_development]
 items = [
+    # Reconciled against full-system audit 2026-07-30
+    "Live peer-auth→kernel allowlist wiring — the kernel PoS-peer gate is real when XDP is attached, but on the shipped binary two eBPF orchestrators are disconnected: blockmatrix's mirror_peer_auth_to_kernel writes set_peer_pos_validated into an instance that never attaches XDP, while stoq's attached instance never receives validations (W2-93); so pos_header_map/policy_map never learn an authenticated peer at runtime",
     "Real multi-node traffic testing for matrix routing and PoS validation pipeline",
     "Datapath caveat — the 0x484D header is only kernel-visible on the AF_XDP raw path; production sends via Quinn QUIC (encrypted, kernel-invisible), so header-on-wire is deferred (not deployed to gateway until settled)",
 ]

@@ -19,7 +19,7 @@ use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use chacha20poly1305::aead::{KeyInit, OsRng};
+use chacha20poly1305::aead::OsRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -288,8 +288,7 @@ impl GenesisAuthManager {
 
         // Encrypt new TOTP secret
         let password_key = genesis_crypto::derive_password_key(passphrase)?;
-        let encrypted_totp_secret =
-            genesis_crypto::encrypt_data(&new_totp_secret, &password_key)?;
+        let encrypted_totp_secret = genesis_crypto::encrypt_data(&new_totp_secret, &password_key)?;
 
         // Update credentials
         let creds = self
@@ -437,9 +436,7 @@ mod tests {
         let code =
             genesis_crypto::compute_totp(&secret, time_step).expect("test: expected success");
         assert_eq!(code.len(), genesis_crypto::TOTP_DIGITS);
-        assert!(
-            genesis_crypto::verify_totp(&secret_base32, &code).expect("test: assertion value")
-        );
+        assert!(genesis_crypto::verify_totp(&secret_base32, &code).expect("test: assertion value"));
 
         // Wrong code should fail
         assert!(

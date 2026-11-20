@@ -204,8 +204,8 @@ impl ChainValidator {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::block::{BlockAssetEntry, StoragePointer};
+    use super::*;
     use crate::assets::core::AssetRegistration;
     use trustchain::proof_of_state::StateProof;
 
@@ -214,9 +214,8 @@ mod tests {
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let mut state_proof = StateProof::default();
         // Set space proof node_id to match coordinate (for belongs_to_node checks)
-        state_proof.space_proof.node_id =
-            format!("({},{},{})", coord.x, coord.y, coord.z);
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        state_proof.space_proof.node_id = format!("({},{},{})", coord.x, coord.y, coord.z);
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,

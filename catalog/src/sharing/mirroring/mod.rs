@@ -18,7 +18,7 @@ use std::time::{Duration, SystemTime};
 use tokio::sync::RwLock;
 
 use crate::registry::CatalogRegistry;
-use crate::{PackageSpecMetadata, AssetRegistration};
+use crate::{AssetRegistration, PackageSpecMetadata};
 
 /// Mirror manager for package replication
 pub struct MirrorManager {

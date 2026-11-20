@@ -81,14 +81,14 @@ pub fn wrap_key_for_recipient(
         .map_err(|e| PipelineError::EncryptionFailed(format!("key serialization: {e}")))?;
 
     // 2. Kyber KEM encapsulate with recipient's public key
-    let pk = kyber1024::PublicKey::from_bytes(recipient_kyber_pubkey)
-        .map_err(|_| PipelineError::EncryptionFailed("invalid recipient Kyber public key".into()))?;
+    let pk = kyber1024::PublicKey::from_bytes(recipient_kyber_pubkey).map_err(|_| {
+        PipelineError::EncryptionFailed("invalid recipient Kyber public key".into())
+    })?;
     let (shared_secret, kem_ciphertext) = kyber1024::encapsulate(&pk);
 
     // 3. Derive AES-256 key and nonce from shared secret via BLAKE3
     let aes_key = blake3::derive_key("HYPERMESH-SHARE-KEY-WRAP-V1", shared_secret.as_bytes());
-    let nonce_full =
-        blake3::derive_key("HYPERMESH-SHARE-KEY-NONCE-V1", shared_secret.as_bytes());
+    let nonce_full = blake3::derive_key("HYPERMESH-SHARE-KEY-NONCE-V1", shared_secret.as_bytes());
     let nonce = &nonce_full[..12];
 
     // 4. AES-256-GCM encrypt the serialized key
@@ -115,8 +115,7 @@ pub fn unwrap_key(
 
     // 2. Derive same AES-256 key and nonce
     let aes_key = blake3::derive_key("HYPERMESH-SHARE-KEY-WRAP-V1", shared_secret.as_bytes());
-    let nonce_full =
-        blake3::derive_key("HYPERMESH-SHARE-KEY-NONCE-V1", shared_secret.as_bytes());
+    let nonce_full = blake3::derive_key("HYPERMESH-SHARE-KEY-NONCE-V1", shared_secret.as_bytes());
     let nonce = &nonce_full[..12];
 
     // 3. AES-256-GCM decrypt
@@ -190,8 +189,7 @@ mod tests {
         };
         let (enc, kem) =
             wrap_key_for_recipient(&dk, recipient_pk.as_bytes()).expect("test: wrap Kyber");
-        let restored =
-            unwrap_key(&enc, &kem, recipient_sk.as_bytes()).expect("test: unwrap Kyber");
+        let restored = unwrap_key(&enc, &kem, recipient_sk.as_bytes()).expect("test: unwrap Kyber");
         assert!(matches!(restored, DecryptionKey::Kyber { .. }));
     }
 
@@ -205,8 +203,7 @@ mod tests {
         });
         let (enc, kem) =
             wrap_key_for_recipient(&dk, recipient_pk.as_bytes()).expect("test: wrap Aes");
-        let restored =
-            unwrap_key(&enc, &kem, recipient_sk.as_bytes()).expect("test: unwrap Aes");
+        let restored = unwrap_key(&enc, &kem, recipient_sk.as_bytes()).expect("test: unwrap Aes");
         assert!(matches!(restored, DecryptionKey::Aes(_)));
     }
 
@@ -222,8 +219,8 @@ mod tests {
         };
         let (enc, kem) = wrap_key_for_recipient(&dk, recipient_pk.as_bytes())
             .expect("test: wrap KyberSegmented");
-        let restored = unwrap_key(&enc, &kem, recipient_sk.as_bytes())
-            .expect("test: unwrap KyberSegmented");
+        let restored =
+            unwrap_key(&enc, &kem, recipient_sk.as_bytes()).expect("test: unwrap KyberSegmented");
         assert!(matches!(restored, DecryptionKey::KyberSegmented { .. }));
     }
 
@@ -237,8 +234,7 @@ mod tests {
             secret_key: vec![0x33; 100],
         };
 
-        let env = KeyEnvelope::wrap_for(&dk, recipient_pk.as_bytes())
-            .expect("test: wrap envelope");
+        let env = KeyEnvelope::wrap_for(&dk, recipient_pk.as_bytes()).expect("test: wrap envelope");
         let restored = env
             .unwrap_with(recipient_sk.as_bytes())
             .expect("test: unwrap envelope");
@@ -264,17 +260,14 @@ mod tests {
             secret_key: raw_secret.clone(),
         };
 
-        let env = KeyEnvelope::wrap_for(&dk, recipient_pk.as_bytes())
-            .expect("test: wrap envelope");
+        let env = KeyEnvelope::wrap_for(&dk, recipient_pk.as_bytes()).expect("test: wrap envelope");
         let serialized = serde_json::to_vec(&env).expect("test: serialize envelope");
 
         // The raw secret window must not appear anywhere in the serialized
         // envelope — it is AES-GCM ciphertext, not plaintext.
         let needle = &raw_secret[..64];
         assert!(
-            !serialized
-                .windows(needle.len())
-                .any(|w| w == needle),
+            !serialized.windows(needle.len()).any(|w| w == needle),
             "raw Kyber secret bytes leaked into serialized KeyEnvelope"
         );
     }

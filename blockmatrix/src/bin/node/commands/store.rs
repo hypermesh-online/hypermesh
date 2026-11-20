@@ -7,19 +7,19 @@
 use anyhow::{anyhow, Context, Result};
 use tracing::{debug, info, warn};
 
+use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
+use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::assets::pipeline::{
     Asset, AssetPipeline, DecryptionKey, PipelineInputMetadata, ProcessedAsset, Shard,
     ShardMetadata,
 };
-use blockmatrix::assets::pipeline::distribution::{DistributedAsset, DistributionMetadata};
-use blockmatrix::assets::pipeline::PipelineStats;
 use blockmatrix::identity::FalconIdentity;
+use blockmatrix::ipc;
 use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::shard_transport::StoqShardTransport;
 use blockmatrix::network::NetworkManager;
 use blockmatrix::sharing::key_wrap::KeyEnvelope;
 use blockmatrix::sharing::shard_map::ShardMap;
-use blockmatrix::ipc;
 use hypermesh_lib::{AccessScope, ContentHash, NodeEncryptor, PrivacyMode};
 
 /// Optional network context for shard distribution during asset storage.
@@ -107,11 +107,9 @@ pub async fn run_store(
     let key_envelope = if privacy_mode.scope == AccessScope::Bounded {
         let identity = FalconIdentity::load_or_create(identity_dir)
             .context("failed to load node identity for key self-custody")?;
-        let env = KeyEnvelope::wrap_for(
-            &processed.decryption_key,
-            identity.encryption_public_key(),
-        )
-        .map_err(|e| anyhow!("failed to self-wrap decryption key: {e}"))?;
+        let env =
+            KeyEnvelope::wrap_for(&processed.decryption_key, identity.encryption_public_key())
+                .map_err(|e| anyhow!("failed to self-wrap decryption key: {e}"))?;
         Some(env)
     } else {
         None
@@ -131,8 +129,7 @@ pub async fn run_store(
         .with_context(|| format!("failed to create {}", maps_dir.display()))?;
 
     let map_path = maps_dir.join(format!("{}.json", asset_id));
-    let map_json =
-        serde_json::to_string_pretty(&map).context("failed to serialize shard map")?;
+    let map_json = serde_json::to_string_pretty(&map).context("failed to serialize shard map")?;
     std::fs::write(&map_path, &map_json)
         .with_context(|| format!("failed to write {}", map_path.display()))?;
 
@@ -361,18 +358,14 @@ async fn fetch_shard_from_network(hash_hex: &str, expected_hash: &[u8]) -> Resul
     }
 
     let resp = client
-        .call_ok(
-            "shard.fetch",
-            serde_json::json!({ "shard_id": hash_hex }),
-        )
+        .call_ok("shard.fetch", serde_json::json!({ "shard_id": hash_hex }))
         .await
         .map_err(|e| anyhow!("IPC shard fetch failed: {e}"))?;
 
     let shard_hex = resp["data"]
         .as_str()
         .ok_or_else(|| anyhow!("shard.fetch response missing 'data' field"))?;
-    let shard_data =
-        hex::decode(shard_hex).map_err(|e| anyhow!("invalid shard data hex: {e}"))?;
+    let shard_data = hex::decode(shard_hex).map_err(|e| anyhow!("invalid shard data hex: {e}"))?;
 
     let computed = blake3::hash(&shard_data);
     if computed.as_bytes() != expected_hash {
@@ -396,13 +389,8 @@ async fn distribute_shards_to_network(
 ) {
     use blockmatrix::network::shard_distribution::distribute_to_peers;
 
-    let result = distribute_to_peers(
-        shard_pairs,
-        placements,
-        peers,
-        ctx.shard_transport.as_ref(),
-    )
-    .await;
+    let result =
+        distribute_to_peers(shard_pairs, placements, peers, ctx.shard_transport.as_ref()).await;
 
     info!(
         "Shard distribution: {} sent, {} kept locally, {} failed",

@@ -191,10 +191,7 @@ async fn handle_transactions(
     params: serde_json::Value,
     state: &DaemonState,
 ) -> Result<serde_json::Value, crate::ipc::protocol::RpcError> {
-    let limit = params
-        .get("limit")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(50) as usize;
+    let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(50) as usize;
 
     #[cfg(feature = "caesar")]
     {
@@ -258,7 +255,12 @@ async fn handle_rewards(
         };
         let protocol = caesar.read().await;
         let node_id = hypermesh_lib::NodeId::from_public_key(state.node_id.as_bytes());
-        let node_status = protocol.storage().get_node_status(&node_id).await.ok().flatten();
+        let node_status = protocol
+            .storage()
+            .get_node_status(&node_id)
+            .await
+            .ok()
+            .flatten();
 
         let (lifetime_earned, settled_count) = match &node_status {
             Some(status) => (
@@ -356,10 +358,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "caesar.transactions",
-            serde_json::json!({"limit": 10}),
-        );
+        let req = RpcRequest::new("caesar.transactions", serde_json::json!({"limit": 10}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none(), "unexpected error: {:?}", resp.error);
         let result = resp.result.expect("test: result present");

@@ -29,7 +29,8 @@ impl CorsMiddleware {
             // For simplicity, we're using the first origin. In production, check against request origin
             headers.insert(
                 "access-control-allow-origin",
-                HeaderValue::from_str(&self.config.allowed_origins[0]).expect("CORS origin should be a valid header value"),
+                HeaderValue::from_str(&self.config.allowed_origins[0])
+                    .expect("CORS origin should be a valid header value"),
             );
         }
 
@@ -44,7 +45,8 @@ impl CorsMiddleware {
         let allowed_headers = self.config.allowed_headers.join(", ");
         headers.insert(
             "access-control-allow-headers",
-            HeaderValue::from_str(&allowed_headers).expect("header names should be a valid header value"),
+            HeaderValue::from_str(&allowed_headers)
+                .expect("header names should be a valid header value"),
         );
 
         // Set credentials flag
@@ -58,7 +60,8 @@ impl CorsMiddleware {
         // Set max age
         headers.insert(
             "access-control-max-age",
-            HeaderValue::from_str(&self.config.max_age.to_string()).expect("numeric max_age should be a valid header value"),
+            HeaderValue::from_str(&self.config.max_age.to_string())
+                .expect("numeric max_age should be a valid header value"),
         );
     }
 
@@ -142,7 +145,8 @@ impl RequestIdMiddleware {
     pub fn add_request_id(headers: &mut HeaderMap, request_id: Uuid) {
         headers.insert(
             "x-request-id",
-            HeaderValue::from_str(&request_id.to_string()).expect("UUID string should be a valid header value"),
+            HeaderValue::from_str(&request_id.to_string())
+                .expect("UUID string should be a valid header value"),
         );
     }
 

@@ -70,10 +70,10 @@ pub struct SegmentIndexEntry {
 /// Balances segment count (index overhead) vs segment size (memory per segment).
 pub fn segment_size_for_asset(asset_bytes: u64) -> u32 {
     match asset_bytes {
-        0..=67_108_863 => 4 * 1024 * 1024,               // <64MB -> 4MB segments
-        67_108_864..=1_073_741_823 => 4 * 1024 * 1024,    // 64MB-1GB -> 4MB
+        0..=67_108_863 => 4 * 1024 * 1024, // <64MB -> 4MB segments
+        67_108_864..=1_073_741_823 => 4 * 1024 * 1024, // 64MB-1GB -> 4MB
         1_073_741_824..=107_374_182_399 => 16 * 1024 * 1024, // 1-100GB -> 16MB
-        _ => 64 * 1024 * 1024,                             // >100GB -> 64MB
+        _ => 64 * 1024 * 1024,             // >100GB -> 64MB
     }
 }
 
@@ -154,8 +154,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&manifest).expect("test: serialize");
-        let roundtripped: AssetManifest =
-            serde_json::from_str(&json).expect("test: deserialize");
+        let roundtripped: AssetManifest = serde_json::from_str(&json).expect("test: deserialize");
         assert_eq!(manifest, roundtripped);
     }
 

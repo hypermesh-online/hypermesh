@@ -64,31 +64,28 @@ async fn run_bilateral_handshake() -> Result<()> {
     let signer_a: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_a);
     let signer_b: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_b);
 
-    let proof_provider_a = BlockMatrixProofProvider::new(
-        node_id_a.clone(),
-        signer_a.clone(),
-    );
-    let proof_provider_b = BlockMatrixProofProvider::new(
-        node_id_b.clone(),
-        signer_b.clone(),
-    );
+    let proof_provider_a = BlockMatrixProofProvider::new(node_id_a.clone(), signer_a.clone());
+    let proof_provider_b = BlockMatrixProofProvider::new(node_id_b.clone(), signer_b.clone());
 
     // Verify proof generation/validation works standalone before network test
-    let proof_bytes = proof_provider_a.generate_proof().await
+    let proof_bytes = proof_provider_a
+        .generate_proof()
+        .await
         .expect("test: Node A proof generation");
     assert!(
-        proof_provider_b.validate_proof(&proof_bytes).await
+        proof_provider_b
+            .validate_proof(&proof_bytes)
+            .await
             .expect("test: Node B validates A's proof"),
         "Node B should accept Node A's FALCON-signed proof"
     );
 
     // --- 3. Create STOQ transports ---
-    let transport_a = Arc::new(make_transport().await
-        .expect("test: transport A"));
-    let transport_b = Arc::new(make_transport().await
-        .expect("test: transport B"));
+    let transport_a = Arc::new(make_transport().await.expect("test: transport A"));
+    let transport_b = Arc::new(make_transport().await.expect("test: transport B"));
 
-    let addr_b = transport_b.local_addr()
+    let addr_b = transport_b
+        .local_addr()
         .expect("test: get Node B listen address");
 
     // Coordinates for the two nodes
@@ -101,11 +98,15 @@ async fn run_bilateral_handshake() -> Result<()> {
 
     let acceptor = tokio::spawn(async move {
         // B: accept incoming connection
-        let conn_b = transport_b.accept().await
+        let conn_b = transport_b
+            .accept()
+            .await
             .expect("test: Node B accept connection");
 
         // B: accept the stream opened by A, then run accept_handshake
-        let mut stream = conn_b.accept_stream().await
+        let mut stream = conn_b
+            .accept_stream()
+            .await
             .expect("test: Node B accept stream");
 
         stoq::protocol::bilateral::accept_handshake(
@@ -118,11 +119,11 @@ async fn run_bilateral_handshake() -> Result<()> {
     });
 
     // A: connect to B
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
-    let conn_a = transport_a.connect(&endpoint_b).await
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
+    let conn_a = transport_a
+        .connect(&endpoint_b)
+        .await
         .expect("test: Node A connect to B");
 
     // A: open stream and run initiate_handshake
@@ -135,7 +136,8 @@ async fn run_bilateral_handshake() -> Result<()> {
     .await
     .expect("test: Node A initiate_handshake");
 
-    let result_b = acceptor.await
+    let result_b = acceptor
+        .await
         .expect("test: acceptor task join")
         .expect("test: Node B accept_handshake");
 
@@ -182,8 +184,14 @@ async fn run_bilateral_handshake() -> Result<()> {
     // Verify identity binding: node_id == BLAKE3(pubkey)
     let expected_id_a = blake3::hash(&pubkey_a).to_hex().to_string();
     let expected_id_b = blake3::hash(&pubkey_b).to_hex().to_string();
-    assert_eq!(result_b.peer_node_id, expected_id_a, "Identity binding check for A");
-    assert_eq!(result_a.peer_node_id, expected_id_b, "Identity binding check for B");
+    assert_eq!(
+        result_b.peer_node_id, expected_id_a,
+        "Identity binding check for A"
+    );
+    assert_eq!(
+        result_a.peer_node_id, expected_id_b,
+        "Identity binding check for B"
+    );
 
     // Verify the received proofs are valid WireSignedProofs (FALCON-signed)
     // by running them through the provider's validate_proof
@@ -191,16 +199,19 @@ async fn run_bilateral_handshake() -> Result<()> {
         .validate_proof(&result_a.peer_proof)
         .await
         .expect("test: A validates B's received proof");
-    assert!(a_validates_b_proof, "A should validate B's state proof post-handshake");
+    assert!(
+        a_validates_b_proof,
+        "A should validate B's state proof post-handshake"
+    );
 
-    let b_validates_a_proof = BlockMatrixProofProvider::new(
-        node_id_b.clone(),
-        signer_b.clone(),
-    )
-    .validate_proof(&result_b.peer_proof)
-    .await
-    .expect("test: B validates A's received proof");
-    assert!(b_validates_a_proof, "B should validate A's state proof post-handshake");
+    let b_validates_a_proof = BlockMatrixProofProvider::new(node_id_b.clone(), signer_b.clone())
+        .validate_proof(&result_b.peer_proof)
+        .await
+        .expect("test: B validates A's received proof");
+    assert!(
+        b_validates_a_proof,
+        "B should validate A's state proof post-handshake"
+    );
 
     // Rotation chains should be empty (fresh keys, no rotations)
     assert!(
@@ -248,14 +259,9 @@ async fn run_forged_identity_test() -> Result<()> {
             .to_string(),
     });
 
-    let proof_provider_a = BlockMatrixProofProvider::new(
-        "rogue".to_string(),
-        rogue_signer.clone(),
-    );
-    let proof_provider_b = BlockMatrixProofProvider::new(
-        signer_b.node_id().to_string(),
-        signer_b.clone(),
-    );
+    let proof_provider_a = BlockMatrixProofProvider::new("rogue".to_string(), rogue_signer.clone());
+    let proof_provider_b =
+        BlockMatrixProofProvider::new(signer_b.node_id().to_string(), signer_b.clone());
 
     let transport_a = Arc::new(make_transport().await?);
     let transport_b = Arc::new(make_transport().await?);
@@ -263,10 +269,8 @@ async fn run_forged_identity_test() -> Result<()> {
 
     let signer_b_clone = signer_b.clone();
     let acceptor = tokio::spawn(async move {
-        let conn = transport_b.accept().await
-            .expect("test: accept");
-        let mut stream = conn.accept_stream().await
-            .expect("test: accept stream");
+        let conn = transport_b.accept().await.expect("test: accept");
+        let mut stream = conn.accept_stream().await.expect("test: accept stream");
         stoq::protocol::bilateral::accept_handshake(
             &mut stream,
             signer_b_clone.as_ref(),
@@ -276,10 +280,8 @@ async fn run_forged_identity_test() -> Result<()> {
         .await
     });
 
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
     let conn_a = transport_a.connect(&endpoint_b).await?;
 
     let initiate_result = stoq::protocol::bilateral::initiate_handshake(
@@ -346,18 +348,13 @@ async fn run_mismatched_signer_test() -> Result<()> {
 
     // A's proof provider signs with signer_x, so the WireSignedProof carries
     // signer_x's pubkey — which does NOT match A's handshake key (signer_a).
-    let proof_provider_a = BlockMatrixProofProvider::new(
-        node_id_a.clone(),
-        signer_x.clone(),
-    );
+    let proof_provider_a = BlockMatrixProofProvider::new(node_id_a.clone(), signer_x.clone());
 
     // Node B is fully honest.
     let identity_b = FalconIdentity::generate();
     let signer_b: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_b);
-    let proof_provider_b = BlockMatrixProofProvider::new(
-        signer_b.node_id().to_string(),
-        signer_b.clone(),
-    );
+    let proof_provider_b =
+        BlockMatrixProofProvider::new(signer_b.node_id().to_string(), signer_b.clone());
 
     let transport_a = Arc::new(make_transport().await?);
     let transport_b = Arc::new(make_transport().await?);
@@ -367,10 +364,8 @@ async fn run_mismatched_signer_test() -> Result<()> {
 
     let signer_b_clone = signer_b.clone();
     let acceptor = tokio::spawn(async move {
-        let conn = transport_b.accept().await
-            .expect("test: accept");
-        let mut stream = conn.accept_stream().await
-            .expect("test: accept stream");
+        let conn = transport_b.accept().await.expect("test: accept");
+        let mut stream = conn.accept_stream().await.expect("test: accept stream");
         stoq::protocol::bilateral::accept_handshake(
             &mut stream,
             signer_b_clone.as_ref(),
@@ -380,10 +375,8 @@ async fn run_mismatched_signer_test() -> Result<()> {
         .await
     });
 
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
     let conn_a = transport_a.connect(&endpoint_b).await?;
 
     // A initiates with its honest handshake signer but a mismatched proof.

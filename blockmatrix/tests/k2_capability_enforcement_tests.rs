@@ -18,9 +18,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 
 use base64::Engine;
-use blockmatrix::auth::{
-    Capability, CapabilityToken, CapabilityTokenIssuer, RevocationRegistry,
-};
+use blockmatrix::auth::{Capability, CapabilityToken, CapabilityTokenIssuer, RevocationRegistry};
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
 use blockmatrix::bootstrap::DnsResolver;
 use blockmatrix::ipc::handler::{CapabilityContext, RequestHandler};
@@ -62,12 +60,12 @@ async fn build_state(
         shard_transport: None,
         coordinate: coord,
         node_id: "k2-test".into(),
+        network_id: "trustnet-test".into(),
         data_dir: PathBuf::from("/tmp"),
         privacy_mode: "Private".into(),
         started_at: Instant::now(),
         shutdown_tx,
         dns_resolver: dns,
-        dns_popularity_tracker: None,
         shard_location_index: None,
         consumer_provider_manager: None,
         #[cfg(feature = "caesar")]
@@ -88,8 +86,8 @@ async fn build_state(
         capability_token_issuer: issuer,
         revocation_registry: revocation,
         light_sync_manager: None,
-            catalog_registry: None,
-            inbox_store: None,
+        catalog_registry: None,
+        inbox_store: None,
     })
 }
 
@@ -210,22 +208,14 @@ async fn test_capability_token_validation_in_ipc_middleware() {
             Duration::from_secs(60),
         )
         .expect("test: issue");
-    let req = RpcRequest::new_with_token(
-        "status",
-        serde_json::json!({}),
-        token_to_b64(&token),
-    );
+    let req = RpcRequest::new_with_token("status", serde_json::json!({}), token_to_b64(&token));
     let resp = handler.dispatch(req).await;
     if let Some(err) = &resp.error {
         assert_ne!(err.code, CAPABILITY_DENIED, "unexpected: {}", err.message);
     }
 
     // ViewOnly token + Admin-required method → CAPABILITY_DENIED.
-    let req = RpcRequest::new_with_token(
-        "shutdown",
-        serde_json::json!({}),
-        token_to_b64(&token),
-    );
+    let req = RpcRequest::new_with_token("shutdown", serde_json::json!({}), token_to_b64(&token));
     let resp = handler.dispatch(req).await;
     let err = resp.error.expect("expected denial");
     assert_eq!(err.code, CAPABILITY_DENIED);
@@ -239,8 +229,7 @@ async fn test_capability_token_revoked_session_rejected() {
     let identity = Arc::new(FalconIdentity::generate());
     let issuer = Arc::new(CapabilityTokenIssuer::new(identity.clone()));
     let revocation = Arc::new(RevocationRegistry::new());
-    let state =
-        build_state(Some(issuer.clone()), revocation.clone()).await;
+    let state = build_state(Some(issuer.clone()), revocation.clone()).await;
     let mut handler = RequestHandler::new();
     register_all(&mut handler, state);
 
@@ -255,11 +244,7 @@ async fn test_capability_token_revoked_session_rejected() {
     // Revoke before dispatch.
     revocation.revoke(token.session_id).await;
 
-    let req = RpcRequest::new_with_token(
-        "status",
-        serde_json::json!({}),
-        token_to_b64(&token),
-    );
+    let req = RpcRequest::new_with_token("status", serde_json::json!({}), token_to_b64(&token));
     let resp = handler.dispatch(req).await;
     let err = resp.error.expect("expected revocation rejection");
     assert_eq!(err.code, CAPABILITY_DENIED);
@@ -290,11 +275,7 @@ async fn test_capability_token_expired_rejected() {
     tokio::time::sleep(Duration::from_millis(10)).await;
     assert!(token.is_expired_at(SystemTime::now()));
 
-    let req = RpcRequest::new_with_token(
-        "status",
-        serde_json::json!({}),
-        token_to_b64(&token),
-    );
+    let req = RpcRequest::new_with_token("status", serde_json::json!({}), token_to_b64(&token));
     let resp = handler.dispatch(req).await;
     let err = resp.error.expect("expected expiry rejection");
     assert_eq!(err.code, CAPABILITY_DENIED);

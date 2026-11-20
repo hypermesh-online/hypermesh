@@ -119,8 +119,7 @@ mod tests {
             "x": 1.5, "y": 2.5, "z": 3.5,
             "distance": 0.866
         });
-        let neighbor: Neighbor =
-            serde_json::from_value(json).expect("test: deserialize Neighbor");
+        let neighbor: Neighbor = serde_json::from_value(json).expect("test: deserialize Neighbor");
         assert_eq!(neighbor.node_id, "n-1");
     }
 

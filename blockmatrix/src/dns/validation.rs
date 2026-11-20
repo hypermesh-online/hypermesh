@@ -175,7 +175,12 @@ mod tests {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string());
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
-        let work = WorkProof::new("owner".to_string(), "workload".to_string(), *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes()).as_bytes());
+        let work = WorkProof::new(
+            "owner".to_string(),
+            "workload".to_string(),
+            *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes())
+                .as_bytes(),
+        );
 
         StateProof::new(stake, time, space, work)
     }
@@ -213,14 +218,18 @@ mod tests {
 
         // Public domain accessible
         let domain = Domain::parse("nike").expect("test: expected success");
-        assert!(validator.validate_network_access(&domain, None).expect("test: validation"));
+        assert!(validator
+            .validate_network_access(&domain, None)
+            .expect("test: validation"));
 
         // Federated domain requires network
         let domain = Domain::parse("admin.nike").expect("test: expected success");
         assert!(validator
             .validate_network_access(&domain, Some("nike-internal"))
             .expect("test: expected success"));
-        assert!(!validator.validate_network_access(&domain, None).expect("test: validation"));
+        assert!(!validator
+            .validate_network_access(&domain, None)
+            .expect("test: validation"));
     }
 
     #[test]

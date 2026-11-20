@@ -286,7 +286,10 @@ async fn start_test_hypermesh_server(port: u16) -> Result<Arc<StoqApiServer>> {
     // Give server time to bind
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    info!("Test HyperMesh Proof of State server started on port {}", port);
+    info!(
+        "Test HyperMesh Proof of State server started on port {}",
+        port
+    );
     Ok(server)
 }
 
@@ -369,7 +372,8 @@ async fn test_four_proof_validation() -> Result<()> {
             "test-owner".to_string(),
             "certificate-issuance".to_string(),
             b"certificate issuance work",
-        ));
+        ),
+    );
 
     // Validate four-proof set
     let result = hypermesh_client
@@ -414,7 +418,8 @@ async fn test_invalid_proof_rejection() -> Result<()> {
         StakeProof::new(String::new(), String::new()), // zero hash → invalid WHAT
         TimeProof::new(Duration::from_secs(0)),
         SpaceProof::new(String::new(), String::new(), 1024), // no identity → invalid WHO
-        WorkProof::new(String::new(), String::new(), [0u8; 32]));
+        WorkProof::new(String::new(), String::new(), [0u8; 32]),
+    );
     assert!(!proof_set.stake_proof.is_structurally_valid());
     assert!(!proof_set.work_proof.is_structurally_valid());
 
@@ -463,7 +468,8 @@ async fn test_byzantine_node_detection() -> Result<()> {
             "byzantine-owner".to_string(),
             "byzantine-op".to_string(),
             b"byzantine op work",
-        ));
+        ),
+    );
 
     let result = hypermesh_client
         .validate_four_proofs(&proof_set, "test_op", "test-asset", "byzantine_node_666")

@@ -571,14 +571,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_fingerprint_tracker_creation() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
         let stats = tracker.get_stats().await;
         assert_eq!(stats.total_tracked, 0);
     }
 
     #[tokio::test]
     async fn test_certificate_tracking() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         let fingerprint = [1u8; 32];
         let common_name = "test.example.com".to_string();
@@ -600,7 +604,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_duplicate_detection() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         let fingerprint = [2u8; 32];
         let common_name = "test.example.com".to_string();
@@ -623,7 +629,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_domain_fingerprints() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         let domain = "example.com";
         let fingerprint1 = [3u8; 32];
@@ -646,7 +654,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_suspicious_activity_detection() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         // Generate many certificates for the same domain
         let domain = "suspicious.example.com";
@@ -673,7 +683,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_revocation_marking() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         let fingerprint = [5u8; 32];
         let common_name = "revoked.example.com".to_string();
@@ -699,7 +711,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fingerprint_search() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         // Add test fingerprints
         for i in 0..10u8 {
@@ -719,14 +733,19 @@ mod tests {
             limit: Some(5),
         };
 
-        let results = tracker.search_fingerprints(&query).await.expect("test: async operation");
+        let results = tracker
+            .search_fingerprints(&query)
+            .await
+            .expect("test: async operation");
         assert_eq!(results.fingerprints.len(), 5);
         assert!(results.has_more);
     }
 
     #[tokio::test]
     async fn test_stats_tracking() {
-        let tracker = FingerprintTracker::new(true).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(true)
+            .await
+            .expect("test: async operation");
 
         // Add some fingerprints
         for i in 0..5u8 {
@@ -744,7 +763,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_tracker() {
-        let tracker = FingerprintTracker::new(false).await.expect("test: async operation");
+        let tracker = FingerprintTracker::new(false)
+            .await
+            .expect("test: async operation");
 
         let fingerprint = [6u8; 32];
         let status = tracker

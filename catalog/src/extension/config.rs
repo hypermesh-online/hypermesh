@@ -369,9 +369,9 @@ impl ConfigLoader {
         }
 
         if let Ok(enable) = std::env::var("CATALOG_STATE_PROOF_VALIDATION") {
-            config.state_validation = enable
-                .parse()
-                .map_err(|_| ConfigError::InvalidValue("Invalid state proof setting".to_string()))?;
+            config.state_validation = enable.parse().map_err(|_| {
+                ConfigError::InvalidValue("Invalid state proof setting".to_string())
+            })?;
         }
 
         if let Ok(address) = std::env::var("CATALOG_HYPERMESH_ADDRESS") {

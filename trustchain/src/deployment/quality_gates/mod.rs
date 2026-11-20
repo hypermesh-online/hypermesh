@@ -16,8 +16,8 @@ use std::path::Path;
 use tracing::{error, info};
 
 use gates::{
-    StateProofValidationGate, DNSInfrastructureGate, HSMDependencyGate, MockResponseGate,
-    ProductionReadinessGate, SecurityTheaterGate,
+    DNSInfrastructureGate, HSMDependencyGate, MockResponseGate, ProductionReadinessGate,
+    SecurityTheaterGate, StateProofValidationGate,
 };
 
 /// Quality gate validation results

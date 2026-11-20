@@ -23,9 +23,7 @@ use crate::os_integration::{DeviceFingerprint, OsAbstraction};
 use trustchain::proof_of_state::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
 use trustchain::proof_of_state::StateProof;
 
-use crate::assets::core::authz::{
-    AuthorizationSet, CapacityDimension, CapacityProfile,
-};
+use crate::assets::core::authz::{AuthorizationSet, CapacityDimension, CapacityProfile};
 
 /// Prefix marking a recoverable device-fingerprint binding inside a proof
 /// string field. The continuity gate parses `PoStake.stake_holder` for this
@@ -118,16 +116,9 @@ impl HardwareAssessment {
     /// The `node_id` is used verbatim as the proof identity. Callers that
     /// have the canonical `BLAKE3(falcon_pubkey)` identity should pass it
     /// here so the collapsed node ID flows into every proof.
-    pub fn from_os(
-        os: &dyn OsAbstraction,
-        node_id: &str,
-        coordinate: MatrixCoordinate,
-    ) -> Self {
+    pub fn from_os(os: &dyn OsAbstraction, node_id: &str, coordinate: MatrixCoordinate) -> Self {
         let (cpu_cores, cpu_mhz) = match os.detect_cpu() {
-            Ok(cpu) => (
-                cpu.cores as u32,
-                cpu.frequency_mhz.unwrap_or(1000) as u32,
-            ),
+            Ok(cpu) => (cpu.cores as u32, cpu.frequency_mhz.unwrap_or(1000) as u32),
             Err(_) => (num_cpus::get() as u32, 1000),
         };
 
@@ -312,10 +303,22 @@ pub fn genesis_capacity_profile(hw: &HardwareAssessment) -> CapacityProfile {
     let compute_units = (hw.cpu_cores as u64) * (hw.cpu_mhz as u64);
     CapacityProfile {
         dimensions: vec![
-            CapacityDimension { name: "cpu_cores".into(), total_units: hw.cpu_cores as u64 },
-            CapacityDimension { name: "cpu_mhz".into(), total_units: hw.cpu_mhz as u64 },
-            CapacityDimension { name: "compute_units".into(), total_units: compute_units },
-            CapacityDimension { name: "memory_mb".into(), total_units: memory_mb },
+            CapacityDimension {
+                name: "cpu_cores".into(),
+                total_units: hw.cpu_cores as u64,
+            },
+            CapacityDimension {
+                name: "cpu_mhz".into(),
+                total_units: hw.cpu_mhz as u64,
+            },
+            CapacityDimension {
+                name: "compute_units".into(),
+                total_units: compute_units,
+            },
+            CapacityDimension {
+                name: "memory_mb".into(),
+                total_units: memory_mb,
+            },
             CapacityDimension {
                 name: "storage_bytes".into(),
                 total_units: hw.storage_bytes,
@@ -604,10 +607,7 @@ mod tests {
         hw_b.device_fingerprint = test_fingerprint("B");
 
         let base = generate_genesis_proof(&hw_a, fixed_epoch());
-        let later = generate_genesis_proof(
-            &hw_a,
-            GenesisEpoch::from_unix_secs(1_780_000_001),
-        );
+        let later = generate_genesis_proof(&hw_a, GenesisEpoch::from_unix_secs(1_780_000_001));
         let other_device = generate_genesis_proof(&hw_b, fixed_epoch());
 
         assert_ne!(base.time_proof.nonce, later.time_proof.nonce);

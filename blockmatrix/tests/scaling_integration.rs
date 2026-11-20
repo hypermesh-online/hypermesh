@@ -17,7 +17,8 @@ use blockmatrix::network::shard_store::ShardStore;
 use blockmatrix::network::swarm_provider::ShardLocationIndex;
 
 use blockmatrix::assets::core::AssetRegistration;
-use hypermesh_lib::ContentHash;
+use hypermesh_lib::{ContentHash, NodeSigner, DEFAULT_NETWORK};
+use trustchain::identity::FalconIdentity;
 use trustchain::proof_of_state::StateProof;
 
 // ---------------------------------------------------------------------------
@@ -27,16 +28,21 @@ use trustchain::proof_of_state::StateProof;
 /// Build a minimal `BlockAssetEntry` for testing (matches chain.rs unit test pattern).
 ///
 /// The proof is bound to the content hash so the entry satisfies the
-/// signed-to-content invariant (P1) enforced on the block-receive path.
+/// signed-to-content invariant (P1), and carries a FALCON `signed_proof`
+/// envelope bound to its author so it passes the H3 gate on the block-receive
+/// path (`insert_received_block`) WITHOUT the legacy accept-unsigned flag.
+/// This mirrors the `signed_test_entry` helper in `blockchain/mutations.rs`:
+/// the proof's `stake_holder_id` is set to the signer's `node_id`
+/// (`BLAKE3(pubkey)`) so the accept-path author binding holds.
 fn test_entry(coord: MatrixCoordinate) -> BlockAssetEntry {
+    let author = FalconIdentity::generate();
     let reg = AssetRegistration::genesis(coord);
     let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-    BlockAssetEntry::new_bound(
-        content_hash,
-        &StateProof::new_for_testing(),
-        StoragePointer::Genesis,
-        reg,
-    )
+    let mut proof = StateProof::new_for_testing();
+    proof.stake_proof.stake_holder_id = author.node_id().to_string();
+    let mut entry = BlockAssetEntry::new_bound(content_hash, &proof, StoragePointer::Genesis, reg);
+    entry.sign_proof(&author).expect("test: FALCON sign");
+    entry
 }
 
 /// Create a ContentHash from a single seed byte.
@@ -67,6 +73,7 @@ async fn test_genesis_adoption_and_header_sync() {
     );
 
     // Step 3: Node B adopts Node A's genesis
+    // TODO(cluster-C): adopt_genesis / cross-genesis convergence is being retired for the per-asset-genesis model
     chain_b
         .adopt_genesis(genesis_a.clone())
         .await
@@ -126,10 +133,7 @@ async fn test_genesis_adoption_and_header_sync() {
             .expect("test: header should exist");
         assert_eq!(header.index, idx);
         // Header hash should match the original block
-        let original = chain_a
-            .get_block(idx)
-            .await
-            .expect("test: original block");
+        let original = chain_a.get_block(idx).await.expect("test: original block");
         assert_eq!(header.hash, original.hash);
     }
 
@@ -217,6 +221,7 @@ async fn test_consumer_becomes_provider() {
         Arc::clone(&shard_store),
         Arc::clone(&shard_location_index),
         "test-node-1".to_string(),
+        DEFAULT_NETWORK,
     );
 
     // Step 3: Create 3 test shards with different hashes
@@ -244,7 +249,9 @@ async fn test_consumer_becomes_provider() {
 
     // Step 7: Verify ShardLocationIndex has "test-node-1" as provider for all 3 hashes
     for hash in [hash_a, hash_b, hash_c] {
-        let providers = shard_location_index.get_providers(&hash).await;
+        let providers = shard_location_index
+            .get_providers_in_network(DEFAULT_NETWORK, &hash)
+            .await;
         assert!(
             providers.contains(&"test-node-1".to_string()),
             "test-node-1 should be a provider for hash {}",
@@ -345,7 +352,10 @@ async fn test_swarm_analytics_popularity_detection() {
             fetch_rate,
             ..
         } => {
-            assert_eq!(*shard_hash, shard_b, "shard B should be first (highest rate)");
+            assert_eq!(
+                *shard_hash, shard_b,
+                "shard B should be first (highest rate)"
+            );
             assert_eq!(*fetch_rate, 20);
         }
         other => unreachable!(
@@ -364,9 +374,6 @@ async fn test_swarm_analytics_popularity_detection() {
             assert_eq!(*shard_hash, shard_a, "shard A should be second");
             assert_eq!(*fetch_rate, 7);
         }
-        other => unreachable!(
-            "test: expected Replicate for shard A, got {:?}",
-            other
-        ),
+        other => unreachable!("test: expected Replicate for shard A, got {:?}", other),
     }
 }

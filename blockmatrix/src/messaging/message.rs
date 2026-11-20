@@ -99,10 +99,8 @@ impl DirectMessage {
             .map_err(|_| anyhow::anyhow!("invalid recipient Kyber public key"))?;
         let (shared_secret, kem_ct) = kyber1024::encapsulate(&pk);
 
-        let aes_key =
-            blake3::derive_key("HYPERMESH-MESSAGE-KEY-V1", shared_secret.as_bytes());
-        let nonce_full =
-            blake3::derive_key("HYPERMESH-MESSAGE-NONCE-V1", shared_secret.as_bytes());
+        let aes_key = blake3::derive_key("HYPERMESH-MESSAGE-KEY-V1", shared_secret.as_bytes());
+        let nonce_full = blake3::derive_key("HYPERMESH-MESSAGE-NONCE-V1", shared_secret.as_bytes());
         let nonce = &nonce_full[..12];
 
         let cipher = Aes256Gcm::new(aes_gcm::Key::<Aes256Gcm>::from_slice(&aes_key));
@@ -116,35 +114,30 @@ impl DirectMessage {
     }
 
     /// Decrypt message body using our Kyber-1024 secret key.
-    pub fn decrypt_body(
-        &self,
-        our_kyber_secret_key: &[u8],
-    ) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn decrypt_body(&self, our_kyber_secret_key: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
         let sk = kyber1024::SecretKey::from_bytes(our_kyber_secret_key)
             .map_err(|_| anyhow::anyhow!("invalid Kyber secret key"))?;
         let ct = kyber1024::Ciphertext::from_bytes(&self.kem_ciphertext)
             .map_err(|_| anyhow::anyhow!("invalid Kyber ciphertext"))?;
         let shared_secret = kyber1024::decapsulate(&ct, &sk);
 
-        let aes_key =
-            blake3::derive_key("HYPERMESH-MESSAGE-KEY-V1", shared_secret.as_bytes());
-        let nonce_full =
-            blake3::derive_key("HYPERMESH-MESSAGE-NONCE-V1", shared_secret.as_bytes());
+        let aes_key = blake3::derive_key("HYPERMESH-MESSAGE-KEY-V1", shared_secret.as_bytes());
+        let nonce_full = blake3::derive_key("HYPERMESH-MESSAGE-NONCE-V1", shared_secret.as_bytes());
         let nonce = &nonce_full[..12];
 
         let cipher = Aes256Gcm::new(aes_gcm::Key::<Aes256Gcm>::from_slice(&aes_key));
         cipher
-            .decrypt(aes_gcm::Nonce::from_slice(nonce), self.encrypted_body.as_ref())
+            .decrypt(
+                aes_gcm::Nonce::from_slice(nonce),
+                self.encrypted_body.as_ref(),
+            )
             .map_err(|_| anyhow::anyhow!("AES-GCM message decryption failed"))
     }
 
     /// Sign this message with the sender's FALCON-1024 identity.
     ///
     /// Replaces any existing signature.
-    pub fn sign(
-        &mut self,
-        identity: &FalconIdentity,
-    ) -> Result<(), anyhow::Error> {
+    pub fn sign(&mut self, identity: &FalconIdentity) -> Result<(), anyhow::Error> {
         let payload = self.signing_payload();
         let hash = blake3::hash(&payload);
         self.signature = NodeSigner::sign(identity, hash.as_bytes())?;
@@ -158,12 +151,8 @@ impl DirectMessage {
         }
         let payload = self.signing_payload();
         let hash = blake3::hash(&payload);
-        FalconIdentity::verify_signature(
-            sender_falcon_pubkey,
-            hash.as_bytes(),
-            &self.signature,
-        )
-        .unwrap_or(false)
+        FalconIdentity::verify_signature(sender_falcon_pubkey, hash.as_bytes(), &self.signature)
+            .unwrap_or(false)
     }
 
     /// Build the deterministic signing payload.
@@ -217,8 +206,7 @@ mod tests {
     fn test_direct_message_serialization_roundtrip() {
         let msg = make_test_message();
         let json = serde_json::to_vec(&msg).expect("test: serialize");
-        let restored: DirectMessage =
-            serde_json::from_slice(&json).expect("test: deserialize");
+        let restored: DirectMessage = serde_json::from_slice(&json).expect("test: deserialize");
         assert_eq!(restored.message_id, msg.message_id);
         assert_eq!(restored.sender_node_id, msg.sender_node_id);
         assert_eq!(restored.sender_name, Some("Alice".into()));

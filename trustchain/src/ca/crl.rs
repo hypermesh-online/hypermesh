@@ -85,10 +85,9 @@ impl CrlGenerator {
         issuer_name: String,
         validity_period: Option<Duration>,
     ) -> TrustChainResult<Self> {
-        let falcon = FalconCrypto::new()
-            .map_err(|e| TrustChainError::CryptoError {
-                reason: format!("Failed to initialize FALCON-1024 for CRL: {}", e),
-            })?;
+        let falcon = FalconCrypto::new().map_err(|e| TrustChainError::CryptoError {
+            reason: format!("Failed to initialize FALCON-1024 for CRL: {}", e),
+        })?;
 
         info!(
             "CRL generator initialized: issuer={}, validity={}s",
@@ -142,12 +141,7 @@ impl CrlGenerator {
         );
 
         // Build signing payload
-        let payload = self.build_signing_payload(
-            &revoked_entries,
-            now,
-            next_update,
-            crl_number,
-        );
+        let payload = self.build_signing_payload(&revoked_entries, now, next_update, crl_number);
 
         // Sign with FALCON-1024
         let signature = self
@@ -250,10 +244,7 @@ impl CrlDistributor {
     /// Default behaviour without a transport is the alpha pattern:
     /// `propagate_to_federation` only logs and returns the target list.
     /// With a transport set, it actively pushes revocations over wire.
-    pub async fn set_federation_transport(
-        &self,
-        transport: Arc<dyn FederationOcspTransport>,
-    ) {
+    pub async fn set_federation_transport(&self, transport: Arc<dyn FederationOcspTransport>) {
         *self.federation_transport.write().await = Some(transport);
     }
 
@@ -461,9 +452,18 @@ mod tests {
             },
         );
 
-        store.store_certificate(&valid).await.expect("test: store failed");
-        store.store_certificate(&revoked1).await.expect("test: store failed");
-        store.store_certificate(&revoked2).await.expect("test: store failed");
+        store
+            .store_certificate(&valid)
+            .await
+            .expect("test: store failed");
+        store
+            .store_certificate(&revoked1)
+            .await
+            .expect("test: store failed");
+        store
+            .store_certificate(&revoked2)
+            .await
+            .expect("test: store failed");
 
         let crl = generator
             .generate_crl()
@@ -486,9 +486,18 @@ mod tests {
     async fn test_crl_number_increments() {
         let (_store, generator, _distributor) = setup().await;
 
-        let crl1 = generator.generate_crl().await.expect("test: CRL gen failed");
-        let crl2 = generator.generate_crl().await.expect("test: CRL gen failed");
-        let crl3 = generator.generate_crl().await.expect("test: CRL gen failed");
+        let crl1 = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
+        let crl2 = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
+        let crl3 = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
 
         assert_eq!(crl1.crl_number, 0);
         assert_eq!(crl2.crl_number, 1);
@@ -503,7 +512,10 @@ mod tests {
         // No CRL published yet
         assert!(distributor.get_current_crl().await.is_none());
 
-        let crl = generator.generate_crl().await.expect("test: CRL gen failed");
+        let crl = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
         distributor.publish_crl(crl.clone()).await;
 
         let retrieved = distributor
@@ -526,18 +538,28 @@ mod tests {
                 revoked_at: SystemTime::now(),
             },
         );
-        store.store_certificate(&revoked).await.expect("test: store failed");
+        store
+            .store_certificate(&revoked)
+            .await
+            .expect("test: store failed");
 
         // Before CRL is published, check returns false
         assert!(!distributor.is_certificate_revoked("serial-check").await);
 
         // Generate and publish CRL
-        let crl = generator.generate_crl().await.expect("test: CRL gen failed");
+        let crl = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
         distributor.publish_crl(crl).await;
 
         // Now check succeeds
         assert!(distributor.is_certificate_revoked("serial-check").await);
-        assert!(!distributor.is_certificate_revoked("serial-not-revoked").await);
+        assert!(
+            !distributor
+                .is_certificate_revoked("serial-not-revoked")
+                .await
+        );
     }
 
     #[tokio::test]
@@ -551,9 +573,15 @@ mod tests {
                 revoked_at: SystemTime::now(),
             },
         );
-        store.store_certificate(&revoked).await.expect("test: store failed");
+        store
+            .store_certificate(&revoked)
+            .await
+            .expect("test: store failed");
 
-        let crl = generator.generate_crl().await.expect("test: CRL gen failed");
+        let crl = generator
+            .generate_crl()
+            .await
+            .expect("test: CRL gen failed");
 
         assert!(!crl.signature.signature_bytes.is_empty());
         assert_eq!(crl.signature.algorithm, "FALCON-1024");
@@ -623,7 +651,11 @@ mod tests {
             .propagate_to_federation("serial-123", "KeyCompromise", &fm)
             .await;
 
-        assert_eq!(targets.len(), 2, "should propagate to Full + Conditional only");
+        assert_eq!(
+            targets.len(),
+            2,
+            "should propagate to Full + Conditional only"
+        );
         assert!(targets.contains(&"peer-full".to_string()));
         assert!(targets.contains(&"peer-cond".to_string()));
         assert!(

@@ -313,9 +313,7 @@ impl LinuxAbstraction {
     /// Read DMI/SMBIOS identifiers. Each is independently optional because
     /// these are typically root-readable only (mode 0400). We degrade
     /// gracefully — a non-root run simply contributes fewer sources.
-    pub(super) fn read_dmi_identifiers(
-        &self,
-    ) -> (Option<String>, Option<String>, Option<String>) {
+    pub(super) fn read_dmi_identifiers(&self) -> (Option<String>, Option<String>, Option<String>) {
         let read_dmi = |field: &str| -> Option<String> {
             let path = format!("/sys/class/dmi/id/{field}");
             fs::read_to_string(&path).ok().and_then(|s| {
@@ -370,7 +368,10 @@ impl LinuxAbstraction {
             }
             Some(name.to_string())
         } else {
-            Some(name.trim_end_matches(|c: char| c.is_ascii_digit()).to_string())
+            Some(
+                name.trim_end_matches(|c: char| c.is_ascii_digit())
+                    .to_string(),
+            )
         }
     }
 

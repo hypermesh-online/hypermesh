@@ -667,7 +667,9 @@ mod tests {
     #[tokio::test]
     async fn test_component_integration_creation() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
+        let integration = ComponentIntegration::new(config)
+            .await
+            .expect("test: async operation");
 
         let health = integration.get_health().await;
         assert!(matches!(health.overall_status, ComponentStatus::Healthy));
@@ -676,7 +678,9 @@ mod tests {
     #[tokio::test]
     async fn test_privacy_pipeline_integration() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
+        let integration = ComponentIntegration::new(config)
+            .await
+            .expect("test: async operation");
 
         let mut pipeline_config = crate::assets::pipeline::PipelineConfig::default();
 
@@ -692,14 +696,19 @@ mod tests {
     #[tokio::test]
     async fn test_integration_validation() {
         let config = IntegrationConfig::default();
-        let integration = ComponentIntegration::new(config).await.expect("test: async operation");
+        let integration = ComponentIntegration::new(config)
+            .await
+            .expect("test: async operation");
 
         // Wait for health checks to populate
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         let components = vec!["stoq_transport".to_string(), "privacy_manager".to_string()];
 
-        let valid = integration.validate_integration(components).await.expect("test: async operation");
+        let valid = integration
+            .validate_integration(components)
+            .await
+            .expect("test: async operation");
         assert!(valid);
     }
 }

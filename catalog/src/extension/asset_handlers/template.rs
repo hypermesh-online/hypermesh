@@ -4,9 +4,9 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, StateProof, ExtensionError, ExtensionResult, HashMap, NetworkScope,
-    OperationResult, RwLock,
+    AssetExtensionHandler, AssetOperation, AssetQuery, AssetRegistration, AssetType, AssetUpdate,
+    ExtensionAssetRecord, ExtensionError, ExtensionResult, HashMap, NetworkScope, OperationResult,
+    RwLock, StateProof,
 };
 
 /// Handler for Template assets (asset generation templates)
@@ -205,7 +205,10 @@ impl AssetExtensionHandler for TemplateHandler {
             return Ok(false);
         }
         if proof.work_proof.work_hash == [0u8; 32] {
-            tracing::warn!("Template asset {}: work hash is zero (no work performed)", id);
+            tracing::warn!(
+                "Template asset {}: work hash is zero (no work performed)",
+                id
+            );
             return Ok(false);
         }
 

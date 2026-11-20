@@ -11,7 +11,7 @@ incremental = true
 linker = "clang"
 rustflags = [
     "-C", "link-arg=-fuse-ld=lld",
-    "-C", "target-cpu=native",
+    # Keep the target CPU baseline portable; native is opt-in for local benchmarks.
     # Enable frame pointers for better profiling
     "-C", "force-frame-pointers=yes",
 ]

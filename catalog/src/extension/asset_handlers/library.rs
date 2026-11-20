@@ -4,9 +4,9 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, StateProof, DeploymentResult, ExtensionError, ExtensionResult, HashMap,
-    NetworkScope, OperationResult, RwLock,
+    AssetExtensionHandler, AssetOperation, AssetQuery, AssetRegistration, AssetType, AssetUpdate,
+    DeploymentResult, ExtensionAssetRecord, ExtensionError, ExtensionResult, HashMap, NetworkScope,
+    OperationResult, RwLock, StateProof,
 };
 
 /// Handler for Library assets (packages, frameworks, dependencies)
@@ -210,9 +210,7 @@ impl AssetExtensionHandler for LibraryHandler {
         }
         // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
         // location; capacity is descriptive and never gates admission.
-        if proof.space_proof.node_id.is_empty()
-            && proof.space_proof.storage_path.is_empty()
-        {
+        if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
             tracing::warn!("library asset {}: PoSpace has no bound location", id);
             return Ok(false);
         }

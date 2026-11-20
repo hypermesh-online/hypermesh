@@ -64,12 +64,9 @@ pub fn build_hardware_state_proof(node_id: &str, coordinate: MatrixCoordinate) -
             generate_genesis_proof(&hw, epoch)
         }
         Err(e) => {
-            warn!(
-                "OS abstraction unavailable ({e}), using fallback hardware values"
-            );
-            let device_fingerprint = blockmatrix::os_integration::DeviceFingerprint::compose(
-                Default::default(),
-            );
+            warn!("OS abstraction unavailable ({e}), using fallback hardware values");
+            let device_fingerprint =
+                blockmatrix::os_integration::DeviceFingerprint::compose(Default::default());
             let hw = HardwareAssessment {
                 cpu_cores: num_cpus::get() as u32,
                 cpu_mhz: 1000,
@@ -201,11 +198,8 @@ fn assess_storage(
                         dev.mount_point, dev.total_bytes, dev.available_bytes,
                     )
                     .into_bytes(),
-                    metadata: format!(
-                        "device={},usage={:.1}%",
-                        dev.device, dev.usage_percent,
-                    )
-                    .into_bytes(),
+                    metadata: format!("device={},usage={:.1}%", dev.device, dev.usage_percent,)
+                        .into_bytes(),
                 };
                 assets.push(AssetRegistration::from_asset_data(
                     &asset_data,

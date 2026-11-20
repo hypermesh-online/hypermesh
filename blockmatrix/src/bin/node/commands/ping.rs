@@ -30,17 +30,15 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
     );
     let identity_dir = blockmatrix::bootstrap::adopt_legacy_identity(&data_dir, &legacy_key)
         .unwrap_or_else(|_| blockmatrix::bootstrap::identity_dir(&data_dir));
-    let falcon_identity =
-        blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)
-            .unwrap_or_else(|_| blockmatrix::identity::FalconIdentity::generate());
+    let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(&identity_dir)
+        .unwrap_or_else(|_| blockmatrix::identity::FalconIdentity::generate());
 
     let signer: Arc<dyn hypermesh_lib::NodeSigner> = Arc::new(falcon_identity);
-    let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> = Arc::new(
-        blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
+    let proof_provider: Arc<dyn hypermesh_lib::StateProofProvider> =
+        Arc::new(blockmatrix::proof_of_state::BlockMatrixProofProvider::new(
             signer.node_id().to_string(),
             signer.clone(),
-        ),
-    );
+        ));
 
     // Create a lightweight STOQ transport (ephemeral, OS-assigned port)
     let stoq_config = stoq::TransportConfig {
@@ -49,12 +47,9 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
         ..stoq::TransportConfig::default()
     };
     let transport = Arc::new(
-        stoq::StoqTransport::new_for_network(
-            stoq_config,
-            stoq::transport::NetworkType::P2P,
-        )
-        .await
-        .context("failed to initialize STOQ transport")?,
+        stoq::StoqTransport::new_for_network(stoq_config, stoq::transport::NetworkType::P2P)
+            .await
+            .context("failed to initialize STOQ transport")?,
     );
 
     println!("PING {} via STOQ (FALCON-1024 bilateral PoS)", addr);
@@ -65,7 +60,15 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
 
     for seq in 1..=count {
         sent += 1;
-        match ping_once(&transport, &addr, coord, signer.as_ref(), proof_provider.as_ref()).await {
+        match ping_once(
+            &transport,
+            &addr,
+            coord,
+            signer.as_ref(),
+            proof_provider.as_ref(),
+        )
+        .await
+        {
             Ok(result) => {
                 received += 1;
                 let ms = result.rtt.as_secs_f64() * 1000.0;
@@ -102,10 +105,7 @@ pub async fn run_ping(target: &str, count: u32, cli: &Cli) -> Result<()> {
 
     println!();
     println!("--- {} ping statistics ---", target);
-    println!(
-        "{} sent, {} received, {:.0}% loss",
-        sent, received, loss,
-    );
+    println!("{} sent, {} received, {:.0}% loss", sent, received, loss,);
 
     if !rtts.is_empty() {
         let min = rtts.iter().cloned().fold(f64::INFINITY, f64::min);
@@ -142,25 +142,25 @@ async fn ping_once(
     };
 
     let endpoint = stoq::Endpoint::new(ipv6, addr.port());
-    let connection = transport.connect(&endpoint).await
+    let connection = transport
+        .connect(&endpoint)
+        .await
         .context("STOQ connect failed")?;
 
     // Open stream and write handshake discriminator
-    let mut stream = connection.open_stream().await
+    let mut stream = connection
+        .open_stream()
+        .await
         .context("failed to open stream")?;
     stream
         .write_discriminator(blockmatrix::network::CONN_TYPE_HANDSHAKE)
         .await
         .context("failed to write discriminator")?;
 
-    let result = stoq::initiate_handshake_on_stream(
-        &mut stream,
-        signer,
-        proof_provider,
-        local_coord,
-    )
-    .await
-    .context("bilateral PoS handshake failed")?;
+    let result =
+        stoq::initiate_handshake_on_stream(&mut stream, signer, proof_provider, local_coord)
+            .await
+            .context("bilateral PoS handshake failed")?;
 
     let _ = stream.finish_send();
     let rtt = start.elapsed();

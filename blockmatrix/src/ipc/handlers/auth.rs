@@ -32,7 +32,7 @@ use crate::assets::core::{
 use crate::auth::{Capability, CapabilityToken, SessionAction};
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::ipc::handler::RequestHandler;
-use crate::ipc::protocol::{INTERNAL_ERROR, INVALID_PARAMS, RpcError};
+use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
 use crate::ipc::state::DaemonState;
 use trustchain::proof_of_state::StateProof;
 use trustchain::proof_of_state::StateProofOps;
@@ -46,16 +46,12 @@ pub const CAPABILITY_DENIED: i64 = -32004;
 ///
 /// K.1 ships in-memory tracking; K.1.5 rebuilds this from the chain on
 /// daemon startup.
-static ISSUED_SESSIONS: tokio::sync::OnceCell<
-    Arc<tokio::sync::RwLock<Vec<IssuedSessionRecord>>>,
-> = tokio::sync::OnceCell::const_new();
+static ISSUED_SESSIONS: tokio::sync::OnceCell<Arc<tokio::sync::RwLock<Vec<IssuedSessionRecord>>>> =
+    tokio::sync::OnceCell::const_new();
 
-async fn issued_sessions()
-    -> Arc<tokio::sync::RwLock<Vec<IssuedSessionRecord>>> {
+async fn issued_sessions() -> Arc<tokio::sync::RwLock<Vec<IssuedSessionRecord>>> {
     ISSUED_SESSIONS
-        .get_or_init(|| async {
-            Arc::new(tokio::sync::RwLock::new(Vec::new()))
-        })
+        .get_or_init(|| async { Arc::new(tokio::sync::RwLock::new(Vec::new())) })
         .await
         .clone()
 }
@@ -128,8 +124,8 @@ async fn record_session_audit(
     state: &Arc<DaemonState>,
     payload: SessionAuditPayload,
 ) -> Result<(), String> {
-    let entry_bytes = serde_json::to_vec(&payload)
-        .map_err(|e| format!("serialize SessionAudit payload: {e}"))?;
+    let entry_bytes =
+        serde_json::to_vec(&payload).map_err(|e| format!("serialize SessionAudit payload: {e}"))?;
     let asset_hash = *blake3::hash(&entry_bytes).as_bytes();
 
     // Build a content-addressed registration so the chain entry is
@@ -263,11 +259,13 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     })?;
 
                     let caps_raw =
-                        params.get("requested_capabilities").ok_or_else(|| RpcError {
-                            code: INVALID_PARAMS,
-                            message: "missing 'requested_capabilities' parameter".into(),
-                            data: None,
-                        })?;
+                        params
+                            .get("requested_capabilities")
+                            .ok_or_else(|| RpcError {
+                                code: INVALID_PARAMS,
+                                message: "missing 'requested_capabilities' parameter".into(),
+                                data: None,
+                            })?;
                     let caps = parse_capabilities(caps_raw)?;
 
                     let ttl_secs = params
@@ -292,9 +290,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         SessionAction::Created,
                     );
                     if let Err(e) = record_session_audit(&s, audit).await {
-                        tracing::warn!(
-                            "SessionAudit chain write failed (non-fatal): {e}"
-                        );
+                        tracing::warn!("SessionAudit chain write failed (non-fatal): {e}");
                     }
 
                     // Track in-memory.
@@ -308,13 +304,17 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|d| d.as_secs())
                         .unwrap_or(0);
-                    issued_sessions().await.write().await.push(IssuedSessionRecord {
-                        session_id: token.session_id,
-                        device_pubkey_hex: hex::encode(&device_pubkey),
-                        capabilities: token.capabilities.clone(),
-                        issued_at_secs,
-                        valid_until_secs,
-                    });
+                    issued_sessions()
+                        .await
+                        .write()
+                        .await
+                        .push(IssuedSessionRecord {
+                            session_id: token.session_id,
+                            device_pubkey_hex: hex::encode(&device_pubkey),
+                            capabilities: token.capabilities.clone(),
+                            issued_at_secs,
+                            valid_until_secs,
+                        });
 
                     Ok(token_to_json(&token))
                 })
@@ -390,9 +390,7 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                         SessionAction::Revoked,
                     );
                     if let Err(e) = record_session_audit(&s, audit).await {
-                        tracing::warn!(
-                            "SessionAudit chain write failed (non-fatal): {e}"
-                        );
+                        tracing::warn!("SessionAudit chain write failed (non-fatal): {e}");
                     }
 
                     Ok(serde_json::json!({
@@ -409,18 +407,18 @@ pub fn register(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
 mod tests {
     use super::*;
     use crate::auth::CapabilityTokenIssuer;
-    use crate::ipc::protocol::RpcRequest;
     use crate::ipc::handlers::tests::test_state;
+    use crate::ipc::protocol::RpcRequest;
     use std::sync::Arc;
     use trustchain::FalconIdentity;
 
-    /// Construct a `DaemonState` with the capability token issuer wired up.
-    async fn test_state_with_issuer() -> Arc<DaemonState> {
+    /// Construct a `DaemonState` and issuer pair for tests.
+    async fn test_state_with_issuer() -> (Arc<DaemonState>, Arc<CapabilityTokenIssuer>) {
         let state = test_state().await;
-        // Replace via Arc::get_mut would require unwrap; instead build a new
-        // state by hand. Simpler: construct fresh. The tests below call
-        // helpers that construct their own state.
-        state
+        let issuer = Arc::new(CapabilityTokenIssuer::new(Arc::new(
+            FalconIdentity::generate(),
+        )));
+        (state, issuer)
     }
 
     #[tokio::test]
@@ -442,10 +440,16 @@ mod tests {
         assert!(err.message.contains("alpha-default inert"));
     }
 
-    /// Build a `DaemonState` carrying a capability token issuer for the
-    /// happy-path tests in `tests/k1_light_client_capability_tests.rs`.
-    pub(crate) async fn _doc_helper() {
-        let _ = test_state_with_issuer;
-        let _ = CapabilityTokenIssuer::new(Arc::new(FalconIdentity::generate()));
+    #[tokio::test]
+    async fn test_capability_token_issuer_session() {
+        let (_state, issuer) = test_state_with_issuer().await;
+        let token = issuer
+            .issue(
+                vec![1, 2, 3, 4],
+                vec![crate::auth::Capability::ViewOnly],
+                std::time::Duration::from_secs(300),
+            )
+            .expect("token issuance");
+        assert!(!token.signature.is_empty());
     }
 }

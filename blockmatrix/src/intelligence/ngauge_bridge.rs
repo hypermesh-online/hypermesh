@@ -16,12 +16,12 @@
 #[cfg(feature = "intelligence")]
 use std::sync::Arc;
 
+use hypermesh_lib::{MatrixPosition, NetworkId, NodeId};
 #[cfg(feature = "intelligence")]
 use ngauge::{
     PathPolicyRecommendation, ReplicationConfig, ReplicationSignal, ReplicationTrigger,
-    RoutingAdvisor, RoutingIntelligence, SwarmAnalytics, TensorWeightModifier,
+    SwarmAnalytics, TensorWeightModifier,
 };
-use hypermesh_lib::{ContentHash, MatrixPosition, NodeId};
 
 use crate::blockchain::propagation::PropagationWeight;
 use crate::matrix::coordinate::MatrixCoordinate;
@@ -38,12 +38,14 @@ pub async fn feed_swarm_analytics(
     tracker: &SwarmDemandTracker,
     analytics: &mut SwarmAnalytics,
     our_position: MatrixPosition,
+    network_id: NetworkId,
 ) {
-    let snapshot = tracker.snapshot().await;
+    let snapshot = tracker.snapshot_in_network(network_id).await;
     for (shard_id, entry) in &snapshot {
         for requester_id in &entry.requester_ids {
             let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
-            analytics.record_request(
+            analytics.record_request_in_network(
+                network_id,
                 *shard_id,
                 consumer_id,
                 our_position,
@@ -82,9 +84,7 @@ pub fn compute_propagation_weights(
 /// `(enable_redundant, strategy_name)` pair expected by
 /// STOQ's `PathSelector::apply_recommendation`.
 #[cfg(feature = "intelligence")]
-pub fn apply_path_recommendation(
-    rec: &PathPolicyRecommendation,
-) -> (bool, &'static str) {
+pub fn apply_path_recommendation(rec: &PathPolicyRecommendation) -> (bool, &'static str) {
     use ngauge::routing_intel::SchedulingStrategy;
     let strategy_name = match rec.strategy {
         SchedulingStrategy::BandwidthWeighted => "BandwidthWeighted",
@@ -107,20 +107,26 @@ pub struct NGaugeBridge {
     tracker: Arc<SwarmDemandTracker>,
     analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
     position: MatrixPosition,
+    /// The network this bridge attributes demand + replication checks to. Under
+    /// a single joined network this is that one canonical [`NetworkId`], so the
+    /// bridge feeds/reads the same key the replication loops use.
+    network_id: NetworkId,
 }
 
 #[cfg(feature = "intelligence")]
 impl NGaugeBridge {
-    /// Create a new bridge.
+    /// Create a new bridge scoped to `network_id`.
     pub fn new(
         tracker: Arc<SwarmDemandTracker>,
         analytics: Arc<std::sync::Mutex<SwarmAnalytics>>,
         position: MatrixPosition,
+        network_id: NetworkId,
     ) -> Self {
         Self {
             tracker,
             analytics,
             position,
+            network_id,
         }
     }
 
@@ -136,7 +142,13 @@ impl NGaugeBridge {
                     .analytics
                     .lock()
                     .expect("ngauge bridge: analytics lock poisoned");
-                feed_swarm_analytics(&self.tracker, &mut analytics, self.position).await;
+                feed_swarm_analytics(
+                    &self.tracker,
+                    &mut analytics,
+                    self.position,
+                    self.network_id,
+                )
+                .await;
             }
             tokio::time::sleep(interval).await;
         }
@@ -164,7 +176,7 @@ impl NGaugeBridge {
     ) -> Vec<ReplicationSignal> {
         let trigger = ReplicationTrigger::new(config);
         match self.analytics.lock() {
-            Ok(guard) => trigger.check(&guard),
+            Ok(guard) => trigger.check_in_network(&guard, self.network_id),
             Err(e) => {
                 tracing::warn!("ngauge bridge: analytics lock poisoned: {e}");
                 Vec::new()
@@ -201,8 +213,9 @@ impl NGaugeBridge {
 #[cfg(feature = "intelligence")]
 mod tests {
     use super::*;
-    use ngauge::PathPolicyRecommendation;
+    use hypermesh_lib::ContentHash;
     use ngauge::routing_intel::SchedulingStrategy;
+    use ngauge::PathPolicyRecommendation;
 
     #[test]
     fn path_recommendation_maps_strategies() {
@@ -272,7 +285,13 @@ mod tests {
             z: 0.0,
         };
 
-        feed_swarm_analytics(&tracker, &mut analytics, pos).await;
+        feed_swarm_analytics(
+            &tracker,
+            &mut analytics,
+            pos,
+            hypermesh_lib::DEFAULT_NETWORK,
+        )
+        .await;
 
         let pop = analytics.get_popularity(&hash);
         assert!(pop.is_some(), "shard should have popularity data");
@@ -286,7 +305,11 @@ mod tests {
     async fn test_bridge_feeds_analytics() {
         let tracker = Arc::new(SwarmDemandTracker::new());
         let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
-        let pos = MatrixPosition { x: 1.0, y: 2.0, z: 3.0 };
+        let pos = MatrixPosition {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
 
         // Record some demand data.
         let hash = ContentHash([0xDD; 32]);
@@ -301,7 +324,12 @@ mod tests {
             for (shard_id, entry) in &snapshot {
                 for requester_id in &entry.requester_ids {
                     let consumer_id = NodeId::from_public_key(requester_id.as_bytes());
-                    analytics_guard.record_request(*shard_id, consumer_id, pos, entry.last_request_us);
+                    analytics_guard.record_request(
+                        *shard_id,
+                        consumer_id,
+                        pos,
+                        entry.last_request_us,
+                    );
                 }
             }
         }
@@ -330,10 +358,18 @@ mod tests {
 
         let candidates = vec![node_a, node_b];
         let ri = ngauge::RoutingIntelligence::new(30);
-        let source_pos = MatrixPosition { x: 0.0, y: 0.0, z: 0.0 };
+        let source_pos = MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        };
 
         let modifiers = ri.compute_weight_adjustments(&source_pos, &source_pos, &candidates);
-        assert_eq!(modifiers.len(), 2, "should get modifiers for both candidates");
+        assert_eq!(
+            modifiers.len(),
+            2,
+            "should get modifiers for both candidates"
+        );
 
         let weights = compute_propagation_weights(&modifiers, &node_coords);
         assert_eq!(weights.len(), 2, "both candidates have known coordinates");
@@ -349,7 +385,11 @@ mod tests {
     async fn test_replication_trigger_fires_on_demand() {
         let tracker = Arc::new(SwarmDemandTracker::new());
         let analytics = Arc::new(std::sync::Mutex::new(SwarmAnalytics::new()));
-        let pos = MatrixPosition { x: 0.0, y: 0.0, z: 0.0 };
+        let pos = MatrixPosition {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        };
 
         // Record high demand for a shard (exceeds default threshold of 100 per replica).
         let hash = ContentHash([0xEE; 32]);
@@ -373,11 +413,17 @@ mod tests {
         let guard = analytics.lock().expect("test: analytics lock");
         let trigger = ngauge::ReplicationTrigger::new(ngauge::ReplicationConfig::default());
         let signals = trigger.check(&guard);
-        assert!(!signals.is_empty(), "should detect replication need for high-demand shard");
+        assert!(
+            !signals.is_empty(),
+            "should detect replication need for high-demand shard"
+        );
 
         let signal = &signals[0];
         assert_eq!(signal.shard_id, hash);
         assert!(signal.urgency > 0.0, "urgency should be positive");
-        assert!(signal.suggested_count >= 1, "should suggest at least 1 replica");
+        assert!(
+            signal.suggested_count >= 1,
+            "should suggest at least 1 replica"
+        );
     }
 }

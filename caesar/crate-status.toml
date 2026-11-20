@@ -45,6 +45,8 @@ items = [
 
 [features.planned]
 items = [
+    # Newly-established gap from full-system audit 2026-07-30
+    "Remove mock coin-staking economics from the UI /staking handler (W2-9) — ui_handlers.rs serves fabricated APY + lock-period data that conflates PoStake-as-authorization with coin staking and presents as a real feature; violates the no-stake-magnitude / no-coin-logic canon",
     "Live multi-chain UPI bridge BTC/ETH/SOL (blocked by: chain SDK deps)",
     "Stripe provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",
     "Plaid provider (integration point is caesar-sdk UPI adapter traits; live banking providers require compliance + API credentials)",

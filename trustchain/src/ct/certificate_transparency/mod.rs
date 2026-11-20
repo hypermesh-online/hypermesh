@@ -14,13 +14,11 @@ pub mod types;
 pub use operations::CertificateTransparencyLog;
 pub use types::*;
 
-use crate::proof_of_state::StateProofOps;
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ca::{CertificateMetadata, CertificateStatus, IssuedCertificate};
-    use crate::proof_of_state::StateProof;
+    use crate::proof_of_state::{StateProof, StateProofOps};
     use std::time::{Duration, SystemTime};
 
     #[tokio::test]
@@ -53,7 +51,9 @@ mod tests {
             state_proof: match StateProof::generate_from_network("test-node").await {
                 Ok(p) => p,
                 Err(_) => {
-                    use crate::proof_of_state::proof::{SpaceProof, StakeProof, TimeProof, WorkProof};
+                    use crate::proof_of_state::proof::{
+                        SpaceProof, StakeProof, TimeProof, WorkProof,
+                    };
                     StateProof::new(
                         StakeProof::default(),
                         TimeProof::default(),

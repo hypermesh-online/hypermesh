@@ -146,7 +146,9 @@ impl MinSpecBudget {
             return BudgetResult::Fail {
                 reason: format!(
                     "bandwidth: {} bytes to upload in {} seconds exceeds {} B/s limit",
-                    upload_bytes, round_duration_secs, Self::BANDWIDTH_BYTES_PER_SEC
+                    upload_bytes,
+                    round_duration_secs,
+                    Self::BANDWIDTH_BYTES_PER_SEC
                 ),
             };
         }

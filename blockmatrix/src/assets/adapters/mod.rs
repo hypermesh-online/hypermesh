@@ -196,10 +196,7 @@ mod tests {
         // `validate()` rejects an unbound proof first (returning `Err`), and
         // the adapter's own WHERE-binding check returns `Ok(false)`. Both are
         // rejections — what must never happen is admission.
-        let admitted = storage
-            .validate_state_proof(&proof)
-            .await
-            .unwrap_or(false);
+        let admitted = storage.validate_state_proof(&proof).await.unwrap_or(false);
         assert!(
             !admitted,
             "storage adapter must REJECT a proof that binds no location"

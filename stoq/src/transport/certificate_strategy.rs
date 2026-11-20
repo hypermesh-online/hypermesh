@@ -469,7 +469,10 @@ mod tests {
     fn test_anonymous_identity_scope() {
         let strategy = AnonymousCertificateStrategy::new();
         let scope = strategy.identity_scope();
-        assert_eq!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Device);
+        assert_eq!(
+            scope.blockchain_scope,
+            hypermesh_lib::BlockchainScope::Device
+        );
         assert!(!scope.tracked);
     }
 
@@ -483,7 +486,10 @@ mod tests {
             "Public".to_string(),
         );
         let scope = strategy.identity_scope();
-        assert_eq!(scope.blockchain_scope, hypermesh_lib::BlockchainScope::Network);
+        assert_eq!(
+            scope.blockchain_scope,
+            hypermesh_lib::BlockchainScope::Network
+        );
         assert!(scope.tracked);
     }
 

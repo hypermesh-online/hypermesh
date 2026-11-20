@@ -107,7 +107,9 @@ async fn s3_2_three_sequential_entries_form_an_unbroken_lineage() {
     }
 
     // And the whole chain verifies as unbroken.
-    lineage.verify().expect("test: lineage must verify unbroken");
+    lineage
+        .verify()
+        .expect("test: lineage must verify unbroken");
     chain
         .verify_asset_lineage(&asset)
         .await
@@ -278,10 +280,7 @@ async fn s3_2_received_unknown_asset_genesis_is_accepted() {
         .insert_received_block(block)
         .await
         .expect("test: an asset-genesis for a new asset is accepted");
-    assert_eq!(
-        chain.asset_lineage(&[0xD0u8; 32]).await.sequence(),
-        vec![0],
-    );
+    assert_eq!(chain.asset_lineage(&[0xD0u8; 32]).await.sequence(), vec![0],);
 }
 
 #[tokio::test]
@@ -350,7 +349,11 @@ async fn s3_2_two_entries_for_one_asset_in_one_block_continue_the_lineage() {
     // The genesis hardware batch shape: one block, several entries — here two
     // of them for the SAME asset.
     chain
-        .add_block(vec![local_entry(asset), local_entry([0xF2u8; 32]), local_entry(asset)])
+        .add_block(vec![
+            local_entry(asset),
+            local_entry([0xF2u8; 32]),
+            local_entry(asset),
+        ])
         .await
         .expect("test: add_block");
 
@@ -384,8 +387,14 @@ async fn s3_2_two_entries_for_one_asset_in_one_block_continue_the_lineage() {
 /// Returns `(chain, high_water_lineage_id, high_water_seq, block_3)`.
 async fn chain_with_pruned_asset(asset: [u8; 32]) -> (NodeBlockchain, String, u64, Block) {
     let chain = NodeBlockchain::new(coord());
-    chain.add_block(vec![local_entry(asset)]).await.expect("test: block 1");
-    chain.add_block(vec![local_entry(asset)]).await.expect("test: block 2");
+    chain
+        .add_block(vec![local_entry(asset)])
+        .await
+        .expect("test: block 1");
+    chain
+        .add_block(vec![local_entry(asset)])
+        .await
+        .expect("test: block 2");
     let block_3 = chain
         .add_block(vec![local_entry([0x5Au8; 32])])
         .await
@@ -423,8 +432,7 @@ async fn chain_with_pruned_asset(asset: [u8; 32]) -> (NodeBlockchain, String, u6
 #[tokio::test]
 async fn s3_2_f1_pruning_does_not_re_open_an_asset_to_a_fresh_root() {
     let asset = [0x9Au8; 32];
-    let (chain, high_water_id, high_water_seq, block_3) =
-        chain_with_pruned_asset(asset).await;
+    let (chain, high_water_id, high_water_seq, block_3) = chain_with_pruned_asset(asset).await;
     let id = FalconIdentity::generate();
 
     // (b) A properly signed FRESH asset-genesis for the pruned asset. Every
@@ -448,12 +456,7 @@ async fn s3_2_f1_pruning_does_not_re_open_an_asset_to_a_fresh_root() {
 
     // (c) The LEGITIMATE continuation — naming the retained high-water
     //     lineage_id at high-water + 1 — is still accepted after pruning.
-    let continuation = received_entry(
-        &id,
-        asset,
-        Some(high_water_id.clone()),
-        high_water_seq + 1,
-    );
+    let continuation = received_entry(&id, asset, Some(high_water_id.clone()), high_water_seq + 1);
     let block = Block::new(4, vec![continuation], block_3.hash.clone());
     chain
         .insert_received_block(block)
@@ -471,8 +474,7 @@ async fn s3_2_f1_pruning_does_not_re_open_an_asset_to_a_fresh_root() {
 #[tokio::test]
 async fn s3_2_f1_local_appends_continue_from_the_high_water_not_from_zero() {
     let asset = [0x9Bu8; 32];
-    let (chain, high_water_id, high_water_seq, _block_3) =
-        chain_with_pruned_asset(asset).await;
+    let (chain, high_water_id, high_water_seq, _block_3) = chain_with_pruned_asset(asset).await;
 
     // The local stamp path takes the SAME tombstone fallback as the receive
     // path: a local write for a pruned asset CONTINUES its chain rather than
@@ -516,9 +518,7 @@ async fn s3_2_f1_index_rebuild_equality_still_holds_across_a_prune() {
     let (chain, _id, _seq, _b3) = chain_with_pruned_asset(asset).await;
 
     let incremental = chain.asset_index_snapshot().await;
-    let rebuilt = blockmatrix::blockchain::AssetChainIndex::rebuild(
-        chain.get_chain().await.iter(),
-    );
+    let rebuilt = blockmatrix::blockchain::AssetChainIndex::rebuild(chain.get_chain().await.iter());
     assert_eq!(
         incremental, rebuilt,
         "S3.1 rebuild == incremental must still hold after a prune",
@@ -565,7 +565,10 @@ async fn s3_2_f5_sequence_overflow_fails_closed_instead_of_wrapping() {
     normal.set_asset_lineage(Some(hex::encode([0x11u8; 32])), 41);
     let mut next = local_entry(asset);
     next.set_asset_lineage(Some(normal.lineage_id()), 42);
-    assert!(next.succeeds(&normal), "sanity: 41 → 42 is a valid successor");
+    assert!(
+        next.succeeds(&normal),
+        "sanity: 41 → 42 is a valid successor"
+    );
 
     // `AssetLineage::verify` and `check_entry_lineage` carry the same
     // `checked_add`. Their overflow arms are defense-in-depth rather than
@@ -673,10 +676,8 @@ async fn s3_2_f2_a_lineage_rejection_is_visible_at_the_default_log_level() {
         });
     });
 
-    let captured = String::from_utf8_lossy(
-        &sink.lock().expect("test: log sink").clone(),
-    )
-    .to_string();
+    let captured =
+        String::from_utf8_lossy(&sink.lock().expect("test: log sink").clone()).to_string();
 
     assert!(
         captured.contains("Dropping orphan block 3"),

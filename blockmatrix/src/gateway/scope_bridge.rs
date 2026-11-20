@@ -277,9 +277,7 @@ impl ScopeBridge {
             .await
             .map_err(|e| GatewayError::ProofValidationFailed {
                 scope: "blockchain".to_string(),
-                reason: format!(
-                    "state proof generation for transfer {transfer_id}: {e}"
-                ),
+                reason: format!("state proof generation for transfer {transfer_id}: {e}"),
             })?;
         let registration = crate::assets::core::AssetRegistration::from_asset_data(
             &crate::assets::core::asset_id::AssetData {
@@ -303,12 +301,12 @@ impl ScopeBridge {
             registration,
         );
 
-        bc.add_block(vec![block_entry]).await.map_err(|e| {
-            GatewayError::ProofValidationFailed {
+        bc.add_block(vec![block_entry])
+            .await
+            .map_err(|e| GatewayError::ProofValidationFailed {
                 scope: "blockchain".to_string(),
                 reason: format!("failed to write {} entry: {}", label, e),
-            }
-        })?;
+            })?;
 
         info!(
             "Transfer {} entry written to blockchain for {}",
@@ -347,12 +345,11 @@ impl ScopeBridge {
             locked_at: chrono::Utc::now().timestamp(),
             proof_hash: *blake3::hash(b"transfer-lock-proof").as_bytes(),
         };
-        let entry_bytes = serde_json::to_vec(&lock_entry).map_err(|e| {
-            GatewayError::ProofValidationFailed {
+        let entry_bytes =
+            serde_json::to_vec(&lock_entry).map_err(|e| GatewayError::ProofValidationFailed {
                 scope: "serialization".to_string(),
                 reason: format!("serialize lock: {e}"),
-            }
-        })?;
+            })?;
         self.write_transfer_entry(&entry_bytes, "lock", transfer_id)
             .await?;
 
@@ -407,10 +404,7 @@ impl ScopeBridge {
                     .send_shard(target_node, &shard.shard_id, &shard.data)
                     .await
                     .map_err(|e| {
-                        warn!(
-                            "Shard transport failed for transfer {}: {}",
-                            transfer_id, e
-                        );
+                        warn!("Shard transport failed for transfer {}: {}", transfer_id, e);
                         GatewayError::ProofValidationFailed {
                             scope: "transport".to_string(),
                             reason: format!("Shard send failed: {e}"),
@@ -462,12 +456,11 @@ impl ScopeBridge {
             registered_at: chrono::Utc::now().timestamp(),
             proof_hash: *blake3::hash(b"transfer-registration-proof").as_bytes(),
         };
-        let entry_bytes = serde_json::to_vec(&reg_entry).map_err(|e| {
-            GatewayError::ProofValidationFailed {
+        let entry_bytes =
+            serde_json::to_vec(&reg_entry).map_err(|e| GatewayError::ProofValidationFailed {
                 scope: "serialization".to_string(),
                 reason: format!("serialize registration: {e}"),
-            }
-        })?;
+            })?;
         self.write_transfer_entry(&entry_bytes, "registration", transfer_id)
             .await?;
 

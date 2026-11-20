@@ -149,10 +149,7 @@ impl NodeBlockchain {
     /// cannot be re-indexed. A local append that collides with a concurrently
     /// received block still returns a real error to its caller — never a
     /// silent drop.
-    pub async fn add_block(
-        &self,
-        mut entries: Vec<BlockAssetEntry>,
-    ) -> Result<Block, String> {
+    pub async fn add_block(&self, mut entries: Vec<BlockAssetEntry>) -> Result<Block, String> {
         if entries.is_empty() {
             return Err("Cannot add block with zero entries".to_string());
         }
@@ -172,9 +169,7 @@ impl NodeBlockchain {
             // this is byte-identical to the pre-D4 single-bar call.
             self.state_proof_validator
                 .validate(&entry.state_proof, &entry.registration.network_scope)
-                .map_err(|e| {
-                    format!("State proof validation failed for entry {i}: {e}")
-                })?;
+                .map_err(|e| format!("State proof validation failed for entry {i}: {e}"))?;
         }
 
         // FIX 2 — head reservation. Everything from here to the insert must be
@@ -206,9 +201,9 @@ impl NodeBlockchain {
         //     (dev/test/library) leave `signed_proof = None`.
         if let Some(signer) = self.signer.as_ref() {
             for (i, entry) in entries.iter_mut().enumerate() {
-                entry.sign_proof(signer.as_ref()).map_err(|e| {
-                    format!("Failed to FALCON-sign proof for entry {i}: {e}")
-                })?;
+                entry
+                    .sign_proof(signer.as_ref())
+                    .map_err(|e| format!("Failed to FALCON-sign proof for entry {i}: {e}"))?;
             }
         }
 
@@ -236,10 +231,7 @@ impl NodeBlockchain {
 
         info!(
             "Added block #{} to node ({},{},{}) chain",
-            new_index,
-            self.node_coordinate.x,
-            self.node_coordinate.y,
-            self.node_coordinate.z,
+            new_index, self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z,
         );
 
         Ok(new_block)
@@ -260,10 +252,7 @@ impl NodeBlockchain {
     ///
     /// Called under the head reservation (`append_lock`), so the head this
     /// reads cannot move before the block is inserted.
-    async fn stamp_asset_lineage(
-        &self,
-        entries: &mut [BlockAssetEntry],
-    ) -> Result<(), String> {
+    async fn stamp_asset_lineage(&self, entries: &mut [BlockAssetEntry]) -> Result<(), String> {
         use std::collections::HashMap;
 
         // asset_hash -> (lineage_id, asset_seq) of the last entry stamped for
@@ -273,15 +262,16 @@ impl NodeBlockchain {
         for entry in entries.iter_mut() {
             let predecessor = match in_block.get(&entry.asset_hash) {
                 Some(previous) => Some(previous.clone()),
-                None => self.asset_lineage_head(&entry.asset_hash).await.map_err(
-                    |locator| {
+                None => self
+                    .asset_lineage_head(&entry.asset_hash)
+                    .await
+                    .map_err(|locator| {
                         format!(
                             "asset head at block {} entry {} is no longer held in full \
                              — refusing to append without its lineage",
                             locator.block_index, locator.entry_ix,
                         )
-                    },
-                )?,
+                    })?,
             };
 
             match predecessor {
@@ -339,7 +329,10 @@ impl NodeBlockchain {
         for (i, entry) in block.entries.iter().enumerate() {
             let expected = match seen.get(&entry.asset_hash) {
                 Some(previous) => Some(previous.clone()),
-                None => self.recorded_asset_head(&entry.asset_hash, block.index, i).await?,
+                None => {
+                    self.recorded_asset_head(&entry.asset_hash, block.index, i)
+                        .await?
+                }
             };
 
             check_entry_lineage(entry, expected, block.index, i)?;
@@ -368,13 +361,15 @@ impl NodeBlockchain {
         block_index: u64,
         entry_ix: usize,
     ) -> Result<Option<(String, u64)>, String> {
-        self.asset_lineage_head(asset_hash).await.map_err(|locator| {
-            format!(
-                "Block {block_index} entry {entry_ix}: our head for this asset (block {}) \
+        self.asset_lineage_head(asset_hash)
+            .await
+            .map_err(|locator| {
+                format!(
+                    "Block {block_index} entry {entry_ix}: our head for this asset (block {}) \
                  is no longer held in full — cannot verify lineage, mirror rejected",
-                locator.block_index,
-            )
-        })
+                    locator.block_index,
+                )
+            })
     }
 
     /// Create an asset from raw data and add it as a block.
@@ -458,13 +453,13 @@ impl NodeBlockchain {
         // the exact same standard as an announced one.
         for (i, entry) in block.entries.iter().enumerate() {
             // (a) proof_hash integrity: hπ == BLAKE3(serialize(state_proof)).
-            let proof_bytes = serde_json::to_vec(&entry.state_proof).map_err(|e| {
+            let proof_bytes = entry.state_proof.to_bytes().map_err(|e| {
                 format!(
                     "Block {} entry {i} proof serialization failed — mirror rejected: {e}",
                     block.index,
                 )
             })?;
-            let computed_hash: [u8; 32] = blake3::hash(&proof_bytes).into();
+            let computed_hash: [u8; 32] = *blake3::hash(&proof_bytes).as_bytes();
             if computed_hash != entry.proof_hash {
                 return Err(format!(
                     "Block {} entry {i} proof_hash mismatch \
@@ -493,10 +488,10 @@ impl NodeBlockchain {
             // applies exactly `proof.validate()` (structural only), NOT the
             // freshness gate, so a historical block replayed from a sync pool
             // with a stale WHEN offset is not newly rejected.
-            match self.state_proof_validator.validate_received(
-                &entry.state_proof,
-                &entry.registration.network_scope,
-            ) {
+            match self
+                .state_proof_validator
+                .validate_received(&entry.state_proof, &entry.registration.network_scope)
+            {
                 Ok(true) => {}
                 _ => {
                     return Err(format!(
@@ -613,9 +608,8 @@ impl NodeBlockchain {
             let now = std::time::Instant::now();
 
             // 1. TTL sweep: drop orphans whose predecessor never showed up.
-            orphans.retain(|_, (_, arrived)| {
-                now.duration_since(*arrived) < super::chain::ORPHAN_TTL
-            });
+            orphans
+                .retain(|_, (_, arrived)| now.duration_since(*arrived) < super::chain::ORPHAN_TTL);
 
             // 2. Capacity cap: if still full and this is a NEW key, evict the
             //    oldest buffered orphan to make room. (Re-buffering an existing
@@ -698,8 +692,10 @@ impl NodeBlockchain {
             let orphan_hash = orphan.hash.clone();
             match self.insert_block(orphan).await {
                 Ok(()) => {
-                    info!("Linked buffered orphan into chain (prev={})",
-                        &parent_hash[..16.min(parent_hash.len())]);
+                    info!(
+                        "Linked buffered orphan into chain (prev={})",
+                        &parent_hash[..16.min(parent_hash.len())]
+                    );
                     parent_hash = orphan_hash;
                 }
                 Err(e) => {
@@ -721,9 +717,7 @@ impl NodeBlockchain {
     ) -> Result<Block, String> {
         info!(
             "Registering asset on blockchain at ({},{},{})",
-            self.node_coordinate.x,
-            self.node_coordinate.y,
-            self.node_coordinate.z,
+            self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z,
         );
 
         let asset_hash = registration.content_hash;
@@ -752,9 +746,7 @@ impl NodeBlockchain {
     ) -> Result<Block, String> {
         info!(
             "Registering DNS asset on blockchain at ({},{},{})",
-            self.node_coordinate.x,
-            self.node_coordinate.y,
-            self.node_coordinate.z,
+            self.node_coordinate.x, self.node_coordinate.y, self.node_coordinate.z,
         );
 
         let asset_hash = registration.content_hash;
@@ -809,9 +801,8 @@ impl NodeBlockchain {
     ) -> Result<Block, String> {
         use crate::assets::core::{AssetCategory, AssetData, BaseSystemType};
 
-        let entry_bytes = serde_json::to_vec(entry).map_err(|e| {
-            format!("Failed to serialize key rotation entry: {e}")
-        })?;
+        let entry_bytes = serde_json::to_vec(entry)
+            .map_err(|e| format!("Failed to serialize key rotation entry: {e}"))?;
 
         // The rotation registration is metadata (category + scope) for a NEW
         // entry in an EXISTING asset's chain; its own content hash is unused as
@@ -869,12 +860,7 @@ impl NodeBlockchain {
             .into_iter()
             .map(|reg| {
                 let asset_hash = reg.content_hash;
-                BlockAssetEntry::new_bound(
-                    asset_hash,
-                    state_proof,
-                    StoragePointer::Genesis,
-                    reg,
-                )
+                BlockAssetEntry::new_bound(asset_hash, state_proof, StoragePointer::Genesis, reg)
             })
             .collect();
 
@@ -956,10 +942,7 @@ mod tests {
         // use it directly so the signed-to-content binding stays intact.
         let entry = test_entry(coord);
 
-        let block = chain
-            .add_block(vec![entry])
-            .await
-            .expect("test: add_block");
+        let block = chain.add_block(vec![entry]).await.expect("test: add_block");
         assert_eq!(block.index, 1);
         assert_eq!(block.entries.len(), 1);
     }
@@ -1089,9 +1072,11 @@ mod tests {
         // attack — a valid proof for asset A replayed against asset B.
         let reg = AssetRegistration::genesis(coord);
         let asset_b = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
-        let (proof_for_a, _) =
-            crate::blockchain::block::bind_proof_to_asset(&[0xAAu8; 32], &StateProof::new_for_testing());
-        let proof_bytes = serde_json::to_vec(&proof_for_a).unwrap_or_default();
+        let (proof_for_a, _) = crate::blockchain::block::bind_proof_to_asset(
+            &[0xAAu8; 32],
+            &StateProof::new_for_testing(),
+        );
+        let proof_bytes = proof_for_a.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         let forged = BlockAssetEntry {
             asset_hash: asset_b,
@@ -1153,20 +1138,21 @@ mod tests {
         let asset_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let mut bad_proof = StateProof::new_for_testing();
         bad_proof.stake_proof.stake_holder_id = String::new(); // CANONICAL: empty identity invalidates PoStake (authorization, not amount)
-        let entry = BlockAssetEntry::new_bound(
-            asset_hash,
-            &bad_proof,
-            StoragePointer::Genesis,
-            reg,
-        );
+        let entry =
+            BlockAssetEntry::new_bound(asset_hash, &bad_proof, StoragePointer::Genesis, reg);
         // Sanity: the proof really is invalid.
-        assert!(!entry.state_proof.validate(), "test setup: proof must be invalid");
+        assert!(
+            !entry.state_proof.validate(),
+            "test setup: proof must be invalid"
+        );
         let block = Block::new(1, vec![entry], genesis.hash.clone());
 
         let result = chain.insert_received_block(block).await;
         assert!(result.is_err(), "invalid state proof must be rejected");
         assert!(
-            result.unwrap_err().contains("state proof validation failed"),
+            result
+                .unwrap_err()
+                .contains("state proof validation failed"),
             "error should cite state proof validation failure",
         );
         assert_eq!(chain.get_height().await, 0, "chain must be untouched");
@@ -1215,7 +1201,11 @@ mod tests {
             .insert_received_block(block2.clone())
             .await
             .expect("test: orphan buffering returns Ok");
-        assert_eq!(chain.get_height().await, 0, "block2 must NOT be in the chain yet");
+        assert_eq!(
+            chain.get_height().await,
+            0,
+            "block2 must NOT be in the chain yet"
+        );
         assert!(chain.get_block(2).await.is_none(), "orphan not inserted");
 
         // Now deliver block1 — verified linkage → insert, then drain block2.
@@ -1224,11 +1214,12 @@ mod tests {
             .await
             .expect("test: honest block1 accepted");
 
-        assert_eq!(chain.get_height().await, 2, "orphan block2 linked after block1");
         assert_eq!(
-            chain.get_block(1).await.expect("test: block1"),
-            block1,
+            chain.get_height().await,
+            2,
+            "orphan block2 linked after block1"
         );
+        assert_eq!(chain.get_block(1).await.expect("test: block1"), block1,);
         assert_eq!(
             chain.get_block(2).await.expect("test: block2 linked"),
             block2,
@@ -1259,8 +1250,7 @@ mod tests {
         for i in 0..flood {
             // Unique 64-hex previous_hash per block → distinct orphan keys.
             let fake_prev = format!("{i:064x}");
-            let orphan =
-                Block::new(9_000_000 + i as u64, vec![flood_entry.clone()], fake_prev);
+            let orphan = Block::new(9_000_000 + i as u64, vec![flood_entry.clone()], fake_prev);
             chain
                 .insert_received_block(orphan)
                 .await
@@ -1273,7 +1263,11 @@ mod tests {
             "orphan buffer must stay bounded (<= {MAX_ORPHANS}), got {count}"
         );
         // Nothing was spliced into the actual chain.
-        assert_eq!(chain.get_height().await, 0, "flood must not touch the chain");
+        assert_eq!(
+            chain.get_height().await,
+            0,
+            "flood must not touch the chain"
+        );
 
         // Buffer-then-link STILL works: deliver a valid block2 (orphan), then
         // its verified predecessor block1 → block2 gets drained and linked.
@@ -1285,7 +1279,10 @@ mod tests {
             .insert_received_block(block2.clone())
             .await
             .expect("test: orphan buffering returns Ok");
-        assert!(chain.get_block(2).await.is_none(), "block2 buffered, not inserted");
+        assert!(
+            chain.get_block(2).await.is_none(),
+            "block2 buffered, not inserted"
+        );
 
         chain
             .insert_received_block(block1.clone())
@@ -1297,7 +1294,10 @@ mod tests {
             2,
             "buffer-then-link must still work after a flood"
         );
-        assert_eq!(chain.get_block(2).await.expect("test: block2 linked"), block2);
+        assert_eq!(
+            chain.get_block(2).await.expect("test: block2 linked"),
+            block2
+        );
         assert!(chain.validate_chain().await, "linked chain must validate");
     }
 
@@ -1315,7 +1315,11 @@ mod tests {
         // The very first orphan we insert (oldest) must be the first evicted
         // once the buffer overflows.
         let oldest_prev = format!("{:064x}", 0xAAAA_u64);
-        let oldest = Block::new(8_000_000, vec![signed_test_entry(coord)], oldest_prev.clone());
+        let oldest = Block::new(
+            8_000_000,
+            vec![signed_test_entry(coord)],
+            oldest_prev.clone(),
+        );
         chain
             .insert_received_block(oldest)
             .await
@@ -1327,8 +1331,7 @@ mod tests {
         let fill_entry = signed_test_entry(coord);
         for i in 0..MAX_ORPHANS {
             let fake_prev = format!("{:064x}", 0x1_0000_u64 + i as u64);
-            let orphan =
-                Block::new(8_100_000 + i as u64, vec![fill_entry.clone()], fake_prev);
+            let orphan = Block::new(8_100_000 + i as u64, vec![fill_entry.clone()], fake_prev);
             chain
                 .insert_received_block(orphan)
                 .await
@@ -1361,7 +1364,9 @@ mod tests {
 
         let entry = signed_test_entry(coord);
         // Sanity: the envelope verifies and binds to its author.
-        let pubkey = entry.verify_signed_proof().expect("test: envelope verifies");
+        let pubkey = entry
+            .verify_signed_proof()
+            .expect("test: envelope verifies");
         assert_eq!(
             blake3::hash(&pubkey).to_hex().to_string(),
             entry.state_proof.stake_proof.stake_holder_id,
@@ -1445,7 +1450,10 @@ mod tests {
 
         // The signature itself is valid (B really signed), so verify_signed_proof
         // succeeds; the accept path must reject on the author binding.
-        assert!(entry.verify_signed_proof().is_ok(), "B's signature is valid");
+        assert!(
+            entry.verify_signed_proof().is_ok(),
+            "B's signature is valid"
+        );
 
         let block = Block::new(1, vec![entry], genesis.hash.clone());
         let result = chain.insert_received_block(block).await;
@@ -1474,6 +1482,10 @@ mod tests {
         std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
 
         result.expect("test: compat flag must accept a legacy unsigned block");
-        assert_eq!(chain.get_height().await, 1, "legacy block accepted under flag");
+        assert_eq!(
+            chain.get_height().await,
+            1,
+            "legacy block accepted under flag"
+        );
     }
 }

@@ -491,12 +491,8 @@ impl StoqTransportLayer {
                 // Accept the announcement; DHT layer stores on Ack
                 ResponseData::Ack
             }
-            RequestType::SearchPackages(ref _query) => {
-                ResponseData::SearchResults(Vec::new())
-            }
-            RequestType::GetPeers => {
-                ResponseData::Peers(Vec::new())
-            }
+            RequestType::SearchPackages(ref _query) => ResponseData::SearchResults(Vec::new()),
+            RequestType::GetPeers => ResponseData::Peers(Vec::new()),
             RequestType::Ping => ResponseData::Ack,
         }
     }

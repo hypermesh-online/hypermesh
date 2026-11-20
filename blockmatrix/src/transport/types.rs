@@ -104,12 +104,7 @@ mod tests {
     #[test]
     fn peer_identity_to_node_id_roundtrip() {
         let bytes = [0xAB; 32];
-        let peer = PeerIdentity::new(
-            "test-peer".into(),
-            bytes,
-            Ipv6Addr::LOCALHOST,
-            Vec::new(),
-        );
+        let peer = PeerIdentity::new("test-peer".into(), bytes, Ipv6Addr::LOCALHOST, Vec::new());
         let node_id = peer.to_node_id();
         assert_eq!(node_id.as_bytes(), &bytes);
     }

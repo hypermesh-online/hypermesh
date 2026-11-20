@@ -44,26 +44,7 @@ impl RoutingTable {
     }
 
     pub(crate) fn add_node(&mut self, node: NodeInfo) {
-        let bucket_idx = Self::bucket_for_key(&DhtNodeId { id: [0u8; 32] }, &node.id);
-        let bucket = &mut self.buckets[bucket_idx];
-
-        // Check if node already exists -- update last_seen
-        if let Some(existing) = bucket.nodes.iter_mut().find(|n| n.id == node.id) {
-            existing.last_seen = node.last_seen;
-            existing.rtt = node.rtt;
-            return;
-        }
-
-        // Add new node
-        if bucket.nodes.len() < self.config.k {
-            bucket.nodes.push(node);
-        } else {
-            // Bucket full, add to replacements
-            bucket.replacements.push(node);
-            if bucket.replacements.len() > self.config.k {
-                bucket.replacements.remove(0);
-            }
-        }
+        self.add_node_with_local_id(&DhtNodeId { id: [0u8; 32] }, node);
     }
 
     pub(crate) fn add_node_with_local_id(&mut self, local_id: &DhtNodeId, node: NodeInfo) {

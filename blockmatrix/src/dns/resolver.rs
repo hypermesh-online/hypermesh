@@ -331,7 +331,10 @@ impl DnsResolver {
             });
         }
 
-        let proof = query.proof.as_ref().expect("proof required for federated domain resolution");
+        let proof = query
+            .proof
+            .as_ref()
+            .expect("proof required for federated domain resolution");
 
         // Validate access with proof
         let validation = self
@@ -388,7 +391,10 @@ impl DnsResolver {
 
         while let Some(parent_domain) = current {
             let parent_name = parent_domain.full.clone();
-            let network_id = derive_network_id(&parent_name);
+            // The federated DNS pools + `DnsResolutionTier` are keyed by the
+            // network's wire string; render the derived `NetworkId` to its
+            // canonical hex here (byte-identical to the pre-retype value).
+            let network_id = derive_network_id(&parent_name).to_string();
 
             debug!(
                 "Hierarchical walk: trying parent '{}' (network {})",
@@ -430,10 +436,10 @@ impl DnsResolver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dns::DnsRecordData;
     use crate::proof_of_state::proof_of_state_integration::{
         SpaceProof, StakeProof, TimeProof, WorkProof,
     };
-    use crate::dns::DnsRecordData;
     use std::net::Ipv6Addr;
     use std::time::Duration;
 
@@ -451,7 +457,12 @@ mod tests {
         let stake = StakeProof::new("holder".to_string(), "holder-id".to_string());
         let time = TimeProof::new(Duration::from_secs(10));
         let space = SpaceProof::new("node".to_string(), "/storage".to_string(), 1024 * 1024);
-        let work = WorkProof::new("owner".to_string(), "workload".to_string(), *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes()).as_bytes());
+        let work = WorkProof::new(
+            "owner".to_string(),
+            "workload".to_string(),
+            *blake3::hash(format!("{}:{}", "owner".to_string(), "workload".to_string()).as_bytes())
+                .as_bytes(),
+        );
 
         StateProof::new(stake, time, space, work)
     }
@@ -470,7 +481,10 @@ mod tests {
 
         // Register public record
         let record = create_test_record("nike");
-        pool_manager.register_public(record).await.expect("test: async operation");
+        pool_manager
+            .register_public(record)
+            .await
+            .expect("test: async operation");
 
         // Query
         let query = DnsQuery {
@@ -481,7 +495,10 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.expect("test: async operation");
+        let response = resolver
+            .resolve(query)
+            .await
+            .expect("test: async operation");
         assert_eq!(response.tier, DnsResolutionTier::Public);
         assert_eq!(response.records.len(), 1);
     }
@@ -506,7 +523,10 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.expect("test: async operation");
+        let response = resolver
+            .resolve(query)
+            .await
+            .expect("test: async operation");
         assert!(matches!(response.tier, DnsResolutionTier::Federated { .. }));
         assert_eq!(response.records.len(), 1);
     }
@@ -523,7 +543,10 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response = resolver.resolve(query).await.expect("test: async operation");
+        let response = resolver
+            .resolve(query)
+            .await
+            .expect("test: async operation");
         assert_eq!(response.tier, DnsResolutionTier::P2PDirect);
         assert_eq!(response.records.len(), 0); // P2P returns empty
     }
@@ -534,7 +557,10 @@ mod tests {
 
         // Register and query once
         let record = create_test_record("nike");
-        pool_manager.register_public(record).await.expect("test: async operation");
+        pool_manager
+            .register_public(record)
+            .await
+            .expect("test: async operation");
 
         let query = DnsQuery {
             domain: Domain::parse("nike").expect("test: expected success"),
@@ -544,11 +570,17 @@ mod tests {
             timestamp: SystemTime::now(),
         };
 
-        let response1 = resolver.resolve(query.clone()).await.expect("test: async operation");
+        let response1 = resolver
+            .resolve(query.clone())
+            .await
+            .expect("test: async operation");
         assert!(!response1.from_cache);
 
         // Second query should hit cache
-        let response2 = resolver.resolve(query).await.expect("test: async operation");
+        let response2 = resolver
+            .resolve(query)
+            .await
+            .expect("test: async operation");
         assert!(response2.from_cache);
     }
 
@@ -562,8 +594,9 @@ mod tests {
         let resolver = DnsResolver::new(pool_manager.clone(), validator, cache)
             .with_domain_registry(domain_registry);
 
-        // Register a record in the parent domain's pool (keyed by network_id)
-        let parent_network_id = crate::dns::domain::derive_network_id("hypermesh");
+        // Register a record in the parent domain's pool (keyed by network_id
+        // wire string, matching the hierarchical walk's `derive_network_id(..).to_string()`).
+        let parent_network_id = crate::dns::domain::derive_network_id("hypermesh").to_string();
         let record = create_test_record("host.hypermesh");
         pool_manager
             .register_federated(parent_network_id, record)

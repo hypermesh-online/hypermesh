@@ -169,10 +169,7 @@ fn test_wrong_recipient_key_fails() {
 
     // Bob tries to decrypt with his own secret key -- must fail
     let result = msg.decrypt_body(bob_sk.as_bytes());
-    assert!(
-        result.is_err(),
-        "decrypting with wrong key must fail"
-    );
+    assert!(result.is_err(), "decrypting with wrong key must fail");
 }
 
 // -----------------------------------------------------------------------

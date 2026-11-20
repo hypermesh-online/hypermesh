@@ -11,7 +11,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::assets::core::{AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope};
+use crate::assets::core::{
+    AssetCategory, AssetData, AssetRegistration, BaseSystemType, NetworkScope,
+};
 use crate::dashboard::deploy;
 use crate::ipc::handler::RequestHandler;
 use crate::ipc::protocol::{RpcError, INTERNAL_ERROR, INVALID_PARAMS};
@@ -61,18 +63,19 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     })?
                     .to_string();
 
-                let files_obj = params
-                    .get("files")
-                    .and_then(|v| v.as_object())
-                    .ok_or_else(|| RpcError {
-                        code: INVALID_PARAMS,
-                        message: "missing 'files' parameter (object)".into(),
-                        data: None,
-                    })?;
+                let files_obj =
+                    params
+                        .get("files")
+                        .and_then(|v| v.as_object())
+                        .ok_or_else(|| RpcError {
+                            code: INVALID_PARAMS,
+                            message: "missing 'files' parameter (object)".into(),
+                            data: None,
+                        })?;
 
                 // Validate manifest
-                let manifest = crate::dashboard::parse_manifest(&manifest_toml)
-                    .map_err(|e| RpcError {
+                let manifest =
+                    crate::dashboard::parse_manifest(&manifest_toml).map_err(|e| RpcError {
                         code: INVALID_PARAMS,
                         message: format!("invalid manifest: {e}"),
                         data: None,
@@ -131,13 +134,12 @@ fn register_deploy(handler: &mut RequestHandler, state: &Arc<DaemonState>) {
                     })?;
 
                 // Store bundle in asset store (keyed by blockchain content hash)
-                deploy::store_dashboard_bundle(
-                    &s.data_dir, &content_hash, &manifest_toml, &bundle,
-                ).map_err(|e| RpcError {
-                    code: INTERNAL_ERROR,
-                    message: format!("failed to store dashboard bundle: {e}"),
-                    data: None,
-                })?;
+                deploy::store_dashboard_bundle(&s.data_dir, &content_hash, &manifest_toml, &bundle)
+                    .map_err(|e| RpcError {
+                        code: INTERNAL_ERROR,
+                        message: format!("failed to store dashboard bundle: {e}"),
+                        data: None,
+                    })?;
 
                 Ok(serde_json::json!({
                     "status": "deployed",
@@ -292,12 +294,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "dash-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir,
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -345,10 +347,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "dashboard.info",
-            serde_json::json!({"name": "nonexistent"}),
-        );
+        let req = RpcRequest::new("dashboard.info", serde_json::json!({"name": "nonexistent"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");
@@ -377,8 +376,7 @@ mod tests {
         register(&mut handler, &state);
 
         use base64::Engine as _;
-        let b64_html = base64::engine::general_purpose::STANDARD
-            .encode(b"<h1>hello</h1>");
+        let b64_html = base64::engine::general_purpose::STANDARD.encode(b"<h1>hello</h1>");
 
         let req = RpcRequest::new(
             "dashboard.deploy",
@@ -399,11 +397,7 @@ public = "dist/public/"
             }),
         );
         let resp = handler.dispatch(req).await;
-        assert!(
-            resp.error.is_none(),
-            "deploy failed: {:?}",
-            resp.error
-        );
+        assert!(resp.error.is_none(), "deploy failed: {:?}", resp.error);
         let result = resp.result.expect("test: result");
         assert_eq!(result["status"], "deployed");
         assert_eq!(result["name"], "my-dash");
@@ -421,10 +415,7 @@ public = "dist/public/"
         assert!(result["dashboards"][0]["block"].as_u64().is_some());
 
         // Info should return details (found by name via blockchain scan)
-        let req = RpcRequest::new(
-            "dashboard.info",
-            serde_json::json!({"name": "my-dash"}),
-        );
+        let req = RpcRequest::new("dashboard.info", serde_json::json!({"name": "my-dash"}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

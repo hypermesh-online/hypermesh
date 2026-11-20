@@ -165,12 +165,13 @@ impl WirePosHeader {
         b
     }
 
-    /// Deserialize from the 40-byte C layout. Returns `None` if too short.
-    ///
-    /// The reserved word at `[4..8]` is ignored on read — nothing in the
-    /// protocol derives meaning from it.
+    /// Deserialize from the 40-byte C layout. Returns `None` if too short
+    /// or if reserved bytes are non-zero.
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() < Self::SIZE {
+            return None;
+        }
+        if bytes[Self::RESERVED_RANGE].iter().any(|&b| b != 0) {
             return None;
         }
         let mut hash = [0u8; 32];

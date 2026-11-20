@@ -37,7 +37,9 @@ use crate::ca::trust_provider::PeerCertFingerprint;
 /// Errors raised by the threshold-signing coordinator.
 #[derive(thiserror::Error, Debug)]
 pub enum ThresholdError {
-    #[error("threshold-sign: federation has only {available} eligible peers, need at least {needed}")]
+    #[error(
+        "threshold-sign: federation has only {available} eligible peers, need at least {needed}"
+    )]
     NotEnoughPeers { available: usize, needed: usize },
     #[error("threshold-sign: only {received} valid shares before deadline (needed {needed})")]
     Timeout { received: usize, needed: usize },
@@ -173,8 +175,11 @@ impl ThresholdSignCoordinator {
         let needed = threshold as usize;
         let responses = match timeout(
             deadline,
-            self.transport
-                .await_responses(request_id, needed.saturating_sub(shares.len()), deadline),
+            self.transport.await_responses(
+                request_id,
+                needed.saturating_sub(shares.len()),
+                deadline,
+            ),
         )
         .await
         {
@@ -368,9 +373,6 @@ mod tests {
         let result = coordinator
             .sign([0xAB; 32], b"msg", 3, Duration::from_millis(50))
             .await;
-        assert!(matches!(
-            result,
-            Err(ThresholdError::NotEnoughPeers { .. })
-        ));
+        assert!(matches!(result, Err(ThresholdError::NotEnoughPeers { .. })));
     }
 }

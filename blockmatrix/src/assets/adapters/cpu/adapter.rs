@@ -14,8 +14,8 @@ use tokio::sync::RwLock;
 use crate::assets::core::{
     AdapterCapabilities, AdapterHealth, AssetAdapter, AssetAllocation, AssetAllocationRequest,
     AssetCategory, AssetData, AssetError, AssetRegistration, AssetResult, AssetState, AssetStatus,
-    AssetType, BaseSystemType, StateProof, CpuRequirements, CpuUsage, NetworkScope,
-    PrivacyMode, ProxyAddress, ResourceLimits, ResourceUsage,
+    AssetType, BaseSystemType, CpuRequirements, CpuUsage, NetworkScope, PrivacyMode, ProxyAddress,
+    ResourceLimits, ResourceUsage, StateProof,
 };
 use crate::os_integration::create_os_abstraction;
 
@@ -364,10 +364,7 @@ impl AssetAdapter for CpuAssetAdapter {
         &self,
         request: &AssetAllocationRequest,
     ) -> AssetResult<AssetAllocation> {
-        if !self
-            .validate_state_proof(&request.state_proof)
-            .await?
-        {
+        if !self.validate_state_proof(&request.state_proof).await? {
             return Err(AssetError::StateProofValidationFailed {
                 reason: "CPU allocation state proof validation failed".to_string(),
             });
@@ -460,8 +457,7 @@ impl AssetAdapter for CpuAssetAdapter {
                     crate::assets::core::privacy::ResourceAllocationConfig::default(),
                 concurrency_limits: crate::assets::core::privacy::ConcurrencyLimits::default(),
                 duration_config: crate::assets::core::privacy::DurationConfig::default(),
-                state_requirements:
-                    crate::assets::core::privacy::StateRequirements::default(),
+                state_requirements: crate::assets::core::privacy::StateRequirements::default(),
             },
             access_config: crate::assets::core::privacy::AccessConfig {
                 allowed_certificates: vec![request.certificate_fingerprint.clone()],

@@ -273,7 +273,8 @@ mod tests {
     fn test_config_serialization() {
         let config = HyperMeshTransportConfig::default();
         let yaml = serde_yaml::to_string(&config).expect("test: expected success");
-        let deserialized: HyperMeshTransportConfig = serde_yaml::from_str(&yaml).expect("test: expected success");
+        let deserialized: HyperMeshTransportConfig =
+            serde_yaml::from_str(&yaml).expect("test: expected success");
 
         assert_eq!(config.network_usage.port, deserialized.network_usage.port);
     }

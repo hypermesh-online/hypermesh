@@ -96,9 +96,7 @@ impl CatalogStoqApi {
         server.register_handler(Arc::new(TypePublishHandler {
             state: app_state.clone(),
         }));
-        server.register_handler(Arc::new(TypeLookupHandler {
-            state: app_state,
-        }));
+        server.register_handler(Arc::new(TypeLookupHandler { state: app_state }));
 
         info!("Catalog STOQ API handlers registered (8 endpoints)");
 
@@ -281,12 +279,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_handler_with_registry() {
-        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
         use crate::registry::asset_type::AssetTypeDefinition;
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use blockmatrix::assets::StateProof;
         use blockmatrix::proof_of_state::proof_of_state_integration::{
             SpaceProof, StakeProof, TimeProof, WorkProof,
         };
-        use blockmatrix::assets::StateProof;
         use hypermesh_lib::PrivacyMode;
 
         let registry = CatalogRegistry::new(
@@ -303,7 +301,9 @@ mod tests {
         let time = TimeProof::new(std::time::Duration::from_secs(10));
         let proof = StateProof::new(stake, time, space, work);
         let type_def = AssetTypeDefinition::new("GpuCompute".to_string(), schema, proof);
-        registry.register_type(type_def).await
+        registry
+            .register_type(type_def)
+            .await
             .expect("test: register type");
 
         let state = std::sync::Arc::new(CatalogAppState::with_registry(registry));
@@ -339,12 +339,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_package_with_registry() {
-        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
         use crate::registry::asset_type::AssetTypeDefinition;
+        use crate::registry::{CatalogRegistry, RegistryConfig, TrustPolicy};
+        use blockmatrix::assets::StateProof;
         use blockmatrix::proof_of_state::proof_of_state_integration::{
             SpaceProof, StakeProof, TimeProof, WorkProof,
         };
-        use blockmatrix::assets::StateProof;
         use hypermesh_lib::PrivacyMode;
 
         let registry = CatalogRegistry::new(
@@ -360,7 +360,9 @@ mod tests {
         let time = TimeProof::new(std::time::Duration::from_secs(10));
         let proof = StateProof::new(stake, time, space, work);
         let type_def = AssetTypeDefinition::new("MyPackage".to_string(), schema, proof);
-        registry.register_type(type_def).await
+        registry
+            .register_type(type_def)
+            .await
             .expect("test: register type");
 
         let state = std::sync::Arc::new(CatalogAppState::with_registry(registry));
@@ -378,7 +380,9 @@ mod tests {
             payload: Bytes::from(serde_json::to_vec(&req_body).expect("test: serialize")),
             metadata: HashMap::new(),
         };
-        let resp = handler.handle(api_req).await
+        let resp = handler
+            .handle(api_req)
+            .await
             .expect("test: package should be found");
         assert!(resp.success);
         let body: GetPackageResponse =

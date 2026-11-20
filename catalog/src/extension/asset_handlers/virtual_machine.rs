@@ -4,9 +4,9 @@
 
 use super::{
     async_trait, ApplicationDomain, Arc, AssetCategory, AssetCreationSpec, AssetData,
-    AssetExtensionHandler, ExtensionAssetRecord, AssetOperation, AssetQuery, AssetRegistration, AssetType,
-    AssetUpdate, StateProof, DeploymentResult, ExecutionResult, ExtensionError,
-    ExtensionResult, HashMap, NetworkScope, OperationResult, ResourceUsageReport, RwLock,
+    AssetExtensionHandler, AssetOperation, AssetQuery, AssetRegistration, AssetType, AssetUpdate,
+    DeploymentResult, ExecutionResult, ExtensionAssetRecord, ExtensionError, ExtensionResult,
+    HashMap, NetworkScope, OperationResult, ResourceUsageReport, RwLock, StateProof,
 };
 
 /// Handler for Virtual Machine assets (Lua, WASM, etc.)
@@ -237,10 +237,11 @@ impl AssetExtensionHandler for VirtualMachineHandler {
         }
         // PoSpace: CANONICAL MODEL — WHERE (location). Require a bound
         // location; capacity is descriptive and never gates admission.
-        if proof.space_proof.node_id.is_empty()
-            && proof.space_proof.storage_path.is_empty()
-        {
-            tracing::warn!("virtual_machine asset {}: PoSpace has no bound location", id);
+        if proof.space_proof.node_id.is_empty() && proof.space_proof.storage_path.is_empty() {
+            tracing::warn!(
+                "virtual_machine asset {}: PoSpace has no bound location",
+                id
+            );
             return Ok(false);
         }
         if proof.work_proof.work_hash == [0u8; 32] {

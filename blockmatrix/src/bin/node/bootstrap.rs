@@ -7,9 +7,9 @@
 use anyhow::{Context, Result};
 use tracing::{info, warn};
 
-use blockmatrix::bootstrap::{LocalhostCertificate, NodeBootstrap};
 use blockmatrix::blockchain::block::Block;
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
+use blockmatrix::bootstrap::{LocalhostCertificate, NodeBootstrap};
 use blockmatrix::create_os_abstraction;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
 use blockmatrix::persistence::{BlockQuery, PersistenceConfig, PersistenceManager};
@@ -221,8 +221,7 @@ pub(crate) async fn resume_node(
         NodeBootstrap::generate_fresh_certificate()?
     };
 
-    let bootstrap =
-        NodeBootstrap::resume(coord, blockchain, genesis_block, localhost_cert).await?;
+    let bootstrap = NodeBootstrap::resume(coord, blockchain, genesis_block, localhost_cert).await?;
     Ok((bootstrap, persistence))
 }
 
@@ -248,10 +247,9 @@ pub(crate) async fn fresh_boot(
     // hardware-asset registration re-loads it (idempotent `load_or_create`
     // reads the same persisted keys). D5: identity lives at the
     // coordinate-independent `identity_dir`, not under the data-dir key.
-    let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> =
-        std::sync::Arc::new(blockmatrix::identity::FalconIdentity::load_or_create(
-            identity_dir,
-        )?);
+    let signer: std::sync::Arc<dyn hypermesh_lib::NodeSigner + Send + Sync> = std::sync::Arc::new(
+        blockmatrix::identity::FalconIdentity::load_or_create(identity_dir)?,
+    );
 
     // S3.0/B1: the persistence manager is created BEFORE the chain so it can be
     // attached as the chain's durable block sink. Every runtime block then
@@ -309,8 +307,7 @@ pub(crate) async fn fresh_boot(
 
     // === R1/R10: Load identity and assess hardware for genesis asset registration ===
     // D5: identity lives at the coordinate-independent `identity_dir`.
-    let falcon_identity =
-        blockmatrix::identity::FalconIdentity::load_or_create(identity_dir)?;
+    let falcon_identity = blockmatrix::identity::FalconIdentity::load_or_create(identity_dir)?;
     info!(
         "Genesis identity: {}... (FALCON-1024 + Kyber-1024)",
         &falcon_identity.node_id[..16]

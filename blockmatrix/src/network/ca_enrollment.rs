@@ -153,9 +153,10 @@ fn convert_to_stoq_cert(
     // In production (Phase 5), the node would send a CSR and receive
     // back a cert signed with its own public key. For now, use the
     // CA-issued cert bytes directly with a matching ephemeral key.
-    let cert_key = rcgen::generate_simple_self_signed(vec![
-        format!("node-{}.hypermesh", &node_id[..16.min(node_id.len())]),
-    ])
+    let cert_key = rcgen::generate_simple_self_signed(vec![format!(
+        "node-{}.hypermesh",
+        &node_id[..16.min(node_id.len())]
+    )])
     .map_err(|e| anyhow!("Failed to generate cert keypair: {e}"))?;
 
     let cert_der = CertificateDer::from(issued.certificate_der.clone());
@@ -189,8 +190,7 @@ mod tests {
     fn test_build_cert_request() {
         let node_id = "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
         let state_proof = StateProof::new_for_testing();
-        let request = build_cert_request(node_id, state_proof)
-            .expect("test: build cert request");
+        let request = build_cert_request(node_id, state_proof).expect("test: build cert request");
         assert_eq!(request.common_name, "node-abcdef1234567890.hypermesh");
         assert_eq!(request.node_id, node_id);
         assert!(!request.san_entries.is_empty());
@@ -210,22 +210,18 @@ mod tests {
 
         // Create CA and issue cert
         let ca = create_local_ca(node_id).await.expect("test: create CA");
-        let request = build_cert_request(node_id, state_proof)
-            .expect("test: build request");
+        let request = build_cert_request(node_id, state_proof).expect("test: build request");
         let issued = ca
             .issue_certificate_local(request)
             .await
             .expect("test: issue cert");
 
         // Convert to STOQ cert
-        let stoq_cert = convert_to_stoq_cert(node_id, &issued)
-            .expect("test: convert cert");
+        let stoq_cert = convert_to_stoq_cert(node_id, &issued).expect("test: convert cert");
         assert_eq!(stoq_cert.node_id, node_id);
         assert!(stoq_cert.metadata.is_some());
 
-        let meta = String::from_utf8_lossy(
-            stoq_cert.metadata.as_ref().expect("test: metadata"),
-        );
+        let meta = String::from_utf8_lossy(stoq_cert.metadata.as_ref().expect("test: metadata"));
         assert!(meta.contains("TRUSTCHAIN:CA:serial="));
     }
 }

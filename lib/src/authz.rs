@@ -36,7 +36,9 @@ pub struct Owner {
 impl Owner {
     /// Create a new owner from an identity id.
     pub fn new(identity_id: impl Into<String>) -> Self {
-        Self { identity_id: identity_id.into() }
+        Self {
+            identity_id: identity_id.into(),
+        }
     }
 }
 
@@ -224,9 +226,7 @@ impl AuthorizationSet {
             return AuthDecision::Allowed;
         }
         let covered = self.grants.iter().any(|g| {
-            g.grantee == identity_id
-                && !g.is_expired(now)
-                && scope_covers(g.scope, scope)
+            g.grantee == identity_id && !g.is_expired(now) && scope_covers(g.scope, scope)
         });
         if covered {
             AuthDecision::Allowed
@@ -275,7 +275,10 @@ pub struct CapacityProfile {
 impl CapacityProfile {
     /// Total units advertised for `name`, if present.
     pub fn units(&self, name: &str) -> Option<u64> {
-        self.dimensions.iter().find(|d| d.name == name).map(|d| d.total_units)
+        self.dimensions
+            .iter()
+            .find(|d| d.name == name)
+            .map(|d| d.total_units)
     }
 }
 
@@ -341,7 +344,10 @@ mod tests {
         let (pk, sk) = falcon1024::keypair();
         let grant = sign_grant("owner-1", "grantee-1", GrantScope::Read, None, &pk, &sk);
         assert!(verify_grant(&grant), "well-formed grant must verify");
-        assert!(grant.proof_bytes_match(), "proof_bytes must equal canonical bytes");
+        assert!(
+            grant.proof_bytes_match(),
+            "proof_bytes must equal canonical bytes"
+        );
     }
 
     #[test]
@@ -370,9 +376,14 @@ mod tests {
     fn owner_allowed_non_grantee_denied() {
         let now = SystemTime::now();
         let set = AuthorizationSet::with_owner("owner-1");
-        assert!(set.decide("owner-1", GrantScope::Transfer, now).is_allowed());
+        assert!(set
+            .decide("owner-1", GrantScope::Transfer, now)
+            .is_allowed());
         assert!(
-            matches!(set.decide("stranger", GrantScope::Read, now), AuthDecision::Denied(_)),
+            matches!(
+                set.decide("stranger", GrantScope::Read, now),
+                AuthDecision::Denied(_)
+            ),
             "test: stranger must be denied"
         );
     }
@@ -389,7 +400,9 @@ mod tests {
         // Use grant covers Read and Use, not Transfer.
         assert!(set.decide("reader-1", GrantScope::Read, now).is_allowed());
         assert!(set.decide("reader-1", GrantScope::Use, now).is_allowed());
-        assert!(!set.decide("reader-1", GrantScope::Transfer, now).is_allowed());
+        assert!(!set
+            .decide("reader-1", GrantScope::Transfer, now)
+            .is_allowed());
     }
 
     #[test]
@@ -397,7 +410,14 @@ mod tests {
         let past = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000);
         let now = SystemTime::now();
         let (pk, sk) = falcon1024::keypair();
-        let grant = sign_grant("owner-1", "reader-1", GrantScope::Read, Some(past), &pk, &sk);
+        let grant = sign_grant(
+            "owner-1",
+            "reader-1",
+            GrantScope::Read,
+            Some(past),
+            &pk,
+            &sk,
+        );
         let set = AuthorizationSet {
             owners: vec![Owner::new("owner-1")],
             grants: vec![grant],
@@ -409,8 +429,14 @@ mod tests {
     fn capacity_profile_is_descriptive() {
         let profile = CapacityProfile {
             dimensions: vec![
-                CapacityDimension { name: "cpu_cores".into(), total_units: 8 },
-                CapacityDimension { name: "storage_bytes".into(), total_units: 1_000_000 },
+                CapacityDimension {
+                    name: "cpu_cores".into(),
+                    total_units: 8,
+                },
+                CapacityDimension {
+                    name: "storage_bytes".into(),
+                    total_units: 1_000_000,
+                },
             ],
         };
         assert_eq!(profile.units("cpu_cores"), Some(8));

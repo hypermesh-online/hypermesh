@@ -112,8 +112,7 @@ impl ReleaseFeedEntry {
         // Canonicalize binary_hashes as a sorted-key JSON object so the
         // signing and verifying paths produce byte-identical input.
         let sorted: BTreeMap<&String, &String> = self.binary_hashes.iter().collect();
-        let canonical_hashes = serde_json::to_string(&sorted)
-            .unwrap_or_else(|_| "{}".to_string());
+        let canonical_hashes = serde_json::to_string(&sorted).unwrap_or_else(|_| "{}".to_string());
         buf.extend_from_slice(canonical_hashes.as_bytes());
         buf.push(0u8);
         buf.extend_from_slice(&systime_to_secs_le(self.issued_at));
@@ -264,8 +263,7 @@ impl ReleaseFeedSubscriber {
             .values()
             .filter(|e| e.channel == channel)
             .max_by(|a, b| {
-                compare_versions(&a.version, &b.version)
-                    .then_with(|| a.issued_at.cmp(&b.issued_at))
+                compare_versions(&a.version, &b.version).then_with(|| a.issued_at.cmp(&b.issued_at))
             })
             .cloned()
     }
@@ -382,7 +380,8 @@ mod tests {
         let foundation = FalconIdentity::generate();
         let entry = fixture_entry("0.1.0", ReleaseChannel::Stable, &foundation);
         let sub = ReleaseFeedSubscriber::new();
-        sub.set_foundation_pubkey(foundation.public_key.clone()).await;
+        sub.set_foundation_pubkey(foundation.public_key.clone())
+            .await;
         assert!(sub.ingest(entry).await.is_ok());
         assert_eq!(sub.cached_count().await, 1);
     }

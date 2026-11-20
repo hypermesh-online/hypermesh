@@ -37,7 +37,6 @@ items = [
     # Metrics
     "Real certificate operation metrics (CAMetrics atomic counters: issued, revoked, latency)",
     "Real PoS bilateral verification on peer connections",
-    "PoS-gated CA certificate issuance",
     "CA federation with PoS-validated peers",
     "FALCON-1024 certificate signing in STOQ",
     # Threshold CA (L2) + Distributed CA (L3)
@@ -48,7 +47,6 @@ items = [
     # Phase F.1 — CA Federation Activation (2026-05-07)
     "ThresholdSignCoordinator — broadcasts share-request via FederationTransport, awaits t-of-n responses with deadline, calls reconstruct_and_sign for FALCON-1024 signature",
     "TrustSignalProvider trait — pluggable ngauge-driven trust gating in FederationManager.add_peer_with_proof",
-    "ngauge-gated TrustLevel demotion — peers with low ActivityScore/CapacityMetrics demoted to Conditional; ByzantineDetector flag forces Untrusted",
     "trustchain.request_cert IPC handler — routes through ThresholdSignCoordinator if federation in threshold mode, else local FALCON-1024 self-sign fallback",
     # Phase F.2 — OCSP + CRL Federation (2026-05-07)
     "OCSP HTTP/3 endpoint with federation fallback — POST /api/v1/trustchain/ocsp serves real OcspResponder; on local Unknown, falls back to FederationOcspTransport peer queries when attached",
@@ -70,6 +68,9 @@ items = [
 
 [features.in_development]
 items = [
+    # Reconciled against full-system audit 2026-07-30 — moved out of [working]
+    "PoS-gated CA certificate issuance — the TrustChain CA↔HyperMesh PoS validation loop is structurally disconnected (route mismatch): network-validated issuance always fails 'Handler not found', and the hypermesh_client cert handler is an always-valid echo stub with fabricated BFT metadata (W2-40), so the working claim overstated a loop that does not run",
+    "ngauge-gated TrustLevel demotion — the demotion logic exists but the ngauge trust_signals→FederationManager adapter is UNMOUNTED (W2-32), so federation peers are admitted with no behavioral gating",
     # CERTIFICATES: Dual cert model — rcgen X.509 for TLS (required by rustls/Quinn), FALCON for PoS identity
     "Post-quantum TLS signatures — FALCON not usable for X.509 cert signing (TLS 1.3 only supports RSA/ECDSA/EdDSA in rustls). QUIC key exchange IS post-quantum via X25519MLKEM768 (aws-lc-rs)",
     "Kyber-1024 KEM integration — type exists but not used in certificate operations",
@@ -90,6 +91,10 @@ items = [
 
 [features.planned]
 items = [
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Unify the four-proof validation bar (W2-45) — four-plus parallel four-proof validators with conflicting freshness thresholds and three distinct types named StateAuthenticator; the same proof is valid on one path and invalid on another. Resolve through the single D4 NetworkRuleSet seam",
+    "Delete dead PoS vestiges (W2-46/W2-47) — SignedStateProof (unused duplicate envelope with a lossy to_bytes().unwrap_or_default() conversion), the unused ProofOfState trait, integration shims, and asset_integration",
+    "WHEN-freshness threshold at the handshake trust boundary (W2-44) — inner-proof timestamps/network_time_offset are not bounded at admission; the one quantitative bound the canon allows is unenforced",
     "CRL distribution via blockchain (hash-linked blocks, delta CRLs)",
     "Cascading revocation across federated CAs",
     "Offline device grace period renewal",

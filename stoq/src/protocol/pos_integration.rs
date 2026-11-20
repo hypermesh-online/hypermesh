@@ -534,7 +534,9 @@ mod tests {
 
         assert!(result);
 
-        let stats = integration.get_connection_stats("conn1").expect("test: connection");
+        let stats = integration
+            .get_connection_stats("conn1")
+            .expect("test: connection");
         assert_eq!(stats.privacy_tier, PrivacyMode::PUBLIC);
         assert!(stats.has_pos_token);
     }

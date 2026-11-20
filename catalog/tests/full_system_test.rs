@@ -90,8 +90,7 @@ async fn test_registry_duplicate_type_fails() {
         schema.clone(),
         test_state_proof(),
     );
-    let type2 =
-        AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_state_proof());
+    let type2 = AssetTypeDefinition::new("DuplicateType".to_string(), schema, test_state_proof());
 
     registry.register_type(type1).await.unwrap();
     let result = registry.register_type(type2).await;
@@ -158,7 +157,8 @@ async fn test_registry_resolve_dependencies() {
     );
 
     let schema = json!({"type": "object"});
-    let type_def = AssetTypeDefinition::new("DepTest".to_string(), schema.clone(), test_state_proof());
+    let type_def =
+        AssetTypeDefinition::new("DepTest".to_string(), schema.clone(), test_state_proof());
     registry.register_type(type_def).await.unwrap();
 
     // Look up the typedef's content hash and resolve via the new API.
@@ -217,8 +217,7 @@ async fn test_registry_statistics() {
     );
 
     let schema = json!({"type": "object"});
-    let type_def =
-        AssetTypeDefinition::new("StatsTest".to_string(), schema, test_state_proof());
+    let type_def = AssetTypeDefinition::new("StatsTest".to_string(), schema, test_state_proof());
     registry.register_type(type_def).await.unwrap();
 
     let stats = registry.get_statistics().await;
@@ -250,8 +249,7 @@ fn test_type_definition_validate_valid_instance() {
 #[test]
 fn test_type_definition_validate_invalid_instance() {
     let schema = json!({"type": "object"});
-    let type_def =
-        AssetTypeDefinition::new("StrictType".to_string(), schema, test_state_proof());
+    let type_def = AssetTypeDefinition::new("StrictType".to_string(), schema, test_state_proof());
 
     // A string is not an object, so validation should fail
     let instance = json!("not an object");
@@ -301,8 +299,7 @@ fn test_type_definition_with_validation_rules() {
 #[test]
 fn test_type_definition_add_dependency() {
     let schema = json!({"type": "object"});
-    let mut type_def =
-        AssetTypeDefinition::new("WithDeps".to_string(), schema, test_state_proof());
+    let mut type_def = AssetTypeDefinition::new("WithDeps".to_string(), schema, test_state_proof());
 
     let base = hypermesh_lib::ContentHash::from_bytes(*blake3::hash(b"BaseType").as_bytes());
     let mixin = hypermesh_lib::ContentHash::from_bytes(*blake3::hash(b"MixinType").as_bytes());
@@ -525,8 +522,8 @@ fn test_dht_node_id_hex_display() {
 #[cfg(feature = "future-tests")]
 mod future_full_system_tests {
     use blockmatrix::assets::core::{AssetId, AssetManager, AssetType};
-    use blockmatrix::proof_of_state::{StateProof, ProofType};
     use blockmatrix::extensions::{Extension, ExtensionRequest, ExtensionResponse};
+    use blockmatrix::proof_of_state::{ProofType, StateProof};
     use catalog::{
         AssetLibrary, CatalogConfig, CatalogExtension, DistributionConfig, P2PNode, Package,
         PackageVersion, SecurityConfig, ValidationReport,

@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, SystemTime};
 
 use super::super::SharePermission;
-use crate::{PackageSpecMetadata, AssetRegistration};
+use crate::{AssetRegistration, PackageSpecMetadata};
 
 /// Asset index entry
 #[derive(Debug, Clone, Serialize, Deserialize)]

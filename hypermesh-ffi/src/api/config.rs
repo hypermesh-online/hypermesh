@@ -12,9 +12,7 @@ use std::os::raw::c_char;
 ///
 /// `client` must be a valid pointer returned by `hypermesh_connect`.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_config_show(
-    client: *mut HypermeshClientHandle,
-) -> *mut c_char {
+pub unsafe extern "C" fn hypermesh_config_show(client: *mut HypermeshClientHandle) -> *mut c_char {
     let h = match borrow_handle(client) {
         Some(h) => h,
         None => return std::ptr::null_mut(),
@@ -51,10 +49,7 @@ pub unsafe extern "C" fn hypermesh_config_get(
         None => return std::ptr::null_mut(),
     };
     let params = serde_json::json!({"key": key_str});
-    match h
-        .runtime
-        .block_on(h.client.raw_call("config.get", params))
-    {
+    match h.runtime.block_on(h.client.raw_call("config.get", params)) {
         Ok(val) => json_to_cstring(&val),
         Err(e) => {
             error_state::set_last_error(e.to_string());

@@ -39,6 +39,11 @@ pub mod sync_manager;
 pub mod sync_protocol;
 pub mod validation;
 
+pub use accept::{
+    chain_footprint_bytes, entry_footprint_bytes, AcceptReceipt, AcceptReject, PresentedAssetChain,
+    ReceivedAssetStore, StoreBound, MAX_RECEIVED_CHAINS, MAX_RECEIVED_CHAIN_ENTRIES,
+    MAX_RECEIVED_STORE_BYTES,
+};
 pub use asset_index::{AssetChainIndex, AssetEntryLocator, AssetHighWater};
 pub use attestations::{
     attestation_footprint_bytes, matrix_index_of, verify_attestation, MirrorAttestationPool,
@@ -48,11 +53,6 @@ pub use attestations::{
 pub use block::{Block, BlockHeader};
 pub use block_sink::BlockSink;
 pub use errors::{BlockchainError, PropagationError, Result, StateError};
-pub use accept::{
-    chain_footprint_bytes, entry_footprint_bytes, AcceptReceipt, AcceptReject, PresentedAssetChain,
-    ReceivedAssetStore, StoreBound, MAX_RECEIVED_CHAINS, MAX_RECEIVED_CHAIN_ENTRIES,
-    MAX_RECEIVED_STORE_BYTES,
-};
 pub use genesis_assessor::{
     GenesisAssessor, HardwareProbe, RealHardwareProbe, SyntheticHardwareProbe,
 };
@@ -62,8 +62,8 @@ pub use node_chain::{ChainStats, NodeBlockchain};
 pub use propagation::{
     BlockPropagator, BlockTransport, PropagationResult, PropagationStrategy, SimulatedTransport,
 };
-pub use stoq_transport::StoqBlockTransportAdapter;
 pub use state::{BlockQuery, ChainSnapshot, ChainStateManager, SortOrder, StorageStats};
+pub use stoq_transport::StoqBlockTransportAdapter;
 pub use sync_manager::{
     BlockProvider, NetworkMembership, NodeBlockchainBlockProvider, SyncConfig, SyncManager,
     SyncMessage, SyncObserver, SyncState,

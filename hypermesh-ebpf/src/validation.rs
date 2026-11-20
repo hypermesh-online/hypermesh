@@ -568,8 +568,14 @@ mod tests {
         let mut registry = std::collections::HashMap::new();
         let asset_id = [7u8; 32];
         registry.insert(hex::encode(asset_id), [9u8; 32]);
-        assert!(AssetHashValidator::validate_asset_in_registry(&asset_id, &registry));
-        assert!(!AssetHashValidator::validate_asset_in_registry(&[0u8; 32], &registry));
-        assert!(!AssetHashValidator::validate_asset_in_registry(&[8u8; 32], &registry));
+        assert!(AssetHashValidator::validate_asset_in_registry(
+            &asset_id, &registry
+        ));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &[0u8; 32], &registry
+        ));
+        assert!(!AssetHashValidator::validate_asset_in_registry(
+            &[8u8; 32], &registry
+        ));
     }
 }

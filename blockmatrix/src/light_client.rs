@@ -171,10 +171,7 @@ impl HeaderSyncManager {
     /// - If a header at the same index already exists, it must have the
     ///   identical hash; otherwise a [`LightClientError::Conflict`] is
     ///   returned (defends against malicious peers).
-    pub async fn ingest_header(
-        &self,
-        header: BlockHeader,
-    ) -> Result<(), LightClientError> {
+    pub async fn ingest_header(&self, header: BlockHeader) -> Result<(), LightClientError> {
         let mut tip = self.chain_tip.write().await;
         let mut headers = self.headers.write().await;
 
@@ -318,10 +315,7 @@ impl WitnessedProofVerifier {
     /// Verify the proof against the *tip* header. Convenience wrapper for
     /// callers that just want "did this proof commit to the latest known
     /// state".
-    pub async fn verify_proof_at_tip(
-        &self,
-        proof_hash: &[u8],
-    ) -> Result<bool, LightClientError> {
+    pub async fn verify_proof_at_tip(&self, proof_hash: &[u8]) -> Result<bool, LightClientError> {
         let tip = self
             .sync_manager
             .chain_tip()
@@ -352,17 +346,30 @@ mod tests {
 
     #[test]
     fn light_mode_parses() {
-        assert_eq!("full".parse::<LightMode>().expect("test: parse full"), LightMode::Full);
-        assert_eq!("light".parse::<LightMode>().expect("test: parse light"), LightMode::Light);
-        assert_eq!("thin".parse::<LightMode>().expect("test: parse thin"), LightMode::ThinClient);
+        assert_eq!(
+            "full".parse::<LightMode>().expect("test: parse full"),
+            LightMode::Full
+        );
+        assert_eq!(
+            "light".parse::<LightMode>().expect("test: parse light"),
+            LightMode::Light
+        );
+        assert_eq!(
+            "thin".parse::<LightMode>().expect("test: parse thin"),
+            LightMode::ThinClient
+        );
         assert!("nope".parse::<LightMode>().is_err());
     }
 
     #[tokio::test]
     async fn ingest_genesis_then_one() {
         let mgr = HeaderSyncManager::new();
-        mgr.ingest_header(fake_header(0, "g", "0")).await.expect("test: genesis");
-        mgr.ingest_header(fake_header(1, "h1", "g")).await.expect("test: ingest 1");
+        mgr.ingest_header(fake_header(0, "g", "0"))
+            .await
+            .expect("test: genesis");
+        mgr.ingest_header(fake_header(1, "h1", "g"))
+            .await
+            .expect("test: ingest 1");
         let tip = mgr.chain_tip().await.expect("test: tip");
         assert_eq!(tip.index, 1);
         assert_eq!(tip.hash, "h1");

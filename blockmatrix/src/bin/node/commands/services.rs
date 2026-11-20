@@ -43,9 +43,7 @@ pub(super) async fn propagate_block(
 }
 
 /// Count DNS assets in a block (used for logging during propagation).
-pub(super) fn count_dns_assets_in_block(
-    block: &blockmatrix::blockchain::block::Block,
-) -> usize {
+pub(super) fn count_dns_assets_in_block(block: &blockmatrix::blockchain::block::Block) -> usize {
     block
         .get_assets()
         .iter()
@@ -191,12 +189,9 @@ private = "private"
         .await
     {
         Ok(block) => {
-            if let Err(e) = deploy::store_dashboard_bundle(
-                data_dir,
-                &content_hash,
-                manifest_toml,
-                &bundle,
-            ) {
+            if let Err(e) =
+                deploy::store_dashboard_bundle(data_dir, &content_hash, manifest_toml, &bundle)
+            {
                 warn!("Failed to store dashboard bundle: {}", e);
             }
             info!(

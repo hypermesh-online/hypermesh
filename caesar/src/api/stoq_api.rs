@@ -463,30 +463,30 @@ impl CaesarStoqApi {
         }));
 
         // UI-facing handlers (wallet, balance, transactions, etc.)
-        server.register_handler(Arc::new(
-            super::ui_handlers::WalletHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::BalanceHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::TransactionsHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::RewardsHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::StakingHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::ExchangeRatesHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::AnalyticsHandler { state: app_state.clone() },
-        ));
-        server.register_handler(Arc::new(
-            super::ui_handlers::EarningsHandler { state: app_state },
-        ));
+        server.register_handler(Arc::new(super::ui_handlers::WalletHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::BalanceHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::TransactionsHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::RewardsHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::StakingHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::ExchangeRatesHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::AnalyticsHandler {
+            state: app_state.clone(),
+        }));
+        server.register_handler(Arc::new(super::ui_handlers::EarningsHandler {
+            state: app_state,
+        }));
 
         info!("Caesar STOQ API handlers registered (13 endpoints)");
 

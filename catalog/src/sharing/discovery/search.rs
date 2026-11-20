@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime};
 
 use super::super::{PeerInfo, SharePermission};
 use super::types::*;
-use crate::{PackageSpecMetadata, AssetRegistration};
+use crate::{AssetRegistration, PackageSpecMetadata};
 
 impl super::DiscoveryService {
     /// Search across network
@@ -277,7 +277,9 @@ impl super::DiscoveryService {
         results.sort_by(|a, b| {
             let rel_a = self.calculate_relevance(&a.1, query);
             let rel_b = self.calculate_relevance(&b.1, query);
-            rel_b.partial_cmp(&rel_a).expect("relevance scores should be valid for comparison")
+            rel_b
+                .partial_cmp(&rel_a)
+                .expect("relevance scores should be valid for comparison")
         });
         results
     }

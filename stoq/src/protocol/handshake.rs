@@ -677,8 +677,7 @@ mod tests {
     fn test_cipher_suite_proposal_roundtrip() {
         let proposal = CipherSuiteProposal::private_or_anonymous();
         let bytes = proposal.to_bytes();
-        let decoded = CipherSuiteProposal::from_bytes(&bytes)
-            .expect("test: proposal round-trip");
+        let decoded = CipherSuiteProposal::from_bytes(&bytes).expect("test: proposal round-trip");
 
         assert_eq!(decoded.supported.len(), 3);
         assert!(!decoded.is_public);

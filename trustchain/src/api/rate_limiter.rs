@@ -486,7 +486,9 @@ mod tests {
             max_idle_time: 300,
         };
 
-        let limiter = ConfigurableRateLimiter::new(config).await.expect("test: async operation");
+        let limiter = ConfigurableRateLimiter::new(config)
+            .await
+            .expect("test: async operation");
         assert_eq!(limiter.get_config().requests_per_minute, 30);
 
         let allowed = limiter.check_rate_limit("client1").await;

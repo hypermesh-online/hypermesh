@@ -13,8 +13,8 @@ use std::f64::consts::TAU;
 use std::sync::Arc;
 
 use blockmatrix::blockchain::node_chain::NodeBlockchain;
-use blockmatrix::proof_of_state::validation::DefaultStateAuthenticator;
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
+use blockmatrix::proof_of_state::validation::DefaultStateAuthenticator;
 use blockmatrix::transfer::{
     compute_receipt_hash, create_transfer_intent, proof_to_bytes, StateProofBytes, TransferEngine,
     TransferError, TransferValidation,

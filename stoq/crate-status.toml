@@ -9,13 +9,11 @@ items = [
     # Transport (genuinely production-quality QUIC)
     "QUIC/IPv6 transport via Quinn — connection pooling, health checks, adaptive congestion control",
     "Certificate management — two modes: Anonymous (ephemeral per-connection) and Authenticated (TrustChain-issued)",
-    "Network isolation — PrivacyMode (Anonymous/Private/Public) with eBPF policy push",
     "eBPF-accelerated send/receive — AF_XDP zero-copy I/O via StoqEbpfTransport wrapper",
     "eBPF validation hooks — CertificateValidator + PacketValidator registered with hypermesh-ebpf",
     "Protocol extensions — packets, tokens, shards with canonical length-prefixed serialization",
     "Adaptive transport tiers — EWMA bandwidth estimation, MTU discovery, loss-based adjustment",
     "Multi-path QUIC — scope/privacy/federation policy enforcement, bandwidth-weighted scheduling",
-    "Reflector pool transport — heartbeat/health tracking, quorum detection, sync protocol",
     "Post-quantum QUIC tunnel — X25519MLKEM768 hybrid key exchange via aws-lc-rs + rustls prefer-post-quantum",
     "BLAKE3 content hashing",
     "Real transport metrics (LatencyTracker with jitter, TransportSnapshot, per-connection stats)",
@@ -29,16 +27,13 @@ items = [
     "NGauge METRICS frame type (0xfe000007) — feature-gated handler",
     "MetricsFrame protocol wiring to ngauge",
     "Min-spec transport validation (R13 — bandwidth checks, connection budget)",
-    "PoS fast validation — structural pre-checks on PoS tokens (field presence, size limits, format)",
     "Canonical PoS types consumed from lib (S1) — stoq/src/protocol re-exports hypermesh_lib::proof (SpaceProof/StakeProof/StateProof/TimeProof/WorkProof); the duplicate stoq-local PoS type set was deleted, and no magnitude (stake amount / difficulty / capacity) is checked at the transport gate",
-    "FALCON-1024 PoS signature verification — pos_validator.rs verifies directly via pqcrypto_falcon::falcon1024 using issuer_pubkey from token, no TrustChain client needed",
     "MetricsFrameBridge eBPF integration — publish_ebpf_metrics() accepts HyperMeshMetrics, generates Congestion (drops/latency) + Routing (throughput/paths) frames",
     "Path scheduling feedback — PathSelector.apply_recommendation() accepts ngauge PathPolicyRecommendation, maps strategy to multi-path scheduler",
     "WAN transport (non-localhost bind, interface detection)",
     "MTU clamping for internet paths",
     "Connection migration scaffold",
     "NGauge→path scheduler feedback",
-    "PosValidationState connection gate",
     "PathSelector recommendation polling",
     "Stale certificate auto-recovery — validates cert+key consistency on load, auto-deletes and regenerates on KeyMismatch",
     "Protocol-version negotiation (P6) — Msg1/Msg2 carry a protocol_version field (serde default STOQ_PROTOCOL_VERSION=1.0.0); peer_version_compatible rejects a major-version mismatch BEFORE any trust/application data, minor/patch tolerated, old peers omitting the field still handshake; mirrors blockmatrix::ipc::protocol version rules",
@@ -49,6 +44,10 @@ items = [
 items = [
     "Bilateral handshake protocol — 3-message challenge-response, verified local two-node and local-to-GCP (trust.hypermesh.online), handshake metadata exchange for network_id",
     "Matrix-aware positioning — types exist from hypermesh_lib but not used in actual routing decisions",
+    # Reconciled against full-system audit 2026-07-30 — moved out of [working]: constructed but the gate/consumer is never called on any shipped connection
+    "PoS line-rate validation stack — PosToken/pos_validator.rs/pos_fast_validator + PosValidationState connection gate are constructed at startup but the gate is NEVER called (W2-41/W2-95); PosValidationState stays permanently Pending and the stack keys on SHA-256, so 'PoS at protocol layer / line-rate' does not run live",
+    "network_isolation.rs — application-layer isolation surface inside the pure-transport crate with no live server or consumer (W2-99/W2-15); isolation belongs to blockmatrix, and stoq carrying it violates the transport-only boundary",
+    "Reflector pool transport (transport/reflector/*) — heartbeat/health tracking works, but the sync-protocol/block-transport half is a DEAD duplicate blockchain-sync subsystem never wired, using 0.67 quorum-fraction language that contradicts PoS binary authentication (W2-94)",
 ]
 
 [features.planned]
@@ -56,4 +55,10 @@ items = [
     "Real jitter benchmarking under controlled partitions",
     "Partition recovery timing measurements",
     "FALCON-1024 X.509 cert signing (requires upstream TLS spec for post-quantum signature algorithms in rustls/Quinn — key exchange already post-quantum via X25519MLKEM768)",
+    # Newly-established gaps from full-system audit 2026-07-30
+    "Remove app-layer surface from the transport crate — api/, extensions.rs, network_isolation.rs have no live server/consumer (W2-99); relocate or delete to keep stoq transport-only",
+    ">64KB message transfer — Stream::receive read_to_end 64KB cap silently fails shard payloads and block-fetch responses over 64KB (W2-97)",
+    "Connection pool activation — return_to_pool has no callers, so every dial is a fresh QUIC handshake and reuse_count is always 0 (W2-102)",
+    "DEFAULT_NETWORK sentinel disambiguation — multipath connection reuses the DEFAULT_NETWORK byte value as an 'unknown path/network' sentinel in rejection reasons (W2-7)",
+    "Single eBPF orchestrator — stoq attaches XDP but never receives the peer validations blockmatrix's P5 mirror writes to a detached instance (W2-93)",
 ]

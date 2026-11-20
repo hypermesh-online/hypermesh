@@ -23,8 +23,8 @@
 
 use blockmatrix::blockchain::block::{Block, BlockAssetEntry, StoragePointer};
 use blockmatrix::blockchain::{
-    chain_footprint_bytes, entry_footprint_bytes, PresentedAssetChain, AcceptReject,
-    ReceivedAssetStore, LineageBreak, NodeBlockchain, StoreBound, MAX_RECEIVED_CHAINS,
+    chain_footprint_bytes, entry_footprint_bytes, AcceptReject, LineageBreak, NodeBlockchain,
+    PresentedAssetChain, ReceivedAssetStore, StoreBound, MAX_RECEIVED_CHAINS,
     MAX_RECEIVED_CHAIN_ENTRIES, MAX_RECEIVED_STORE_BYTES,
 };
 use blockmatrix::matrix::coordinate::MatrixCoordinate;
@@ -197,10 +197,7 @@ async fn s3_4_forged_lineage_is_rejected() {
     let mut gapped = received_chain(&stranger, asset, 3);
     let prev = gapped.entries[1].lineage_id();
     gapped.entries[2] = received_entry(&stranger, asset, Some(prev), 9);
-    assert!(matches!(
-        gapped.entries[2].asset_seq(),
-        9,
-    ));
+    assert!(matches!(gapped.entries[2].asset_seq(), 9,));
     assert!(matches!(
         chain.accept_asset_chain(gapped).await,
         Err(AcceptReject::LineageBroken(LineageBreak::SequenceGap {
@@ -250,10 +247,12 @@ async fn s3_4_bad_signers_are_rejected() {
     let stranger = FalconIdentity::generate();
     let impostor = FalconIdentity::generate();
 
-    // (a) UNSIGNED — no envelope at all. Unlike the spine accept mode there is
-    //     NO legacy-migration escape hatch here, and setting the spine's compat
-    //     flag must not open one.
-    std::env::set_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS", "1");
+    // (a) UNSIGNED — no envelope at all. The received-asset-chain accept path
+    //     has NO legacy-migration escape hatch BY CONSTRUCTION: it never
+    //     consults the spine's accept-unsigned flag, so an unsigned import is
+    //     rejected unconditionally. We deliberately do NOT set that process-wide
+    //     env var here — doing so would race parallel tests, and the accept
+    //     path's independence from it holds regardless of the flag's value.
     let chain = NodeBlockchain::new(coord());
     let asset = [0x49u8; 32];
     let mut unsigned = received_chain(&stranger, asset, 2);
@@ -261,9 +260,8 @@ async fn s3_4_bad_signers_are_rejected() {
     assert_eq!(
         chain.accept_asset_chain(unsigned).await,
         Err(AcceptReject::Unsigned { position: 1 }),
-        "the spine's one-release legacy flag must not admit an unsigned received import"
+        "an unsigned received import must be rejected on the accept path"
     );
-    std::env::remove_var("HYPERMESH_ACCEPT_UNSIGNED_BLOCKS");
     assert!(!chain.has_received_asset_chain(&asset).await);
 
     // (b) SIGNER IS NOT THE CLAIMED AUTHOR — a real, valid FALCON signature over
@@ -282,7 +280,10 @@ async fn s3_4_bad_signers_are_rejected() {
     entry.set_asset_lineage(Some(wrong_author.entries[0].lineage_id()), 1);
     // Signed by the IMPOSTOR while still claiming the stranger as author.
     entry.sign_proof(&impostor).expect("test: FALCON sign");
-    assert!(entry.verify_signed_proof().is_ok(), "the signature itself is valid");
+    assert!(
+        entry.verify_signed_proof().is_ok(),
+        "the signature itself is valid"
+    );
     wrong_author.entries[1] = entry;
     assert_eq!(
         chain.accept_asset_chain(wrong_author).await,
@@ -598,7 +599,10 @@ async fn s3_4_the_store_bound_is_a_byte_budget_that_fits_r13() {
     // And it is ENFORCED at the byte boundary, not merely declared.
     let store = ReceivedAssetStore::new();
     assert_eq!(store.bytes_held(), 0);
-    assert_eq!(store.admission_check(true, MAX_RECEIVED_STORE_BYTES), Ok(()));
+    assert_eq!(
+        store.admission_check(true, MAX_RECEIVED_STORE_BYTES),
+        Ok(())
+    );
     assert_eq!(
         store.admission_check(true, MAX_RECEIVED_STORE_BYTES + 1),
         Err(AcceptReject::StoreFull(StoreBound::Bytes {
@@ -848,7 +852,10 @@ async fn s3_4_shadowed_received_chains_are_enumerable_and_reclaimable() {
     enumerated.sort_unstable();
     let mut expected = assets.clone();
     expected.sort_unstable();
-    assert_eq!(enumerated, expected, "every adopted chain must be enumerable");
+    assert_eq!(
+        enumerated, expected,
+        "every adopted chain must be enumerable"
+    );
     assert!(
         chain.shadowed_received_asset_chains().await.is_empty(),
         "nothing is shadowed yet"
@@ -923,7 +930,10 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
     let mut added_total = 0usize;
     for task in tasks {
         // A task that neither returned Ok nor Err is the silent-drop failure.
-        match task.await.expect("test: no accept task may panic or be dropped") {
+        match task
+            .await
+            .expect("test: no accept task may panic or be dropped")
+        {
             Ok(receipt) => {
                 accepted += 1;
                 added_total += receipt.added;
@@ -932,8 +942,15 @@ async fn s3_4_concurrent_accepts_of_distinct_assets_are_all_accounted() {
         }
     }
 
-    assert_eq!(accepted + refused, WRITERS, "every writer must be accounted");
-    assert_eq!(refused, 0, "nothing here contends for the same key or bound");
+    assert_eq!(
+        accepted + refused,
+        WRITERS,
+        "every writer must be accounted"
+    );
+    assert_eq!(
+        refused, 0,
+        "nothing here contends for the same key or bound"
+    );
     assert_eq!(accepted, WRITERS);
     assert_eq!(added_total, WRITERS * ENTRIES);
 
@@ -969,7 +986,10 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
     let mut outcomes = 0usize;
     let mut added_total = 0usize;
     for task in tasks {
-        match task.await.expect("test: no accept task may panic or be dropped") {
+        match task
+            .await
+            .expect("test: no accept task may panic or be dropped")
+        {
             Ok(receipt) => {
                 outcomes += 1;
                 added_total += receipt.added;
@@ -996,7 +1016,11 @@ async fn s3_4_concurrent_accepts_of_the_same_asset_never_drop_or_double_count() 
         .await
         .expect("test: the chain is held");
     assert_eq!(held.entries.len(), WRITERS);
-    assert_eq!(held.verify(), Ok(()), "the merged history must still verify");
+    assert_eq!(
+        held.verify(),
+        Ok(()),
+        "the merged history must still verify"
+    );
     assert_eq!(
         added_total, WRITERS,
         "each entry must be charged as added exactly once — no double count, no gap"

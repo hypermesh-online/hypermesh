@@ -1,0 +1,438 @@
+{
+  "concern_map": [
+    {
+      "concern": "transport",
+      "owner": "stoq crate — StoqTransport (quinn wrapper, tag-framed streams) + protocol/bilateral.rs FALCON handshake; blockmatrix must resolve connections through NetworkManager, never a private map",
+      "violations": [
+        "[W2-91] Sync-pull dials unauthenticated CONN_TYPE_PEER_MESSAGE connections; auth-gated messages silently dropped (sync-pull dead)",
+        "[W2-92] Block-propagation adapter keeps a private duplicate connection registry populated once at startup; late/accepted peers never get blocks",
+        "[W2-26] Reflector sync-pull inert on the same never-authenticated path",
+        "[W2-96] MatrixStoqIntegration husk: connection map has no writers since F2 — position broadcast / neighbor discovery are live no-ops",
+        "[W2-97] 64KB read_to_end cap in Stream::receive bounds every tagged message including shard payloads and block-fetch responses",
+        "[W2-102] stoq connection pool dead (return_to_pool has no callers) — every dial is a fresh QUIC handshake",
+        "[W2-84] blockmatrix/src/transport/ (2177L) self-declared 10% stub duplicating stoq",
+        "[W2-98] blockmatrix/src/transport/ auth/pool are dead; only its type shims are live",
+        "[W2-94] stoq transport/reflector/* dead duplicate blockchain-sync subsystem with 0.67 quorum-fraction language",
+        "[W2-99] stoq api/, extensions.rs, network_isolation.rs: application-layer surface inside the pure-transport crate",
+        "[W2-7] stoq reuses the DEFAULT_NETWORK byte value as an 'unknown network' sentinel in rejection reasons",
+        "[W2-101] Wire-tag constants duplicated outside the protocol module (lockstep hazard)",
+        "[W2-93] Two disconnected eBPF orchestrators: P5 kernel peer-auth mirror writes to an instance that never attaches XDP; stoq's attached instance never receives validations",
+        "[W1-2] Catch-up sync flips SyncManager to Synchronized after every round regardless of remaining lag",
+        "[W1-14] Sync push/pull split across two parallel message vocabularies with manual conversion"
+      ]
+    },
+    {
+      "concern": "PoS validation",
+      "owner": "trustchain (StateProofOps, FourProofValidator) as primary + lib canonical StateProof/WireSignedProof types; blockmatrix orchestrates block-path validation only through the D4 ValidationService/NetworkRuleSet seam",
+      "violations": [
+        "[W2-39/W2-51] Live placement 'PoS eligibility' gate is a hardcoded can_store=true allow-all stub on the store path",
+        "[W2-40] TrustChain CA→HyperMesh validation loop structurally disconnected (route mismatch); cert handler is an always-valid echo stub with fabricated BFT metadata",
+        "[W2-44] Handshake validates FALCON envelope + structural inner proofs only — no WHEN-freshness threshold (StateRequirements never applied at the trust boundary)",
+        "[W2-45] Four-plus parallel four-proof bars with conflicting thresholds; three distinct types named StateAuthenticator",
+        "[W2-41/W2-95] stoq PosToken/pos_fast_validator line-rate stack constructed at startup but its gate is never called; SHA-256 keying",
+        "[W2-46] trustchain SignedStateProof: unused duplicate envelope with a lossy to_bytes().unwrap_or_default() conversion",
+        "[W2-47] Dead proof_of_state vestiges: unused ProofOfState trait, integration shims, asset_integration",
+        "[W2-50] ProofValidationResult::confidence() float on the canonical lib proof type (banned confidence float)",
+        "[W2-42/W2-85] blockmatrix/src/verification/ (R12 shard commitment + PoSPing + R13 min-spec) fully dormant while lib.rs claims it anchors every block",
+        "[W1-4] proof_hash and the FALCON envelope defined over non-canonical serde_json — every StateProof schema change invalidates all previously signed blocks cross-version",
+        "[W1-12] D4 fail-closed hook resolve_strict built but inactive; NetworkRuleSet::publish has zero production callers",
+        "[W1-13/W2-48] HYPERMESH_ACCEPT_UNSIGNED_BLOCKS env bypass compiled into release; two test suites depend on it"
+      ]
+    },
+    {
+      "concern": "placement intelligence",
+      "owner": "ngauge crate — SwarmAnalytics/ReplicationTrigger/DispersionAdvisor, LocalityProvider, RoutingIntelFeed, and the RS sharding engine (advisory + sharding only)",
+      "violations": [
+        "[W2-31] MetricsReporter wire frames never deserialize into ngauge::MetricsFrame (NodeId hex string vs [u8;32]) — live metrics ingestion permanently starved",
+        "[W1-35/W1-47/W2-22/W2-47/W2-69] Live 10s feed re-ingests the full cumulative demand snapshot; consumer_positions unbounded; popularity inflates with uptime not demand",
+        "[W1-36] Demand/analytics state unbounded and remotely drivable",
+        "[W1-31] SwarmDemandTracker demand map + per-shard requester_ids grow without bound",
+        "[W1-37/W1-48/W2-25/W2-68] DispersionAdvisor anti-affinity is a live no-op (fresh advisor per call, register_replica never fed)",
+        "[W2-34] SwarmAnalytics windowed fetch-rate API incl. its only GC (cleanup_cold_shards) has no production caller — bounded mechanism dead, unbounded cumulative path live",
+        "[W1-46/W1-49] H4 propagation-weight loop computes from a fresh, never-fed RoutingIntelligence — permanently neutral, presented as intelligence",
+        "[W2-33] NGauge standalone API serves fabricated data; marketplace engines (~1135L) have zero callers while crate-status lists them working",
+        "[W2-32] trust_signals→TrustChain federation gating unmounted despite crate-status claiming F.1 wired",
+        "[W1-44/W2-36/W2-70] CollectiveIntelligence orphaned (re-export only, zero consumers)",
+        "[W2-28/W2-35] PlacementLease promised live in P2-P4 (all marked complete) but has zero consumers",
+        "[W2-82] intelligence/ ~4000 of 4596 lines are an island duplicating ngauge's advisory concern",
+        "[W2-37] Dormant ngauge modules (receipt/min_spec/compliance/caesar_tracker/node_metrics/throttle/MetricsCollector/trending) tagged 'working'",
+        "[W1-51] blockmatrix still declares the reed-solomon-erasure dep it no longer uses",
+        "[W2-38] ngauge file-size bar exceeded (swarm_analytics 1383L, stoq_api 945L, routing_intel 857L)",
+        "[W1-50] CLI ngauge marketplace/metrics/leases call IPC methods the daemon never registers"
+      ]
+    },
+    {
+      "concern": "placement execution",
+      "owner": "blockmatrix network/placement.rs (place_shards — the single placement authority) + distribution/ (get_eligible_nodes, octant) + ShardLocationIndex; consumes ngauge's RS engine and locality",
+      "violations": [
+        "[W1-34] Replication-poll actuation discards fetched replica bytes and registers phantom providership + inflates replica_count",
+        "[W1-38] distribute_to_peers ignores the placement authority's chosen node and re-picks by announced coordinate",
+        "[W1-39] Store/distribute path never populates ShardLocationIndex on any node (provider sets come only from consumer announcements)",
+        "[W1-41] SpatialBucketAssigner dead in production — spatial block filtering never runs",
+        "[W1-40] R4 Anonymous HashOnly dedup policy built and tested but never selected live",
+        "[W2-52/W2-73] R13-mandated streaming segment pipeline has zero production consumers; legacy whole-blob AssetPipeline is the live path",
+        "[W2-53] Entire AssetManager/adapter/proxy/privacy/multi_node universe unreachable from the shipped daemon",
+        "[W2-57] distribution/ dormant half (redistribution/migration/swarm/rebalancing ~2.3kL) — PoS revocation triggers nothing",
+        "[W2-58] Third/fourth sharding+encryption stacks in adapters/storage & assets/proxy + hardcoded foreign Hetzner IPv6 as 'proxy address' (six adapters)",
+        "[W2-55] Dead parallel blockchain layer in assets/ (AssetBlockchainManager, EntityBlockchain, CrossChainValidationManager)",
+        "[W2-56] AssetAddress fully decorative and its 4-bit shard nibble cannot encode the protocol's own adaptive RS counts (up to 112)",
+        "[W2-59] ProcessedAsset.proof_hash presents as BLAKE3(PoS(A)) but hashes a placeholder string",
+        "[W2-60] Name collisions: two ShardPlacement structs, two StateAuthenticator traits (one allow-all)",
+        "[W2-61] CLI run_store duplicates the daemon store path with a dead branch that would ship unregistered shards",
+        "[W1-45] handle_incoming_shard_stream prod-dead duplicate of handle_shard_message with divergent serve format",
+        "[W2-78] retrieval/ (4200L, R6 instruction-based-retrieval) is a complete island; live fetch uses a parallel sharing/ShardMap",
+        "[W2-62] assets subsystem file-size bar exceeded (six files 800-965L)"
+      ]
+    },
+    {
+      "concern": "chain/lineage authority",
+      "owner": "blockmatrix/src/blockchain — NodeBlockchain (chain.rs/mutations.rs/block.rs), AssetLineage (per-asset authority, lineage_id), and accept/ (received-asset store); insert_received_block is the single accept gate",
+      "violations": [
+        "[W1-0] storage_pointer & registration unauthenticated on the received-block path (outside both the block hash and the FALCON envelope) — CRITICAL",
+        "[W1-1] Network-scope shared chain cannot converge: adopt_genesis unwired and a foreign genesis is uninsertable",
+        "[W1-3] Received blocks bypass ChainValidator; max_block_size cap decorative because Block::size() is a fixed-formula estimate",
+        "[W1-5/W1-20/W1-28/W2-43/W2-66] #52: parse_and_verify_block is a duplicate received-block validation site using intrinsic validate() outside the D4 seam",
+        "[W1-6] BlockPropagator.seen_blocks grows without bound on the live propagation path",
+        "[W1-7/W1-19/W2-74] Received-entry mirror_seal authority unchecked — a peer can deliver seals attributed to identities that never authorized them",
+        "[W1-8] Dead genesis-auth MFA subsystem (~770L) protecting a placeholder random-bytes 'keypair'",
+        "[W1-9] genesis_assessor.rs dead parallel hardware-assessment/genesis-asset path",
+        "[W1-10] errors.rs structured error types dead — the entire blockchain API returns Result<T,String>",
+        "[W1-11] Two block-persistence stacks: live BlockSink/PersistenceManager vs ChainStateManager off the daemon path",
+        "[W1-18/W1-27] D3/S3.4 accept-lineage receive-only: zero producers for asset-chain presentation, mirror attestation, sealing",
+        "[W1-21] Stale deferral in accept_wire_attestation (holds_asset now reachable since D3)",
+        "[W1-22] Documented operator reclaim valves (forget/clear) unreachable; received store + attestation pool memory-only",
+        "[W1-24] F3 'capacity before FALCON' hole for extensions",
+        "[W1-16] Device-scope announce dedup keys on block INDEX across independent chains",
+        "[W1-15/W1-23/W2-0/W2-1/W2-23] 'spine'/'off-spine' survives as serialized wire field names (spine_point/spine_seq) and as primary doc vocabulary despite the non-authoritative-spine model",
+        "[W1-17/W2-49] chain.rs (1469L) and mutations.rs (1479L) over the 500-line bar with real mixed-concern seams",
+        "[W2-64/W2-65] No default-run test carries a FALCON-signed block over real QUIC; network_sync_e2e reimplements the private wire codec; block-dispatch/gossip bodies untested",
+        "[W2-72] Process-global unsigned-block env flag toggled around await races parallel tests"
+      ]
+    },
+    {
+      "concern": "network membership/isolation",
+      "owner": "today only peer_auth::verify_peer_access (String network_id equality) + SyncManager::NetworkMembership; target owner = a single NetworkId type keying (NetworkId,ContentHash) indexes and the shard-serve gate",
+      "violations": [
+        "[W1-42/W1-67/W2-10/W2-67] DefaultIsolationManager/enforcer unmounted on every live path (de-worlds re-orphan); task #59 'Mount IsolationManager' status false",
+        "[W2-15] Four isolation-manager implementations across three modules/crates, zero mounted",
+        "[W2-12] Live shard demand/location/replication all keyed to constant DEFAULT_NETWORK — the peer's authenticated network never reaches the indexes",
+        "[W2-13] Network identity has three live non-converting representations: String (auth/sync/dns), lib NetworkId (placement), NetworkScope (validation); nesting APIs type-incompatible and unwired",
+        "[W2-54] Per-asset NetworkScope never enforced on the shard-serve authorization gate",
+        "[W2-14] Dormant triple-stack multi-network subsystem (trust/ + multi_network.rs + assets/multi_node coordinator): placeholder crypto, fake cross-network validation, doc claims it is live",
+        "[W2-16] Retired 4-tier taxonomy survives as two NetworkType enums plus four Tier structs, contradicting the canonical 2-axis PrivacyMode",
+        "[W2-17/W2-83] Top-level privacy/ (2832L) island documented as the live tier-enforcement layer; live semantics are hypermesh_lib::PrivacyMode",
+        "[W2-18] NetworkMembership.privacy_mode decorative on the sync path; reflector heartbeats hardcode PrivacyMode::PUBLIC",
+        "[W2-11/W2-100] TAG_SHARD_ANNOUNCE and TAG_SHARD_LOCATE bypass the auth gate — unauthenticated index poisoning, provider-topology leakage, unbounded growth",
+        "[W1-30] Ungated state-mutating tags reachable with no handshake via CONN_TYPE_PEER_MESSAGE (socket-addr placeholder identity) into unbounded stores",
+        "[W2-6] Prod code hardcodes NetworkId([0u8;16]) instead of DEFAULT_NETWORK",
+        "[W2-79] DnsPopularityTracker write-only, unbounded, remote-fed, split across two divergent instances"
+      ]
+    },
+    {
+      "concern": "geometry",
+      "owner": "blockmatrix/src/matrix (MatrixCoordinate + deterministic derive_cell) for identity cells; ngauge LocalityProvider for RTT-proximity embeddings — one clustering/distance engine should serve both",
+      "violations": [
+        "[W2-19] Peer-claimed matrix cell never verified against derive_cell(node_id) — device-auth invariant (P2) unenforced; CLI --coord override falsely doc'd 'validated'",
+        "[W2-23] Live 'matrix topology' propagation and neighbor queries run over locality-free identity-hash cells — radius-based strategies are no-ops; topology.neighbors always empty",
+        "[W2-21/W1-43] Three parallel clustering/distance implementations (GeographicClustering k-means, ngauge cluster_positions k-means, inline euclidean in poll.rs); locality_centroids has zero callers despite 'promotion to live' docs",
+        "[W2-20] locality_centroids zero callers — GeographicClustering still dormant while its docs claim a live caller",
+        "[W2-24] Live placement mixes two incommensurable coordinate spaces (RTT embedding vs derive_cell fallback) in one distance computation",
+        "[W2-26] GPS geospatial layer (~2000L converter/hierarchy/topology + persistence topology_backup) test-only and contradicts the emergent-vector-space region model",
+        "[W2-27] P7 'decorative cleanup' left decorative geometry: transforms.rs, 4/7 tensor routing fns, 4 neighbor variants, IntelligenceLayer placeholder retrieval",
+        "[W2-28/W2-35] PlacementLease documented as the location authority (derive_cell docs point at it) with zero consumers",
+        "[W2-29] GeographicClustering kmeans retains stale phantom clusters; coordinate-keyed membership loses node identity",
+        "[W2-30] Five distinct NetworkTopology types across the workspace"
+      ]
+    },
+    {
+      "concern": "node surface/IPC",
+      "owner": "blockmatrix/src/ipc — DaemonState + ipc::register_all (the JSON-RPC registry) driven by bin/node dispatch; every advertised CLI/IPC method must resolve to a registered handler over real DaemonState",
+      "violations": [
+        "[W2-75/W1-50] CLI dispatches 15 IPC methods (caesar/trustchain/ngauge/catalog set) the daemon never registers — method-not-found on a running daemon",
+        "[W2-76] message.* IPC handlers are stubs disconnected from the live MessageStore the network writes; send returns false 'created', inbox always empty",
+        "[W2-77] gateway.transfer constructs a per-request GatewayManager: transfers evaporate, status/list permanently empty, reports false 'pending' success",
+        "[W2-33] NGauge standalone API serves fabricated marketplace/metrics data via registered handlers",
+        "[W2-81] api/ is an island but blockmatrix/CLAUDE.md presents it as the live STOQ API bridge",
+        "[W2-87] catalog registry seam: both halves built (wire_catalog_registry, provider), no binary connects them; handlers return 'not wired'",
+        "[W2-88] cli/ library module (1346L) duplicates the real bin/node CLI and is test-only",
+        "[W2-89] --mode light|thin is accepted and silently ignored (runs a full node, no warning)",
+        "[W2-90] transfer/ TransferEngine test-only island duplicating gateway's transfer concern",
+        "[W1-32] Dead/orphan tag space: CRL tags never routed; distributed-CA, legacy-transfer, key-rotation tags handled but never sent",
+        "[W2-80] Dead files never compiled: src/runtime/ (+phoenix), orchestration/lib.rs, catalog/lib.rs",
+        "[W2-86] ~23K-line island cluster (orchestration+container+integration+security+performance+platform) reachable only from each other and tests"
+      ]
+    }
+  ],
+  "fix_clusters": [
+    {
+      "name": "A — Live sync & propagation: make multi-node actually converge",
+      "order": 1,
+      "autonomy": "in-scope-refactor",
+      "done_means": "A lagging or late-joining node catches up to a peer's head over real authenticated QUIC — block propagation reaches accepted peers, multi-round sync-pull completes instead of falsely flipping to Synchronized, >64KB shard/block payloads transfer, and a default-run multi-node E2E carries a FALCON-signed block across the wire.",
+      "findings": [
+        "[W2-91] Sync-pull dead: TransportSyncDriver dials unauthenticated connections whose auth-gated messages the receiver drops (CRITICAL)",
+        "[W2-92] Block-propagation adapter keeps a private duplicate connection registry populated once at startup; late peers never receive blocks",
+        "[W1-2] Catch-up sync stalls: SyncManager flipped to Synchronized after every round regardless of remaining lag",
+        "[W2-26] Reflector sync-pull inert (same never-authenticated path)",
+        "[W2-97] 64KB read_to_end cap bounds every tagged message incl. shard payloads and block-fetch responses",
+        "[W2-96] MatrixStoqIntegration husk: no connection writers since F2 — position broadcast / neighbor discovery are live no-ops (misleading bringup log)",
+        "[W2-102] stoq connection pool dead — every dial is a fresh QUIC handshake",
+        "[W1-14] Sync push/pull split across two parallel message vocabularies with manual conversion",
+        "[W1-6] BlockPropagator.seen_blocks grows without bound on the live propagation path",
+        "[W1-29] Two overlapping gossip subsystems: TAG_GOSSIP sent live but its handler only logs and discards",
+        "[W2-64] No test carries a FALCON-signed block over real QUIC; both capstones elide QUIC citing untracked flakiness",
+        "[W2-65] network_sync_e2e reimplements the private wire codec/parser; block-dispatch + gossip handler bodies have zero behavioral tests"
+      ]
+    },
+    {
+      "name": "B — Received-block accept path = single authenticated gate",
+      "order": 2,
+      "autonomy": "needs-owner",
+      "done_means": "Every received block's storage_pointer, registration and mirror_seal are committed inside the FALCON envelope, proof_hash is verified over the carried bytes (never re-serialized), a real structural size rule runs first, the duplicate announce-path validator is deleted, and the unsigned-block env lever is removed with tests using real signers.",
+      "findings": [
+        "[W1-0] storage_pointer & registration unauthenticated on the received-block path — enables in-transit shard-authorization and DNS-cache-poisoning forgery (CRITICAL)",
+        "[W1-4] proof_hash + FALCON envelope defined over non-canonical serde_json — every StateProof schema change invalidates all previously signed blocks cross-version",
+        "[W1-7] Received-entry mirror_seal authority unchecked",
+        "[W1-19] Received-block mirror_seal accepted without seal-authority check (accept-lineage view)",
+        "[W2-74] mirror_seal authority gate documented-unimplemented with zero test coverage",
+        "[W1-3] Received blocks bypass ChainValidator; max_block_size decorative because Block::size() is a fixed-formula estimate (also fixes stats.total_data_size)",
+        "[W1-5] #52 duplicate received-block validation site (blockchain-core)",
+        "[W1-20] #52 confirmed open (accept-lineage)",
+        "[W1-28] #52 third per-entry validation site (network-handlers)",
+        "[W2-43] #52 pre-filter outside D4 seam",
+        "[W2-66] #52 latent seam-consistency (parity)",
+        "[W1-13] H3 unsigned-envelope debt in e2e tests",
+        "[W2-48] HYPERMESH_ACCEPT_UNSIGNED_BLOCKS env bypass compiled into release",
+        "[W2-63] 3 flagship sync tests unpassable without the env flag set out-of-band",
+        "[W2-72] Process-global env flag toggled around await races parallel tests in the same binary",
+        "[W1-16] Device-scope announce dedup keys on block INDEX across independent chains"
+      ]
+    },
+    {
+      "name": "D — Auth-gate the ungated wire tags",
+      "order": 3,
+      "autonomy": "in-scope-refactor",
+      "done_means": "TAG_SHARD_ANNOUNCE/TAG_SHARD_LOCATE and every state-mutating tag require an authenticated same-network peer, the unauthenticated CONN_TYPE_PEER_MESSAGE socket-address path is closed, and per-node announced-shard cardinality is capped.",
+      "findings": [
+        "[W2-11] TAG_SHARD_ANNOUNCE and TAG_SHARD_LOCATE bypass the auth gate: unauthenticated index poisoning, provider-topology leakage, unbounded index growth (HIGH)",
+        "[W2-100] TAG_SHARD_ANNOUNCE unauthenticated — any connection can poison the ShardLocationIndex (dup)",
+        "[W1-30] Ungated state-mutating tags reachable with no handshake via CONN_TYPE_PEER_MESSAGE into unbounded stores"
+      ]
+    },
+    {
+      "name": "E — Network-identity unification & per-network isolation enforcement",
+      "order": 4,
+      "autonomy": "needs-owner",
+      "done_means": "One NetworkId type (BLAKE3(domain)[..16]) flows from DNS-derived membership through peer-auth, the shard/demand/replication indexes, and the shard-serve authorization gate; the redundant isolation managers and retired taxonomies are deleted so a single live gate enforces per-network scope, and task #59's status is corrected.",
+      "findings": [
+        "[W2-13] Network identity has three live non-converting representations (String / NetworkId / NetworkScope); nesting APIs type-incompatible and unwired",
+        "[W2-12] Live shard demand/location/replication keyed to constant DEFAULT_NETWORK — peer's authenticated network never reaches the indexes",
+        "[W2-6] Prod code hardcodes NetworkId([0u8;16]) instead of DEFAULT_NETWORK",
+        "[W1-42] DefaultIsolationManager/MultiNetworkRegistry unmounted; NetworkId dimension constant everywhere",
+        "[W1-67] Isolation enforcer unmounted from every live path — tests admit it; task #59 record false",
+        "[W2-67] Isolation enforcer unmounted; validate_packet has zero live callers (dup)",
+        "[W2-10] DefaultIsolationManager confirmed unmounted — de-worlds re-orphan; no live per-network fetch isolation",
+        "[W2-15] Four isolation-manager implementations across three modules/crates, zero mounted",
+        "[W2-54] Per-asset NetworkScope never enforced on the shard-serve gate",
+        "[W2-14] Dormant triple-stack multi-network subsystem with placeholder crypto and fake cross-network validation",
+        "[W2-16] Retired 4-tier taxonomy survives as two NetworkType enums + four Tier structs",
+        "[W2-18] NetworkMembership.privacy_mode decorative; reflector heartbeats hardcode PrivacyMode::PUBLIC",
+        "[W2-79] DnsPopularityTracker write-only, unbounded, remote-fed, split across two divergent instances"
+      ]
+    },
+    {
+      "name": "C — Accept-lineage producers & network-scope convergence model",
+      "order": 5,
+      "autonomy": "needs-owner",
+      "done_means": "The owner has ratified the per-asset convergence model, asset-chain presentation/attestation/seal producers (and operator reclaim valves) are wired to a live trigger or the receive-only plumbing plus adopt_genesis is explicitly retired, and status docs stop claiming cross-genesis block-spine sync.",
+      "findings": [
+        "[W1-1] Network-scope shared chain cannot converge: adopt_genesis unwired, foreign genesis uninsertable, status docs false",
+        "[W1-18] D3/S3.4 accept-lineage receive-only: zero production producers for presentation/attestation/sealing",
+        "[W1-27] Mirror-attestation and presented-asset-chain SEND paths have no production caller",
+        "[W1-21] Stale deferral in accept_wire_attestation (holds_asset now reachable)",
+        "[W1-24] F3 'capacity before FALCON' hole for extensions",
+        "[W1-22] Documented operator reclaim valves (forget/clear) unreachable; stores memory-only",
+        "[W1-25] Status verification: resolve_strict inactive as documented; env flag still load-bearing in two test files"
+      ]
+    },
+    {
+      "name": "F — Replication & demand intelligence correctness",
+      "order": 6,
+      "autonomy": "in-scope-refactor",
+      "done_means": "Replication actuation stores and BLAKE3-verifies fetched replica bytes before claiming providership, demand/analytics state is bounded and drained so signals reflect demand not uptime, a long-lived DispersionAdvisor with real replica positions makes anti-affinity fire, MetricsReporter frames deserialize into ngauge and drive real routing weights, and replication_service has behavioral tests.",
+      "findings": [
+        "[W1-34] Replication-poll actuation discards replica bytes and registers phantom providership + inflates replica_count (HIGH)",
+        "[W2-31] MetricsReporter frames never deserialize into ngauge::MetricsFrame — live intelligence ingestion starved (HIGH)",
+        "[W1-35] H3 feed re-feeds the full cumulative demand snapshot every 10s; trigger reads cumulative counts",
+        "[W1-47] ngauge live feed re-ingests cumulative snapshot — unbounded consumer_positions + popularity inflates with uptime",
+        "[W2-22] consumer_positions unbounded AND 10s feed re-records full snapshot (HIGH)",
+        "[W2-47] Same — unbounded memory + live replication-metric corruption",
+        "[W2-69] consumer_positions unbounded on the live feed path; only a growth test, no bound test",
+        "[W1-36] Demand/analytics state unbounded and remotely drivable",
+        "[W1-31] SwarmDemandTracker demand map + requester_ids grow without bound",
+        "[W1-37] DispersionAdvisor anti-affinity live no-op (replication-placement)",
+        "[W1-48] DispersionAdvisor anti-affinity live no-op (ngauge-crate)",
+        "[W2-25] DispersionAdvisor anti-affinity live no-op — CONFIRMED still true",
+        "[W2-68] replication_service has zero tests; DispersionAdvisor no-op is what a test would catch",
+        "[W1-38] distribute_to_peers ignores the placement authority's chosen node, re-picks by announced coordinate",
+        "[W1-39] Store/distribute path never populates ShardLocationIndex on any node",
+        "[W2-34] SwarmAnalytics windowed fetch-rate + its only GC (cleanup_cold_shards) dead while unbounded cumulative path is live",
+        "[W1-46] H4 propagation-weight runs on a fresh empty RoutingIntelligence (neutral by construction)",
+        "[W1-49] H4 propagation-weight loop permanently neutral, presented as live intelligence"
+      ]
+    },
+    {
+      "name": "G — PoS validation: enforce authorization, unify the bar, delete duplicates",
+      "order": 7,
+      "autonomy": "needs-owner",
+      "done_means": "validate_storage_access enforces real on-chain authorization (no allow-all), certificate issuance is a single real FourProofValidator path (dead STOQ/echo loop deleted), one threshold-parameterized four-proof bar resolves through the D4 NetworkRuleSet seam, and the dead PoS representations (stoq PosToken, SignedStateProof, ProofOfState trait, confidence float, dormant verification/) are deleted or wired.",
+      "findings": [
+        "[W2-39] Live placement 'PoS eligibility' gate is a hardcoded allow-all stub (HIGH)",
+        "[W2-51] Placement PoS eligibility 'Testing mode allows all' on the live store path (HIGH, dup)",
+        "[W2-40] TrustChain CA→HyperMesh validation loop structurally disconnected; cert handler an always-valid echo stub with fabricated BFT metadata",
+        "[W2-44] Handshake validates FALCON envelope + structural inner proofs only — no WHEN-freshness threshold",
+        "[W2-45] Four-plus parallel four-proof bars with conflicting thresholds; three types named StateAuthenticator",
+        "[W2-42] blockmatrix/src/verification/ (R12 commitment + PoSPing + R13) fully dormant",
+        "[W2-85] verification/ dormant while lib.rs claims it anchors every block (dup)",
+        "[W2-41] stoq PosToken line-rate validation stack dead on every live path",
+        "[W2-95] stoq parallel PoS stack constructed at startup but its gate is never called; SHA-256 keying (dup)",
+        "[W2-46] trustchain SignedStateProof: unused duplicate envelope with a lossy conversion",
+        "[W2-47] Dead proof_of_state vestiges: ProofOfState trait, integration shims, asset_integration",
+        "[W2-50] ProofValidationResult::confidence() float on the canonical lib proof type",
+        "[W1-12] D4 fail-closed resolve_strict built but inactive; NetworkRuleSet::publish zero callers"
+      ]
+    },
+    {
+      "name": "H — Assets & pipeline convergence (R13 streaming, one sharding stack)",
+      "order": 8,
+      "autonomy": "needs-owner",
+      "done_means": "The live store/fetch path uses the streaming segment pipeline (R13 bounded memory) with a single ngauge sharding+encryption stack and one shard-identity scheme, and the dead adapter/proxy/blockchain/retrieval/rebalancing duplicates are deleted or explicitly quarantined.",
+      "findings": [
+        "[W2-52] R13-mandated streaming segment pipeline has zero production consumers; whole-blob AssetPipeline is the live path",
+        "[W2-73] Streaming pipeline fully tested but dormant; no test pins the live whole-blob store path",
+        "[W2-58] Third/fourth sharding+encryption stacks in adapters/storage & assets/proxy + hardcoded foreign Hetzner IPv6 (six adapters)",
+        "[W2-55] Dead parallel blockchain layer in assets/ (AssetBlockchainManager, EntityBlockchain, CrossChainValidationManager)",
+        "[W2-56] AssetAddress decorative and cannot encode the protocol's adaptive RS shard counts",
+        "[W2-53] Entire AssetManager/adapter/proxy/privacy/multi_node universe unreachable from the daemon",
+        "[W2-57] distribution/ dormant half (redistribution/migration/swarm/rebalancing ~2.3kL); PoS revocation triggers nothing",
+        "[W2-59] ProcessedAsset.proof_hash hashes a placeholder string, presented as BLAKE3(PoS(A))",
+        "[W2-60] Name collisions: two ShardPlacement types and two StateAuthenticator traits",
+        "[W2-61] CLI run_store duplicates the daemon store path with a dead unregistered-shard distribution branch",
+        "[W1-40] R4 Anonymous HashOnly dedup policy built and tested but never selected live",
+        "[W1-41] SpatialBucketAssigner dead in production — spatial block filtering never runs",
+        "[W2-78] retrieval/ (4200L R6 instruction-based-retrieval) is an island; live fetch uses a parallel sharing/ShardMap",
+        "[W2-62] assets subsystem file-size bar exceeded (six files 800-965L)",
+        "[W1-45] handle_incoming_shard_stream prod-dead duplicate with divergent serve format"
+      ]
+    },
+    {
+      "name": "I — Matrix geometry: verified coordinates, one clustering engine",
+      "order": 9,
+      "autonomy": "needs-owner",
+      "done_means": "Peer coordinates are verified against derive_cell (or a signed grant), propagation/neighbor queries and placement run over one coordinate space (RTT-proximity) served by a single clustering/distance engine, and dead geometry (transforms, GPS layer, extra tensor/neighbor fns, PlacementLease, duplicate NetworkTopology) is deleted or wired.",
+      "findings": [
+        "[W2-19] Peer-claimed matrix cell never verified against derive_cell(node_id) — P2 device-auth invariant unenforced on the wire (HIGH)",
+        "[W2-23] Live 'matrix topology' propagation/neighbor queries run over locality-free identity-hash cells — radius strategies no-ops, topology.neighbors always empty",
+        "[W2-21] Three parallel clustering/distance implementations",
+        "[W1-43] locality_centroids + GeographicClustering 'promotion to live' false — zero callers",
+        "[W2-20] locality_centroids has zero callers — GeographicClustering still dormant while docs claim live promotion",
+        "[W2-24] Live placement mixes two incommensurable coordinate spaces in one distance computation",
+        "[W2-26] GPS geospatial layer (~2000L) test-only and contradicts the emergent-region model",
+        "[W2-27] P7 'decorative cleanup' left decorative geometry: transforms.rs, 4/7 tensor routing fns, 4 neighbor variants, placeholder retrieval",
+        "[W2-28] PlacementLease promised live in P2/P3/P4 but has zero consumers; derive_cell docs point at it as the location authority",
+        "[W2-35] PlacementLease documented seam that nothing consumes (dup)",
+        "[W2-29] GeographicClustering kmeans retains phantom clusters; coordinate-keyed membership loses node identity",
+        "[W2-30] Five distinct NetworkTopology types across the workspace"
+      ]
+    },
+    {
+      "name": "J — Node surface / IPC honesty",
+      "order": 10,
+      "autonomy": "needs-owner",
+      "done_means": "Every CLI-exposed IPC method is registered with a real handler or removed, message/gateway/catalog/ngauge handlers surface real state or honest not-implemented errors (no false success), and claimed-live-but-islanded surfaces (api/, transfer/, cli/) are wired or deleted with docs corrected.",
+      "findings": [
+        "[W2-75] CLI dispatches 15 IPC methods the daemon never registers",
+        "[W1-50] CLI ngauge marketplace/metrics/leases call IPC methods the daemon never registers",
+        "[W2-76] message.* IPC handlers are stubs disconnected from the live MessageStore; send returns false 'created'",
+        "[W2-77] gateway.transfer constructs a per-request GatewayManager — transfers evaporate, status/list empty, false 'pending'",
+        "[W2-33] NGauge standalone API serves fabricated marketplace/metrics data; marketplace engines have zero callers",
+        "[W2-81] api/ island presented in blockmatrix/CLAUDE.md as the live STOQ API bridge",
+        "[W2-87] catalog registry seam: both halves built, no binary connects them (dep cycle)",
+        "[W2-88] cli/ library module (1346L) duplicates the real bin/node CLI and is test-only",
+        "[W2-89] --mode light|thin accepted and silently ignored",
+        "[W2-90] transfer/ TransferEngine test-only island duplicating gateway's transfer concern",
+        "[W1-32] Dead/orphan tag space: CRL never routed; CA/legacy-transfer/key-rotation handled but never sent"
+      ]
+    },
+    {
+      "name": "K — stoq transport-only boundary & the single eBPF gate",
+      "order": 11,
+      "autonomy": "needs-owner",
+      "done_means": "The stoq crate contains only transport + the bilateral PoS handshake (the dead reflector sync state machine, api/extensions/network_isolation, and blockmatrix's stub transport/ are removed or relocated), and the P5 eBPF peer-auth mirror and attached XDP instance are the same single orchestrator.",
+      "findings": [
+        "[W2-94] stoq transport/reflector/* dead duplicate blockchain-sync subsystem with quorum-fraction language",
+        "[W2-99] stoq api/, extensions.rs, network_isolation.rs: application-layer surface in the pure-transport crate",
+        "[W2-84] blockmatrix/src/transport/ (2177L) self-declared 10% stub duplicating stoq",
+        "[W2-98] blockmatrix/src/transport/ transport/auth/pool dead; only its types are live",
+        "[W2-7] stoq reuses the DEFAULT_NETWORK byte value as an 'unknown network' sentinel in rejection reasons",
+        "[W2-101] Wire-tag constants duplicated outside the protocol module (lockstep hazard)",
+        "[W2-93] Two disconnected eBPF orchestrators: P5 kernel peer-auth mirror writes to an instance that never attaches XDP; stoq's attached instance never receives validations"
+      ]
+    },
+    {
+      "name": "L — Dead-code & island removal",
+      "order": 12,
+      "autonomy": "needs-owner",
+      "done_means": "The confirmed islands (intelligence/, privacy/, the orchestration+container+integration+security+performance+platform cluster, genesis-auth MFA, genesis_assessor, errors.rs, ChainStateManager, CollectiveIntelligence, dead files and dead test targets) are deleted or gated behind a non-default feature, and the workspace still builds with all live tests passing.",
+      "findings": [
+        "[W2-80] Dead files never compiled: src/runtime/ (+phoenix), orchestration/lib.rs, catalog/lib.rs",
+        "[W2-82] intelligence/ ~4000 of 4596 lines are an island duplicating ngauge's advisory concern",
+        "[W2-83] privacy/ (2832L) island; live privacy semantics live in hypermesh_lib::PrivacyMode",
+        "[W2-17] Top-level privacy/ module documented as the live tier-enforcement layer, zero consumers (dup)",
+        "[W2-86] ~23K-line island cluster: orchestration + container + integration + security + performance + platform",
+        "[W1-8] Dead genesis-auth MFA subsystem (~770L) protecting a placeholder random-bytes keypair",
+        "[W1-9] genesis_assessor.rs dead parallel hardware-assessment/genesis-asset path",
+        "[W1-10] errors.rs structured error types dead — API returns Result<T,String>",
+        "[W1-11] Two block-persistence stacks: BlockSink/PersistenceManager vs ChainStateManager off the daemon path",
+        "[W1-44] ngauge CollectiveIntelligence orphaned (re-export only)",
+        "[W2-36] CollectiveIntelligence confirmed orphaned (dup)",
+        "[W2-70] CollectiveIntelligence orphaned: zero consumers, self-tests only (dup)",
+        "[W2-71] 13+ dead test files: root tests/ dead targets; 12 blockmatrix tests behind never-on future-tests"
+      ]
+    },
+    {
+      "name": "M — Naming/canon vocabulary & status-file truth sweep",
+      "order": 13,
+      "autonomy": "needs-owner",
+      "done_means": "'spine'/'foreign'/reputation-float/stake-magnitude vocabulary is removed from identifiers, wire fields and docs (with #[serde(rename)] where wire-visible), crate-status.toml stops claiming dormant features as 'working', and the over-500-line grab-bag files are split.",
+      "findings": [
+        "[W2-0] spine_point/spine_seq are wire-visible serde field names in the public signed MirrorAttestation type",
+        "[W2-1] 'spine/off-spine' vocabulary saturates accept/attestation/lineage docs despite the spine being non-authoritative",
+        "[W1-15] 'spine' survives as serialized wire field names and primary chain-core doc vocabulary",
+        "[W1-23] 'Spine' vocabulary survives the de-spine refactor as live type/field names",
+        "[W2-4] audit_ledger doc references the dissolved 'foreign store'; other doc/log 'foreign' survivals",
+        "[W2-5] catalog module file security/reputation.rs survives the ReputationSystem→PublisherAuthenticator rename",
+        "[W2-8] Stale comments claim trust-score/reputation logic where the code is canon-compliant",
+        "[W2-2] Reputation-as-float serde fields with live defaults in the (unmounted) user-contribution platform config",
+        "[W2-9] Stake-as-magnitude: dead StakeAmount criterion variant + Caesar mock staking-APY API (owner call)",
+        "[W2-3] crate-status.toml claims a working 'Genesis adoption protocol' while adopt_genesis is NOT WIRED",
+        "[W2-32] trust_signals→TrustChain gating unmounted despite crate-status claiming F.1 wired ('reputation' wording)",
+        "[W2-37] Dormant module cluster with 'working' status claims (receipt/min_spec/compliance/…)",
+        "[W2-38] File-size bar exceeded in ngauge (swarm_analytics 1383L, stoq_api 945L, routing_intel 857L)",
+        "[W1-51] blockmatrix still declares the unused reed-solomon-erasure dependency (A1 leftover)",
+        "[W1-33] peer_connection.rs (899L) and sync_and_reflection.rs (801L) violate the <500-line contract; the latter is a grab-bag",
+        "[W1-17] chain.rs (1469L) and mutations.rs (1479L) over the 500-line bar with mixed-concern seams",
+        "[W2-49] mutations.rs and chain.rs far exceed the 500-line file bar (dup)"
+      ]
+    }
+  ],
+  "uncovered_gaps": [
+    "PrivacyMode has no distinct transport effect: PUBLIC and PRIVATE both collapse to NetworkType::P2P self-signed certs (node_bringup.rs:93-103), and Anonymous merely toggles FALCON off — the wire-level meaning of the three privacy modes and what authenticates an Anonymous peer at all is unfiled, yet the whole architecture rests on PrivacyMode being independent of BlockchainScope.",
+    "The auth/ module (types + middleware) is built but its enforcement is honestly inert — the issuer is always None (per dormant-wiring summary) — so the HTTP/middleware authentication layer is disabled on the live path with no dedicated finding.",
+    "DaemonState carries several built-but-None seams beyond the --mode flag (W2-89): light_sync_manager (light client), release_feed subscriber, and transfer_coordinator (Phase-G inert in both DaemonState and PeerContext) — these dormant seams are noted in summaries but none is filed as its own gap.",
+    "The sync-fetch wire uses from_height range slicing (blockchain-core summary calls it a residual single-spine assumption) — whether range-based block fetch is even coherent against the canonical per-asset/independent-chain model was never examined by any finding, and it underlies cluster A's sync design.",
+    "The `base` crate is an unwired substrate scaffold with todo!() bodies (per project memory) yet is the canonical home of derive_cell/derive_address/AssetAddress that live blockmatrix code re-implements (base/src/address.rs is referenced by W2-56/W1-9 only in passing) — reconciling base/ as the shared-geometry source of truth is unfiled.",
+    "Caesar's coin/wallet economics beyond the mock staking API (W2-9): economic.rs's descriptive Decimal wallet fields (initialized to zero, never gated) — whether the broader Caesar economic layer is scar to delete or planned CAESAR-reward machinery is unadjudicated.",
+    "R16 link-sovereign interface management (os_integration) is not exercised by any finding — whether the shipped node actually enumerates interfaces and re-selects address/coordinate + signals connection migration on a real link change is unverified end-to-end."
+  ]
+}

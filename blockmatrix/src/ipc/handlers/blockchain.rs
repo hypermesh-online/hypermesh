@@ -163,12 +163,12 @@ mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "bc-test".into(),
+            network_id: "trustnet-test".into(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".into(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: DnsResolver::default(),
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
@@ -215,10 +215,7 @@ mod tests {
         let mut handler = RequestHandler::new();
         register(&mut handler, &state);
 
-        let req = RpcRequest::new(
-            "blockchain.block",
-            serde_json::json!({"index": 0}),
-        );
+        let req = RpcRequest::new("blockchain.block", serde_json::json!({"index": 0}));
         let resp = handler.dispatch(req).await;
         assert!(resp.error.is_none());
         let result = resp.result.expect("test: result");

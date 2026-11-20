@@ -20,9 +20,7 @@ use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 use super::invite::ShareInvite;
-use crate::assets::core::asset_id::{
-    AssetCategory, AssetData, BaseSystemType, NetworkScope,
-};
+use crate::assets::core::asset_id::{AssetCategory, AssetData, BaseSystemType, NetworkScope};
 use crate::assets::core::AssetRegistration;
 use crate::blockchain::block::{BlockAssetEntry, StoragePointer};
 use crate::blockchain::chain::NodeBlockchain;
@@ -256,9 +254,7 @@ impl InboxStore {
         let entry = BlockAssetEntry::new_bound(
             asset_hash,
             &state_proof,
-            StoragePointer::Local {
-                path: invite_json,
-            },
+            StoragePointer::Local { path: invite_json },
             registration,
         );
 
@@ -271,9 +267,7 @@ impl InboxStore {
                 );
                 Ok(())
             }
-            Err(e) => Err(anyhow::anyhow!(
-                "Failed to add invite block: {e}"
-            )),
+            Err(e) => Err(anyhow::anyhow!("Failed to add invite block: {e}")),
         }
     }
 }
@@ -345,14 +339,8 @@ mod tests {
 
         // Create and persist
         let store1 = InboxStore::new(Some(inbox_dir.clone()));
-        store1
-            .add(make_invite("p1", 300))
-            .await
-            .expect("test: add");
-        store1
-            .add(make_invite("p2", 400))
-            .await
-            .expect("test: add");
+        store1.add(make_invite("p1", 300)).await.expect("test: add");
+        store1.add(make_invite("p2", 400)).await.expect("test: add");
         store1.persist().await.expect("test: persist");
 
         // Verify YAML file exists and is YAML format
@@ -394,7 +382,10 @@ mod tests {
 
         // YAML file should now exist (migrated)
         let yaml_path = inbox_dir.join("invites.yaml");
-        assert!(yaml_path.exists(), "YAML file must be created during migration");
+        assert!(
+            yaml_path.exists(),
+            "YAML file must be created during migration"
+        );
     }
 
     #[tokio::test]
@@ -424,13 +415,19 @@ mod tests {
         let chain = Arc::new(RwLock::new(NodeBlockchain::new(coord)));
 
         let store = InboxStore::with_blockchain(None, chain.clone());
-        store.add(make_invite("bc1", 500)).await.expect("test: add with blockchain");
+        store
+            .add(make_invite("bc1", 500))
+            .await
+            .expect("test: add with blockchain");
 
         // Verify the invite was registered on-chain
         let bc = chain.read().await;
         let height = bc.get_height().await;
         // Genesis block is at index 0, invite should be at index 1
-        assert!(height >= 1, "Blockchain should have at least 1 block after invite registration");
+        assert!(
+            height >= 1,
+            "Blockchain should have at least 1 block after invite registration"
+        );
 
         let block = bc.get_block(1).await;
         assert!(block.is_some(), "Block 1 should exist");

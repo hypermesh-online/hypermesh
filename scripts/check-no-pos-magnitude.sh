@@ -20,7 +20,7 @@
 #   NOT limit itself to src/ or to files that compile.
 #
 # Usage: scripts/check-no-pos-magnitude.sh
-# Exit:  0 = clean, 1 = violations found.
+# Exit:  0 = clean, 1 = violations found, 2 = inventory/scan error.
 
 set -uo pipefail
 
@@ -74,7 +74,7 @@ candidates() {
     \( -path ./target -o -path ./.git -o -path './*/target' \
        -o -path ./.claude/worktrees -o -path './.claude/worktrees/*' \
        -o -name node_modules -o -name vendor \) -prune -o \
-    \( -name '*.rs' -o -name '*.c' -o -name '*.h' \) -print
+    \( -name '*.rs' -o -name '*.c' -o -name '*.h' \) -print0
 }
 
 is_allowed() {
@@ -96,7 +96,22 @@ report() {
   fi
 }
 
-FILES="$(candidates | while read -r f; do is_allowed "$f" || echo "$f"; done)"
+fatal() { printf 'FATAL: %s\n' "$*" >&2; exit 2; }
+
+collect_files() {
+  local pid f
+  local -a inventory=()
+  mapfile -d '' -t inventory < <(candidates) || fatal "cannot read source inventory"
+  # mapfile alone cannot report process-substitution/find errors.
+  pid=$!
+  wait "$pid" || fatal "cannot enumerate source inventory"
+  for f in "${inventory[@]}"; do
+    is_allowed "$f" || FILES+=("$f")
+  done
+}
+
+declare -a FILES=()
+collect_files
 
 # ---------------------------------------------------------------------------
 # NARROW, DOCUMENTED EXCEPTIONS (file + identifier scoped, never whole-file).
@@ -135,7 +150,9 @@ B_CLOSE='([^A-Za-z0-9_]|$)'
 
 scan() {
   local pattern="$1"
-  echo "$FILES" | tr '\n' '\0' | xargs -0 -r awk -v pat="$pattern" '
+  local -a statuses=()
+  [ "${#FILES[@]}" -gt 0 ] || return 0
+  printf '%s\0' "${FILES[@]}" | xargs -0 -r awk -v pat="$pattern" '
     {
       line = $0
       sub(/\/\/.*$/, "", line)          # strip // comments
@@ -143,18 +160,46 @@ scan() {
       gsub(/"[^"]*"/, "\"\"", line)     # blank string literal contents
       if (line ~ pat) printf "%s:%d:%s\n", FILENAME, FNR, $0
     }
-  ' 2>/dev/null | grep -vE "$EXCEPTIONS_RE" || true
+  ' | grep -vE "$EXCEPTIONS_RE"
+  statuses=("${PIPESTATUS[@]}")
+  # grep no-match is valid; producer, scanner and grep errors are not.
+  [ "${statuses[0]}" -eq 0 ] && [ "${statuses[1]}" -eq 0 ] &&
+    [ "${statuses[2]}" -le 1 ]
+}
+
+report_scan() {
+  local hits
+  hits=$(scan "$2") || fatal "source scan failed: $1"
+  report "$1" "$hits"
+}
+
+scan_duplicates() {
+  local f
+  local -a files=()
+  for f in "${FILES[@]}"; do
+    [[ "$f" == ./lib/* ]] || files+=("$f")
+  done
+  [ "${#files[@]}" -gt 0 ] || return 0
+  # Normalize grep's legitimate no-match per batch, not xargs' aggregate 123:
+  # a grep read/error in any batch must still propagate as a scan failure.
+  printf '%s\0' "${files[@]}" | xargs -0 -r sh -c '
+    grep -nEH "$@"
+    status=$?
+    [ "$status" -le 1 ]
+  ' guard-grep '^[[:space:]]*pub struct (FourProof|PoSpaceProof|PoStakeProof|PoWorkProof|PoTimeProof|SpaceProof|StakeProof|WorkProof|TimeProof|StateProof|ProofOfState)[[:space:]{(]' --
 }
 
 # Self-test: prove the matcher actually matches before trusting a PASS.
 # A guard that reads nothing is worse than no guard at all.
 selftest() {
-  local probe="/tmp/pos-magnitude-selftest-$$.rs"
-  printf 'fn f() {\n    if proof.space_proof.total_size == 0 {\n        let stake_amount = 5;\n    }\n}\n' > "$probe"
+  # Stream the fixture: no temporary file, TMPDIR requirement or /tmp fallback.
   local hits
-  hits="$(awk -v pat="${B_OPEN}(total_size|capacity)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]" '
-    { line=$0; if (line ~ pat) print FILENAME ":" FNR }' "$probe")"
-  rm -f "$probe"
+  if ! hits="$(printf 'fn f() {\n    if proof.space_proof.total_size == 0 {\n        let stake_amount = 5;\n    }\n}\n' |
+    awk -v pat="${B_OPEN}(total_size|capacity)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]" '
+      { line=$0; if (line ~ pat) print FILENAME ":" FNR }')"; then
+    echo -e "${RED}FATAL: guard self-test command failed; refusing to report PASS.${NC}" >&2
+    exit 2
+  fi
   if [ -z "$hits" ]; then
     echo -e "${RED}FATAL: guard self-test failed — the matcher detects nothing.${NC}" >&2
     echo -e "${RED}Refusing to report PASS. Fix the regex engine assumptions.${NC}" >&2
@@ -164,42 +209,41 @@ selftest() {
 selftest
 
 echo "== Proof of State magnitude guard =="
-echo "   scanning $(echo "$FILES" | grep -c . ) files (whole worktree, incl. orphaned/undeclared)"
+echo "   scanning ${#FILES[@]} files (whole worktree, incl. orphaned/undeclared)"
 echo
 
 # 1. PoStake must never carry an amount. `stake_amount` is forbidden outright.
-report "no 'stake_amount' (PoStake is authorization, never a magnitude)" \
-  "$(scan "${B_OPEN}stake_amount${B_CLOSE}")"
+report_scan "no 'stake_amount' (PoStake is authorization, never a magnitude)" \
+  "${B_OPEN}stake_amount${B_CLOSE}"
 
 # 2. Renamed-not-removed stake magnitudes. Renaming a magnitude does not make it
 #    an authorization — this class is why earlier passes reported false green.
-report "no minimum/threshold stake fields (renamed magnitudes)" \
-  "$(scan "${B_OPEN}(minimum_stake|min_stake|min_validation_stake|stake_threshold|min_stake_amount|stake_requirement)${B_CLOSE}")"
+report_scan "no minimum/threshold stake fields (renamed magnitudes)" \
+  "${B_OPEN}(minimum_stake|min_stake|min_validation_stake|stake_threshold|min_stake_amount|stake_requirement)${B_CLOSE}"
 
 # 3. Arbitrary sanity ceilings that smuggle magnitude back in.
-report "no MAX_REASONABLE_* magnitude ceilings" \
-  "$(scan "${B_OPEN}MAX_REASONABLE_[A-Z_]+")"
+report_scan "no MAX_REASONABLE_* magnitude ceilings" \
+  "${B_OPEN}MAX_REASONABLE_[A-Z_]+"
 
 # 4. Capacity compared against a constant. This is the defect class that
 #    survived three passes: `total_size == 0` denies admission to every
 #    freshly-provisioned node. PoSpace answers WHERE, not how-much.
-report "no capacity/compute compared against a constant (capacity never gates)" \
-  "$(scan "${B_OPEN}(total_size|total_storage|capacity|capacity_commitment|computational_power|compute_power|minimum_compute_power|min_space_commitment)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]")"
+report_scan "no capacity/compute compared against a constant (capacity never gates)" \
+  "${B_OPEN}(total_size|total_storage|capacity|capacity_commitment|computational_power|compute_power|minimum_compute_power|min_space_commitment)[[:space:]]*(==|!=|<|>|<=|>=)[[:space:]]*[0-9]"
 
 # 5. PoWork is the HASH of work done, not mining.
 #    NOTE: a bare `nonce` is NOT forbidden — TimeProof and WireSignedProof use
 #    anti-replay nonces, which are legitimate and unrelated to mining. Only a
 #    nonce attached to the WORK proof (the mining shape) is a violation.
-report "no difficulty/mining fields on PoS paths" \
-  "$(scan "${B_OPEN}(difficulty_target|min_work_difficulty|work_difficulty|difficulty)${B_CLOSE}")"
+report_scan "no difficulty/mining fields on PoS paths" \
+  "${B_OPEN}(difficulty_target|min_work_difficulty|work_difficulty|difficulty)${B_CLOSE}"
 
-report "no mining nonce on the work proof" \
-  "$(scan "work_proof[.a-z_]*nonce|${B_OPEN}PoWorkProof${B_CLOSE}")"
+report_scan "no mining nonce on the work proof" \
+  "work_proof[.a-z_]*nonce|${B_OPEN}PoWorkProof${B_CLOSE}"
 
 # 6. Duplicate PoS type definitions outside lib. There is ONE canonical type set
 #    and it lives in lib/src/proof.rs.
-DUP="$(echo "$FILES" | grep -v '^\./lib/' | tr '\n' '\0' \
-  | xargs -0 -r grep -nEH '^[[:space:]]*pub struct (FourProof|PoSpaceProof|PoStakeProof|PoWorkProof|PoTimeProof|SpaceProof|StakeProof|WorkProof|TimeProof|StateProof|ProofOfState)[[:space:]{(]' 2>/dev/null || true)"
+DUP=$(scan_duplicates) || fatal "duplicate-definition scan failed"
 report "no duplicate PoS type definitions outside lib/" "$DUP"
 
 echo

@@ -77,8 +77,7 @@ impl StoqBlockTransportAdapter {
         let block_json = serde_json::to_vec(block)?;
         let block_json_len = block_json.len() as u64;
 
-        let first_proof_hash: Option<[u8; 32]> =
-            block.entries.first().map(|e| e.proof_hash);
+        let first_proof_hash: Option<[u8; 32]> = block.entries.first().map(|e| e.proof_hash);
         let (proof_hash_len, proof_hash_bytes): (u64, Vec<u8>) = match first_proof_hash {
             Some(hash) => (32u64, hash.to_vec()),
             None => (0u64, Vec::new()),

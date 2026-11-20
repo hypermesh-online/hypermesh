@@ -44,7 +44,10 @@ impl IntelligenceMetricsCollector {
             .unwrap_or(0);
 
         self.monitor.record_resources(cpu_pct, mem_mb).await;
-        debug!(cpu_pct, mem_mb, "Sampled hardware metrics for intelligence layer");
+        debug!(
+            cpu_pct,
+            mem_mb, "Sampled hardware metrics for intelligence layer"
+        );
     }
 
     /// Record an asset processing operation.

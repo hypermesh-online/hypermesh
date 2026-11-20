@@ -34,8 +34,8 @@
 //! 4. Add a forward-compat test in `format_migrations` that round-trips
 //!    a block from old → new → old (when both directions are safe).
 
-use crate::blockchain::block::Block;
 use super::super::PersistenceResult;
+use crate::blockchain::block::Block;
 
 /// Migrate a V1 block to V2.
 ///
@@ -57,9 +57,8 @@ pub fn migrate_v1_to_v2(block: &Block) -> PersistenceResult<Block> {
 ///
 /// `(from_version, to_version, migrate_fn)`. Startup migration logic
 /// walks this list to run any required transformations.
-pub const MIGRATIONS: &[(u8, u8, fn(&Block) -> PersistenceResult<Block>)] = &[
-    (1, 2, migrate_v1_to_v2),
-];
+pub const MIGRATIONS: &[(u8, u8, fn(&Block) -> PersistenceResult<Block>)] =
+    &[(1, 2, migrate_v1_to_v2)];
 
 /// True when a migration exists for `(from, to)`. Used by startup
 /// detection to decide whether to migrate or refuse-and-log.

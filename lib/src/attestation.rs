@@ -308,7 +308,9 @@ impl MirrorAttestation {
     /// named third party — that is exactly the check `verify_grant` performs
     /// against `Grant.grantor`.
     pub fn binds_to_signer(&self) -> bool {
-        let derived = blake3::hash(&self.signature.signer_pubkey).to_hex().to_string();
+        let derived = blake3::hash(&self.signature.signer_pubkey)
+            .to_hex()
+            .to_string();
         self.mirror == derived
     }
 
@@ -456,7 +458,10 @@ impl std::fmt::Display for SealBreak {
                 f,
                 "seal committed to {sealed} attestations, {presented} presented"
             ),
-            Self::DuplicateAttestor { matrix_index, mirror } => write!(
+            Self::DuplicateAttestor {
+                matrix_index,
+                mirror,
+            } => write!(
                 f,
                 "duplicate attestor {mirror} at matrix cell {matrix_index}"
             ),
@@ -627,9 +632,15 @@ pub fn membership_proof(
             match level.get(i + 1) {
                 Some(right) => {
                     if index == i {
-                        path.push(MerkleStep { sibling: *right, sibling_on_right: true });
+                        path.push(MerkleStep {
+                            sibling: *right,
+                            sibling_on_right: true,
+                        });
                     } else if index == i + 1 {
-                        path.push(MerkleStep { sibling: level[i], sibling_on_right: false });
+                        path.push(MerkleStep {
+                            sibling: level[i],
+                            sibling_on_right: false,
+                        });
                     }
                     next.push(node_hash(&level[i], right));
                 }
@@ -658,10 +669,14 @@ pub fn verify_membership(
     seal: &MirrorSeal,
 ) -> Result<(), SealBreak> {
     if attestation.asset_hash != *asset_hash {
-        return Err(SealBreak::WrongAsset { position: proof.leaf_index });
+        return Err(SealBreak::WrongAsset {
+            position: proof.leaf_index,
+        });
     }
     if !attestation.is_structurally_valid() {
-        return Err(SealBreak::NotStructurallyValid { position: proof.leaf_index });
+        return Err(SealBreak::NotStructurallyValid {
+            position: proof.leaf_index,
+        });
     }
 
     let mut accumulator = leaf_hash(&attestation.commitment());
@@ -857,7 +872,10 @@ mod tests {
     fn tampered_matrix_index_rejected() {
         let mut a = attest([9u8; 32], MatrixIndex::new(1, 2, 3), "head-id", 4, 1);
         a.matrix_index = MatrixIndex::new(1, 2, 4);
-        assert!(!a.proof_bytes_match(), "tampered cell breaks structural binding");
+        assert!(
+            !a.proof_bytes_match(),
+            "tampered cell breaks structural binding"
+        );
         assert!(!a.is_structurally_valid());
     }
 
@@ -876,7 +894,8 @@ mod tests {
         let (pk, sk) = falcon1024::keypair();
         a.mirror = "0".repeat(64);
         a.signature.proof_bytes = a.my_canonical_bytes();
-        let digest = MirrorAttestation::signing_digest(&a.signature.proof_bytes, &a.signature.nonce);
+        let digest =
+            MirrorAttestation::signing_digest(&a.signature.proof_bytes, &a.signature.nonce);
         a.signature.signature = falcon1024::detached_sign(&digest, &sk).as_bytes().to_vec();
         a.signature.signer_pubkey = pk.as_bytes().to_vec();
         assert!(a.proof_bytes_match(), "structural bind still holds");
@@ -898,15 +917,23 @@ mod tests {
         // The only length any producer emits: hex of a BLAKE3 digest.
         let honest = attest(asset, cell, &"ab".repeat(32), 4, 1);
         assert_eq!(honest.spine_point.len(), 64);
-        assert!(honest.is_structurally_valid(), "an honest lineage_id must pass");
+        assert!(
+            honest.is_structurally_valid(),
+            "an honest lineage_id must pass"
+        );
 
         // Exactly at the cap: accepted. One byte over: refused.
         let at_cap = attest(asset, cell, &"c".repeat(MAX_SPINE_POINT_BYTES), 4, 2);
         assert!(at_cap.is_structurally_valid(), "the cap is inclusive");
         let over = attest(asset, cell, &"c".repeat(MAX_SPINE_POINT_BYTES + 1), 4, 3);
-        assert!(!over.is_structurally_valid(), "one byte over must be refused");
-        assert!(over.proof_bytes_match() && over.binds_to_signer() && falcon_ok(&over),
-            "the refusal is by SIZE — the envelope and identity binding are sound");
+        assert!(
+            !over.is_structurally_valid(),
+            "one byte over must be refused"
+        );
+        assert!(
+            over.proof_bytes_match() && over.binds_to_signer() && falcon_ok(&over),
+            "the refusal is by SIZE — the envelope and identity binding are sound"
+        );
 
         // The measured attack.
         let attack = attest(asset, cell, &"S".repeat(13_400), 4, 4);
@@ -954,7 +981,13 @@ mod tests {
         ));
 
         let mut added = set.clone();
-        added.push(attest(asset, MatrixIndex::new(99, 99, 99), "spine-point-abc", 7, 99));
+        added.push(attest(
+            asset,
+            MatrixIndex::new(99, 99, 99),
+            "spine-point-abc",
+            7,
+            99,
+        ));
         assert!(matches!(
             verify_sealed_set(&asset, &added, &seal),
             Err(SealBreak::CountMismatch { .. })
@@ -997,8 +1030,17 @@ mod tests {
         let member = set[1].clone();
         assert_eq!(sealed_set_contains(&asset, &set, &seal, &member), Ok(true));
 
-        let stranger = attest(asset, MatrixIndex::new(-5, -5, -5), "spine-point-abc", 7, 77);
-        assert_eq!(sealed_set_contains(&asset, &set, &seal, &stranger), Ok(false));
+        let stranger = attest(
+            asset,
+            MatrixIndex::new(-5, -5, -5),
+            "spine-point-abc",
+            7,
+            77,
+        );
+        assert_eq!(
+            sealed_set_contains(&asset, &set, &seal, &stranger),
+            Ok(false)
+        );
 
         let mut altered = set.clone();
         altered[0].signature.nonce[31] ^= 1;
@@ -1012,8 +1054,10 @@ mod tests {
         let b = attest(asset, MatrixIndex::new(0, 1, 9), "p", 0, 2);
         let c = attest(asset, MatrixIndex::new(-1, 9, 9), "p", 0, 3);
         let set = vec![a.clone(), b.clone(), c.clone()];
-        let ordered: Vec<MatrixIndex> =
-            canonical_order(&set).iter().map(|x| x.matrix_index).collect();
+        let ordered: Vec<MatrixIndex> = canonical_order(&set)
+            .iter()
+            .map(|x| x.matrix_index)
+            .collect();
         assert_eq!(
             ordered,
             vec![
@@ -1085,7 +1129,11 @@ mod tests {
         let root = seal_root(&set);
         set.swap(0, 6);
         set.swap(2, 4);
-        assert_eq!(root, seal_root(&set), "shuffle cannot change the Merkle root");
+        assert_eq!(
+            root,
+            seal_root(&set),
+            "shuffle cannot change the Merkle root"
+        );
         // Distinct cardinalities never collide, even on promoted-odd shapes.
         let roots: std::collections::HashSet<[u8; 32]> =
             (0..8u8).map(|n| seal_root(&set_of(n, asset))).collect();
@@ -1097,7 +1145,8 @@ mod tests {
         // A grant's canonical bytes can never equal an attestation's: the
         // attestation stream begins with its own length-prefixed domain tag.
         let a = MirrorAttestation::canonical_bytes(&[0u8; 32], MatrixIndex::origin(), "m", "s", 0);
-        let g = crate::authz::Grant::canonical_bytes("m", "s", crate::authz::GrantScope::Read, None);
+        let g =
+            crate::authz::Grant::canonical_bytes("m", "s", crate::authz::GrantScope::Read, None);
         assert_ne!(a, g);
         assert!(a.starts_with(&(ATTESTATION_DOMAIN.len() as u32).to_le_bytes()));
     }

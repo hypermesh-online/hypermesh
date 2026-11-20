@@ -16,6 +16,44 @@ use super::middleware::{add_cors_headers, RequestLogger};
 use super::router::Router;
 use stoq::{StoqTransport, TransportConfig as StoqTransportConfig};
 
+fn server_transport_config(addr: SocketAddr, ipv6_addr: std::net::Ipv6Addr) -> StoqTransportConfig {
+    StoqTransportConfig {
+        bind_address: ipv6_addr,
+        port: addr.port(),
+        max_connections: None,
+        connection_timeout: Duration::from_secs(30),
+        enable_migration: true,
+        enable_0rtt: true,
+        max_idle_timeout: Duration::from_secs(60),
+        cert_rotation_interval: Duration::from_secs(86400),
+        max_concurrent_streams: 100,
+        send_buffer_size: 2 * 1024 * 1024,    // 2MB
+        receive_buffer_size: 2 * 1024 * 1024, // 2MB
+        connection_pool_size: 10,
+        enable_zero_copy: true,
+        max_datagram_size: 1400,
+        memory_pool_size: 1000,
+        congestion_control: stoq::transport::CongestionControl::Cubic,
+        enable_memory_pool: true,
+        frame_batch_size: 64,
+        enable_cpu_affinity: false,
+        health_check_interval: 10,
+        connection_idle_timeout: 30,
+        enable_large_send_offload: true,
+        enable_falcon_crypto: false,
+        falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,
+        enable_kernel_acceleration: true,
+        ebpf_interface: None,
+        interface: None,
+        ewma_alpha: 0.125,
+        mtu_probe_interval_secs: 30,
+        loss_window_size: 10,
+        wan_enabled: false,
+        public_ipv6: None,
+        connection_migration_timeout_ms: 3000,
+    }
+}
+
 pub struct Http3StoqServer {
     addr: SocketAddr,
     router: Arc<Router>,
@@ -49,40 +87,7 @@ impl Http3StoqServer {
         };
 
         // Create STOQ transport configuration
-        let stoq_config = StoqTransportConfig {
-            bind_address: ipv6_addr,
-            port: self.addr.port(),
-            max_connections: None,
-            connection_timeout: Duration::from_secs(30),
-            enable_migration: true,
-            enable_0rtt: true,
-            max_idle_timeout: Duration::from_secs(60),
-            cert_rotation_interval: Duration::from_secs(86400),
-            max_concurrent_streams: 100,
-            send_buffer_size: 2 * 1024 * 1024,    // 2MB
-            receive_buffer_size: 2 * 1024 * 1024, // 2MB
-            connection_pool_size: 10,
-            enable_zero_copy: true,
-            max_datagram_size: 1400,
-            memory_pool_size: 1000,
-            congestion_control: stoq::transport::CongestionControl::Cubic,
-            enable_memory_pool: true,
-            frame_batch_size: 64,
-            enable_cpu_affinity: false,
-            health_check_interval: 10,
-            connection_idle_timeout: 30,
-            enable_large_send_offload: true,
-            enable_falcon_crypto: false,
-            falcon_variant: stoq::transport::falcon::FalconVariant::Falcon1024,
-            ebpf_interface: None,
-            interface: None,
-            ewma_alpha: 0.125,
-            mtu_probe_interval_secs: 30,
-            loss_window_size: 10,
-            wan_enabled: false,
-            public_ipv6: None,
-            connection_migration_timeout_ms: 3000,
-        };
+        let stoq_config = server_transport_config(self.addr, ipv6_addr);
 
         // Initialize STOQ transport
         let transport = StoqTransport::new(stoq_config)
@@ -94,20 +99,18 @@ impl Http3StoqServer {
         // Accept connections using STOQ's underlying Quinn endpoint
         let endpoint = transport.quinn_endpoint();
 
+        let handle = |incoming: quinn::Incoming, router: Arc<Router>| async move {
+            let connection = match incoming.await {
+                Ok(connection) => connection,
+                Err(e) => return error!("Failed to accept connection: {}", e),
+            };
+            if let Err(e) = handle_connection(connection, router).await {
+                error!("Connection error: {}", e);
+            }
+        };
         while let Some(incoming) = endpoint.accept().await {
             let router = self.router.clone();
-            tokio::spawn(async move {
-                match incoming.await {
-                    Ok(connection) => {
-                        if let Err(e) = handle_connection(connection, router).await {
-                            error!("Connection error: {}", e);
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to accept connection: {}", e);
-                    }
-                }
-            });
+            tokio::spawn(handle(incoming, router));
         }
 
         Ok(())

@@ -8,7 +8,7 @@ use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
 #[cfg(feature = "kernel-attach")]
-use super::kernel_types::{KernelState, XdpDesc};
+use super::kernel_types::XdpDesc;
 
 use super::manager::AfXdpSocket;
 
@@ -18,14 +18,8 @@ use super::manager::AfXdpSocket;
 
 impl AfXdpSocket {
     /// Send multiple packets in batch for efficiency
-    pub async fn send_batch(&self, packets: &[&[u8]]) -> Result<usize> {
+    pub async fn send_batch(&self, _packets: &[&[u8]]) -> Result<usize> {
         if !self.kernel_backed {
-            let count = packets.len();
-            let mut stats = self.stats.write();
-            stats.packets_sent += count as u64;
-            for packet in packets {
-                stats.bytes_sent += packet.len() as u64;
-            }
             return Err(anyhow!(
                 "AF_XDP not kernel-backed: use standard I/O for batch send"
             ));
@@ -33,7 +27,7 @@ impl AfXdpSocket {
 
         #[cfg(feature = "kernel-attach")]
         {
-            return self.send_batch_kernel(packets);
+            return self.send_batch_kernel(_packets);
         }
 
         #[cfg(not(feature = "kernel-attach"))]

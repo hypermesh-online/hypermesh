@@ -605,7 +605,10 @@ mod tests {
             .await
             .expect("test: expected success");
 
-        let retrieved = registry.get_metadata("test-ext").await.expect("test: async operation");
+        let retrieved = registry
+            .get_metadata("test-ext")
+            .await
+            .expect("test: async operation");
         assert_eq!(retrieved.id, "test-ext");
 
         let list = registry.list_extensions().await;

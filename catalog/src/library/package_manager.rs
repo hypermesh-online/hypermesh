@@ -585,7 +585,10 @@ mod tests {
         let library = Arc::new(AssetLibrary::new());
         let manager = AssetPackageManager::new(library, PackageManagerConfig::default());
 
-        let installed = manager.list_installed().await.expect("test: async operation");
+        let installed = manager
+            .list_installed()
+            .await
+            .expect("test: async operation");
         assert_eq!(installed.len(), 0);
     }
 
@@ -595,27 +598,42 @@ mod tests {
 
         // Add a test package to the library
         let package = create_test_package("test-pkg");
-        library.add_package(package).await.expect("test: async operation");
+        library
+            .add_package(package)
+            .await
+            .expect("test: async operation");
 
         let manager =
             AssetPackageManager::new(Arc::clone(&library), PackageManagerConfig::default());
 
         // Install package
-        let result = manager.install_package("test-pkg").await.expect("test: async operation");
+        let result = manager
+            .install_package("test-pkg")
+            .await
+            .expect("test: async operation");
         assert!(result.success);
         assert_eq!(result.packages_affected.len(), 1);
 
         // Check it's installed
-        let installed = manager.list_installed().await.expect("test: async operation");
+        let installed = manager
+            .list_installed()
+            .await
+            .expect("test: async operation");
         assert_eq!(installed.len(), 1);
         assert_eq!(installed[0].id, "test-pkg");
 
         // Uninstall package
-        let result = manager.uninstall_package("test-pkg").await.expect("test: async operation");
+        let result = manager
+            .uninstall_package("test-pkg")
+            .await
+            .expect("test: async operation");
         assert!(result.success);
 
         // Check it's gone
-        let installed = manager.list_installed().await.expect("test: async operation");
+        let installed = manager
+            .list_installed()
+            .await
+            .expect("test: async operation");
         assert_eq!(installed.len(), 0);
     }
 

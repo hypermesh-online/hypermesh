@@ -273,10 +273,7 @@ impl NodeBlockchain {
     /// Builder form — the live daemon calls this right after constructing the
     /// chain (`from_genesis`/`from_blocks`) with its `FalconIdentity`. Chains
     /// without a signer produce unsigned entries.
-    pub fn with_signer(
-        mut self,
-        signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>,
-    ) -> Self {
+    pub fn with_signer(mut self, signer: Arc<dyn hypermesh_lib::NodeSigner + Send + Sync>) -> Self {
         self.signer = Some(signer);
         self
     }
@@ -290,10 +287,7 @@ impl NodeBlockchain {
     /// (`from_genesis`/`from_blocks`) with its `PersistenceManager`. Chains
     /// without a sink keep the pre-S3.0 memory-only behaviour, which is
     /// correct for library and test chains that have no storage directory.
-    pub fn with_persistence(
-        mut self,
-        sink: Arc<dyn super::block_sink::BlockSink>,
-    ) -> Self {
+    pub fn with_persistence(mut self, sink: Arc<dyn super::block_sink::BlockSink>) -> Self {
         self.block_sink = Some(sink);
         self
     }
@@ -608,7 +602,11 @@ impl NodeBlockchain {
 
     /// S3.1: the most recent entry recorded for `asset_hash`, if any.
     pub async fn asset_head(&self, asset_hash: &[u8; 32]) -> Option<AssetEntryLocator> {
-        self.asset_index.read().await.asset_head(asset_hash).cloned()
+        self.asset_index
+            .read()
+            .await
+            .asset_head(asset_hash)
+            .cloned()
     }
 
     /// S3.2/F1 — the `(lineage_id, asset_seq)` this container recognises as
@@ -655,7 +653,10 @@ impl NodeBlockchain {
     /// F1 — has this container EVER recorded an entry for `asset_hash`, even
     /// one since pruned away?
     pub async fn has_ever_seen_asset(&self, asset_hash: &[u8; 32]) -> bool {
-        self.asset_index.read().await.has_ever_seen_asset(asset_hash)
+        self.asset_index
+            .read()
+            .await
+            .has_ever_seen_asset(asset_hash)
     }
 
     /// Number of distinct assets the index knows about.
@@ -896,8 +897,8 @@ impl NodeBlockchain {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::block::{BlockAssetEntry, StoragePointer};
+    use super::*;
     use crate::assets::core::AssetRegistration;
     use trustchain::proof_of_state::StateProof;
 
@@ -905,7 +906,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,
@@ -939,7 +940,10 @@ mod tests {
         let genesis = chain.get_head().await.expect("test: genesis");
         let block = Block::new(1, vec![entry], genesis.hash.clone());
 
-        chain.insert_block(block.clone()).await.expect("test: insert");
+        chain
+            .insert_block(block.clone())
+            .await
+            .expect("test: insert");
 
         let retrieved = chain.get_block(1).await.expect("test: block retrieval");
         assert_eq!(retrieved, block);
@@ -1054,8 +1058,7 @@ mod tests {
         let block2 = Block::new(2, vec![entry2], block1.hash.clone());
 
         let blocks = vec![genesis, block1, block2];
-        let chain =
-            NodeBlockchain::from_blocks(coord, blocks).expect("test: from_blocks");
+        let chain = NodeBlockchain::from_blocks(coord, blocks).expect("test: from_blocks");
 
         assert_eq!(chain.get_height().await, 2);
         assert_eq!(chain.get_stats().await.total_blocks, 3);
@@ -1110,11 +1113,7 @@ mod tests {
 
         let result = chain.adopt_genesis(non_genesis).await;
         assert!(result.is_err());
-        assert!(
-            result
-                .expect_err("test: should error")
-                .contains("index 0"),
-        );
+        assert!(result.expect_err("test: should error").contains("index 0"),);
     }
 
     #[tokio::test]
@@ -1129,11 +1128,9 @@ mod tests {
 
         let result = chain.adopt_genesis(tampered).await;
         assert!(result.is_err());
-        assert!(
-            result
-                .expect_err("test: should error")
-                .contains("hash verification"),
-        );
+        assert!(result
+            .expect_err("test: should error")
+            .contains("hash verification"),);
     }
 
     #[tokio::test]
@@ -1423,7 +1420,7 @@ mod tests {
         let reg = AssetRegistration::genesis(coord);
         let content_hash = *blake3::hash(reg.to_string().as_bytes()).as_bytes();
         let state_proof = StateProof::default();
-        let proof_bytes = serde_json::to_vec(&state_proof).unwrap_or_default();
+        let proof_bytes = state_proof.to_bytes().unwrap_or_default();
         let proof_hash = *blake3::hash(&proof_bytes).as_bytes();
         BlockAssetEntry {
             asset_hash: content_hash,

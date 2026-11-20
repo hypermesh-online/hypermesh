@@ -41,7 +41,9 @@ pub fn create_invitation(
         .as_secs();
     let expires_at = now.saturating_add(ttl_secs);
     let invitee = invitee_node_id.unwrap_or("");
-    let network_id = super::domain::derive_network_id(domain_name);
+    // `DomainInvitation.network_id` is a serialized wire field; keep its
+    // canonical hex string form (byte-identical to the pre-retype value).
+    let network_id = super::domain::derive_network_id(domain_name).to_string();
 
     let key = derive_key(owner_proof_bytes);
     let payload = format!("{domain_name}:{invitee}:{expires_at}");
@@ -85,8 +87,7 @@ pub fn encode_invitation(invitation: &DomainInvitation) -> Result<String, serde_
 
 /// Decode an invitation from a hex-encoded string.
 pub fn decode_invitation(token_str: &str) -> Result<DomainInvitation, String> {
-    let bytes =
-        hex::decode(token_str).map_err(|e| format!("Invalid token encoding: {e}"))?;
+    let bytes = hex::decode(token_str).map_err(|e| format!("Invalid token encoding: {e}"))?;
     serde_json::from_slice(&bytes).map_err(|e| format!("Invalid token format: {e}"))
 }
 
@@ -163,7 +164,10 @@ mod tests {
         inv.expires_at = 1;
         // Re-derive token with the past timestamp so the HMAC matches
         let key = derive_key(proof);
-        let payload = format!("{}:{}:{}", inv.domain_name, inv.invitee_node_id, inv.expires_at);
+        let payload = format!(
+            "{}:{}:{}",
+            inv.domain_name, inv.invitee_node_id, inv.expires_at
+        );
         inv.token = *blake3::keyed_hash(&key, payload.as_bytes()).as_bytes();
 
         assert!(

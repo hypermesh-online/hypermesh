@@ -50,11 +50,7 @@ pub struct RevocationNotice {
 
 impl RevocationNotice {
     /// Create a new revocation notice with computed hash.
-    pub fn new(
-        serial_number: String,
-        reason: String,
-        issuing_ca_id: String,
-    ) -> Self {
+    pub fn new(serial_number: String, reason: String, issuing_ca_id: String) -> Self {
         let notice_id = uuid::Uuid::new_v4().to_string();
         let hash = Self::compute_hash(&notice_id, &serial_number, &reason);
         Self {
@@ -197,10 +193,7 @@ impl RevocationPropagator {
     /// Accept an incoming revocation notice from a remote peer.
     ///
     /// Validates the notice hash and stores it. Generates an ack message.
-    pub async fn receive_revocation(
-        &self,
-        notice: RevocationNotice,
-    ) -> TrustChainResult<()> {
+    pub async fn receive_revocation(&self, notice: RevocationNotice) -> TrustChainResult<()> {
         // Verify hash integrity
         let expected = RevocationNotice::compute_hash(
             &notice.notice_id,
@@ -209,10 +202,7 @@ impl RevocationPropagator {
         );
         if expected != notice.notice_hash {
             return Err(TrustChainError::InvalidRequest {
-                reason: format!(
-                    "Notice hash mismatch for '{}'",
-                    notice.notice_id
-                ),
+                reason: format!("Notice hash mismatch for '{}'", notice.notice_id),
             });
         }
 
@@ -238,17 +228,14 @@ impl RevocationPropagator {
     }
 
     /// Mark a peer as having received (propagated) a notice.
-    pub async fn mark_propagated(
-        &self,
-        notice_id: &str,
-        peer_ca_id: &str,
-    ) -> TrustChainResult<()> {
+    pub async fn mark_propagated(&self, notice_id: &str, peer_ca_id: &str) -> TrustChainResult<()> {
         let mut propagations = self.propagations.write().await;
-        let prop = propagations.get_mut(notice_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
-                reason: format!("Notice '{}' not found", notice_id),
-            }
-        })?;
+        let prop =
+            propagations
+                .get_mut(notice_id)
+                .ok_or_else(|| TrustChainError::InvalidRequest {
+                    reason: format!("Notice '{}' not found", notice_id),
+                })?;
         if let Some(status) = prop.peer_status.get_mut(peer_ca_id) {
             *status = PropagationStatus::Propagated;
         }
@@ -256,17 +243,14 @@ impl RevocationPropagator {
     }
 
     /// Mark a peer as having confirmed receipt of a notice.
-    pub async fn mark_confirmed(
-        &self,
-        notice_id: &str,
-        peer_ca_id: &str,
-    ) -> TrustChainResult<()> {
+    pub async fn mark_confirmed(&self, notice_id: &str, peer_ca_id: &str) -> TrustChainResult<()> {
         let mut propagations = self.propagations.write().await;
-        let prop = propagations.get_mut(notice_id).ok_or_else(|| {
-            TrustChainError::InvalidRequest {
-                reason: format!("Notice '{}' not found", notice_id),
-            }
-        })?;
+        let prop =
+            propagations
+                .get_mut(notice_id)
+                .ok_or_else(|| TrustChainError::InvalidRequest {
+                    reason: format!("Notice '{}' not found", notice_id),
+                })?;
         if let Some(status) = prop.peer_status.get_mut(peer_ca_id) {
             *status = PropagationStatus::Confirmed;
         }
@@ -279,9 +263,7 @@ impl RevocationPropagator {
         notice_id: &str,
     ) -> Option<HashMap<String, PropagationStatus>> {
         let propagations = self.propagations.read().await;
-        propagations
-            .get(notice_id)
-            .map(|p| p.peer_status.clone())
+        propagations.get(notice_id).map(|p| p.peer_status.clone())
     }
 
     /// Drain the outbound message queue.
@@ -336,14 +318,8 @@ mod tests {
             .get_propagation_status(&notice_id)
             .await
             .expect("test: status exists");
-        assert_eq!(
-            status.get("peer-alpha"),
-            Some(&PropagationStatus::Pending)
-        );
-        assert_eq!(
-            status.get("peer-beta"),
-            Some(&PropagationStatus::Pending)
-        );
+        assert_eq!(status.get("peer-alpha"), Some(&PropagationStatus::Pending));
+        assert_eq!(status.get("peer-beta"), Some(&PropagationStatus::Pending));
     }
 
     #[tokio::test]
@@ -416,10 +392,7 @@ mod tests {
             .get_propagation_status(&notice_id)
             .await
             .expect("test: status");
-        assert_eq!(
-            status.get("peer-1"),
-            Some(&PropagationStatus::Propagated)
-        );
+        assert_eq!(status.get("peer-1"), Some(&PropagationStatus::Propagated));
 
         // Propagated -> Confirmed
         propagator
@@ -431,9 +404,6 @@ mod tests {
             .get_propagation_status(&notice_id)
             .await
             .expect("test: status");
-        assert_eq!(
-            status.get("peer-1"),
-            Some(&PropagationStatus::Confirmed)
-        );
+        assert_eq!(status.get("peer-1"), Some(&PropagationStatus::Confirmed));
     }
 }

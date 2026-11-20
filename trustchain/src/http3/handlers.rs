@@ -18,10 +18,10 @@ use crate::ca::certificate_store::CertificateStore;
 use crate::ca::federation::FederationManager;
 use crate::ca::ocsp::{OcspCertStatus, OcspRequest, OcspResponder};
 use crate::ca::{CertificateRequest, CertificateStatus, IssuedCertificate, TrustChainCA};
-use crate::proof_of_state::StateProof;
 use crate::errors::{Result as TrustChainResult, TrustChainError};
-use crate::security::SecurityMonitor;
+use crate::proof_of_state::StateProof;
 use crate::proof_of_state::StateProofOps;
+use crate::security::SecurityMonitor;
 
 // ---------------------------------------------------------------------------
 // Request / Response types
@@ -906,9 +906,7 @@ mod tests {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
-        let ca = TrustChainCA::new(ca_config)
-            .await
-            .expect("test: create CA");
+        let ca = TrustChainCA::new(ca_config).await.expect("test: create CA");
         let store = CertificateStore::new()
             .await
             .expect("test: create cert store");
@@ -937,9 +935,7 @@ mod tests {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
-        let ca = TrustChainCA::new(ca_config)
-            .await
-            .expect("test: create CA");
+        let ca = TrustChainCA::new(ca_config).await.expect("test: create CA");
         let store = CertificateStore::new()
             .await
             .expect("test: create cert store");
@@ -1003,9 +999,7 @@ mod tests {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
-        let ca = TrustChainCA::new(ca_config)
-            .await
-            .expect("test: create CA");
+        let ca = TrustChainCA::new(ca_config).await.expect("test: create CA");
         let store = CertificateStore::new()
             .await
             .expect("test: create cert store");
@@ -1033,9 +1027,7 @@ mod tests {
         use crate::security::SecurityConfig;
 
         let ca_config = crate::ca::CAConfig::testing();
-        let ca = TrustChainCA::new(ca_config)
-            .await
-            .expect("test: create CA");
+        let ca = TrustChainCA::new(ca_config).await.expect("test: create CA");
         let store = CertificateStore::new()
             .await
             .expect("test: create cert store");

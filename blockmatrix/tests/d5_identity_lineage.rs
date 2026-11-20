@@ -24,10 +24,9 @@ async fn d5_identity_and_key_rotation_walk_as_one_lineage() {
     let node = FalconIdentity::generate();
 
     // The node's identity, scoped to the node itself.
-    let fingerprint =
-        NetworkScope::Private(NodeFingerprint::from(hypermesh_lib::NodeId::from_public_key(
-            &node.public_key,
-        )));
+    let fingerprint = NetworkScope::Private(NodeFingerprint::from(
+        hypermesh_lib::NodeId::from_public_key(&node.public_key),
+    ));
     let identity_registration = AssetRegistration::from_asset_data(
         &AssetData {
             config: Vec::new(),

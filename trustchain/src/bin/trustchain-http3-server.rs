@@ -20,8 +20,7 @@ use trustchain::crypto::falcon::FalconCrypto;
 use trustchain::crypto::KeyUsage;
 use trustchain::http3::handlers::{
     self, DnsResolveRequest as HandlerDnsResolveRequest, HttpHandlerContext,
-    IssueCertificateRequest, OcspHttpRequest, RevokeCertificateRequest,
-    ValidateCertificateRequest,
+    IssueCertificateRequest, OcspHttpRequest, RevokeCertificateRequest, ValidateCertificateRequest,
 };
 use trustchain::http3::{ApiResponse, Http3StoqServer, Router};
 use trustchain::security::{SecurityConfig, SecurityMonitor};
@@ -158,11 +157,18 @@ async fn main() -> Result<()> {
 
     // Start server using configured bind address and port
     let bind_addr = tc_config.api.bind_address;
-    let bind_port = if tc_config.api.port == 0 { 50053 } else { tc_config.api.port };
+    let bind_port = if tc_config.api.port == 0 {
+        50053
+    } else {
+        tc_config.api.port
+    };
     let addr = SocketAddr::new(IpAddr::V6(bind_addr), bind_port);
     let server = Http3StoqServer::new(addr, router);
 
-    info!("TrustChain HTTP/3 server (STOQ transport) listening on https://[{}]:{}", bind_addr, bind_port);
+    info!(
+        "TrustChain HTTP/3 server (STOQ transport) listening on https://[{}]:{}",
+        bind_addr, bind_port
+    );
 
     // Run server with graceful shutdown
     let server_task = tokio::spawn(async move {
@@ -380,17 +386,20 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
     });
 
     // State proof validate (stub)
-    let router = router.post("/api/v1/trustchain/state_proof/validate", |_req| async move {
-        // TODO: Implement handle_state_proof_validate() in handlers.rs — needs
-        // StateProof deserialization from request body and validation via
-        // SecurityMonitor::validate_certificate_operation().
-        build_error_response(
-            "NOT_IMPLEMENTED",
-            "State proof validation endpoint requires proof deserialization (not yet wired)"
-                .to_string(),
-            uuid::Uuid::new_v4().to_string(),
-        )
-    });
+    let router = router.post(
+        "/api/v1/trustchain/state_proof/validate",
+        |_req| async move {
+            // TODO: Implement handle_state_proof_validate() in handlers.rs — needs
+            // StateProof deserialization from request body and validation via
+            // SecurityMonitor::validate_certificate_operation().
+            build_error_response(
+                "NOT_IMPLEMENTED",
+                "State proof validation endpoint requires proof deserialization (not yet wired)"
+                    .to_string(),
+                uuid::Uuid::new_v4().to_string(),
+            )
+        },
+    );
 
     // State proofs by asset ID (stub)
     let router = router.get(
@@ -400,8 +409,7 @@ fn build_router(ctx: Arc<HttpHandlerContext>) -> Router {
             // per-asset proof retrieval from blockchain/state proof layer.
             build_error_response(
                 "NOT_IMPLEMENTED",
-                "State proof retrieval requires blockchain integration (not yet wired)"
-                    .to_string(),
+                "State proof retrieval requires blockchain integration (not yet wired)".to_string(),
                 uuid::Uuid::new_v4().to_string(),
             )
         },

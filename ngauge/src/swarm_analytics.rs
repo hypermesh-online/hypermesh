@@ -86,7 +86,6 @@ pub struct SwarmAnalytics {
     replica_counts: HashMap<(NetworkId, ContentHash), u32>,
 
     // -- Windowed fetch-rate tracking --
-
     /// `(network, shard_hash)` -> list of fetch timestamps (windowed).
     fetch_history: HashMap<(NetworkId, [u8; 32]), Vec<Instant>>,
     /// Sliding window for counting fetches.
@@ -134,7 +133,13 @@ impl SwarmAnalytics {
         consumer_pos: MatrixPosition,
         timestamp_us: u64,
     ) {
-        self.record_request_in_network(DEFAULT_NETWORK, shard_id, consumer_id, consumer_pos, timestamp_us);
+        self.record_request_in_network(
+            DEFAULT_NETWORK,
+            shard_id,
+            consumer_id,
+            consumer_pos,
+            timestamp_us,
+        );
     }
 
     /// Record a request for a shard within a specific network.
@@ -154,7 +159,10 @@ impl SwarmAnalytics {
         entry.last_access_us = timestamp_us;
         entry.consumer_positions.push(consumer_pos);
 
-        let consumers = self.shard_consumers.entry((network_id, shard_id)).or_default();
+        let consumers = self
+            .shard_consumers
+            .entry((network_id, shard_id))
+            .or_default();
         consumers.insert(consumer_id);
         entry.unique_consumers = consumers.len();
     }
@@ -177,14 +185,17 @@ impl SwarmAnalytics {
     ///
     /// Spans all networks (only [`DEFAULT_NETWORK`] is present, so
     /// the result is identical to the flat map).
-    pub fn get_popular_shards(&self, min_request_count: u64) -> Vec<(ContentHash, &ShardPopularity)> {
+    pub fn get_popular_shards(
+        &self,
+        min_request_count: u64,
+    ) -> Vec<(ContentHash, &ShardPopularity)> {
         let mut popular: Vec<_> = self
             .shard_data
             .iter()
             .filter(|(_, pop)| pop.request_count >= min_request_count)
             .map(|((_network, hash), pop)| (*hash, pop))
             .collect();
-        popular.sort_by(|a, b| b.1.request_count.cmp(&a.1.request_count));
+        popular.sort_by_key(|item| std::cmp::Reverse(item.1.request_count));
         popular
     }
 
@@ -210,7 +221,12 @@ impl SwarmAnalytics {
     }
 
     /// Set the replica count for a shard within a specific network.
-    pub fn set_replica_count_in_network(&mut self, network_id: NetworkId, shard_id: ContentHash, count: u32) {
+    pub fn set_replica_count_in_network(
+        &mut self,
+        network_id: NetworkId,
+        shard_id: ContentHash,
+        count: u32,
+    ) {
         self.replica_counts.insert((network_id, shard_id), count);
     }
 
@@ -220,8 +236,15 @@ impl SwarmAnalytics {
     }
 
     /// Get the replica count for a shard within a specific network.
-    pub fn get_replica_count_in_network(&self, network_id: NetworkId, shard_id: &ContentHash) -> u32 {
-        self.replica_counts.get(&(network_id, *shard_id)).copied().unwrap_or(0)
+    pub fn get_replica_count_in_network(
+        &self,
+        network_id: NetworkId,
+        shard_id: &ContentHash,
+    ) -> u32 {
+        self.replica_counts
+            .get(&(network_id, *shard_id))
+            .copied()
+            .unwrap_or(0)
     }
 
     // -- Windowed fetch-rate API (R12 swarm scaling) --
@@ -233,8 +256,16 @@ impl SwarmAnalytics {
     }
 
     /// Record a shard fetch event at a specific instant within a network.
-    pub fn record_fetch_at_in_network(&mut self, network_id: NetworkId, shard_hash: [u8; 32], at: Instant) {
-        let history = self.fetch_history.entry((network_id, shard_hash)).or_default();
+    pub fn record_fetch_at_in_network(
+        &mut self,
+        network_id: NetworkId,
+        shard_hash: [u8; 32],
+        at: Instant,
+    ) {
+        let history = self
+            .fetch_history
+            .entry((network_id, shard_hash))
+            .or_default();
         history.push(at);
 
         // Trim entries outside the window.
@@ -510,7 +541,11 @@ impl ReplicationTrigger {
         }
 
         // Sort by urgency descending.
-        signals.sort_by(|a, b| b.urgency.partial_cmp(&a.urgency).unwrap_or(std::cmp::Ordering::Equal));
+        signals.sort_by(|a, b| {
+            b.urgency
+                .partial_cmp(&a.urgency)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         signals
     }
 }
@@ -637,9 +672,7 @@ fn cluster_positions(positions: &[MatrixPosition], k: usize) -> Vec<MatrixPositi
 
     // Initialize centroids by evenly sampling from positions.
     let step = positions.len() / k;
-    let mut centroids: Vec<MatrixPosition> = (0..k)
-        .map(|i| positions[i * step])
-        .collect();
+    let mut centroids: Vec<MatrixPosition> = (0..k).map(|i| positions[i * step]).collect();
 
     // Run a few iterations of k-means.
     for _ in 0..10 {
@@ -836,7 +869,9 @@ mod tests {
         analytics.record_request(shard, consumer_a, test_pos(1.0, 0.0, 0.0), 2000);
         analytics.record_request(shard, consumer_b, test_pos(5.0, 0.0, 0.0), 3000);
 
-        let pop = analytics.get_popularity(&shard).expect("test: popularity should exist");
+        let pop = analytics
+            .get_popularity(&shard)
+            .expect("test: popularity should exist");
         assert_eq!(pop.request_count, 3);
         assert_eq!(pop.unique_consumers, 2);
         assert_eq!(pop.last_access_us, 3000);
@@ -1078,7 +1113,10 @@ mod tests {
             analytics.record_fetch_at(hash, now + Duration::from_secs(i));
         }
         // All 7 within 60s window when queried at now + 6s.
-        assert_eq!(analytics.get_fetch_rate_at(&hash, now + Duration::from_secs(6)), 7);
+        assert_eq!(
+            analytics.get_fetch_rate_at(&hash, now + Duration::from_secs(6)),
+            7
+        );
     }
 
     #[test]
@@ -1178,7 +1216,10 @@ mod tests {
             ReplicationRecommendation::UrgentReplicate { fetch_rate, .. } => {
                 assert_eq!(*fetch_rate, 30);
             }
-            other => unreachable!("test: expected UrgentReplicate for hot shard, got {:?}", other),
+            other => unreachable!(
+                "test: expected UrgentReplicate for hot shard, got {:?}",
+                other
+            ),
         }
         match &recs[1] {
             ReplicationRecommendation::Replicate { fetch_rate, .. } => {
@@ -1226,7 +1267,11 @@ mod tests {
             .fetch_history
             .get(&(DEFAULT_NETWORK, hash))
             .expect("test: history should exist");
-        assert_eq!(history.len(), 20, "history should be capped at max_history_per_shard");
+        assert_eq!(
+            history.len(),
+            20,
+            "history should be capped at max_history_per_shard"
+        );
     }
 
     #[test]
@@ -1265,7 +1310,10 @@ mod tests {
             ReplicationRecommendation::UrgentReplicate {
                 suggested_replicas, ..
             } => {
-                assert_eq!(suggested_replicas, 10, "suggested_replicas should be capped at 10");
+                assert_eq!(
+                    suggested_replicas, 10,
+                    "suggested_replicas should be capped at 10"
+                );
             }
             other => unreachable!("test: expected UrgentReplicate, got {:?}", other),
         }

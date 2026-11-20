@@ -66,10 +66,7 @@ impl ValidationService {
     /// [`NetworkRuleSet::resolve_strict`] once networks publish genesis
     /// rulesets, and BOTH the local and received paths gain fail-closed
     /// rejection of unadopted networks together.
-    fn resolve_rules(
-        &self,
-        scope: &NetworkScope,
-    ) -> Result<&StateRequirements, StateProofError> {
+    fn resolve_rules(&self, scope: &NetworkScope) -> Result<&StateRequirements, StateProofError> {
         Ok(self.rules.resolve(scope))
     }
 
@@ -115,19 +112,11 @@ impl ValidationService {
 /// Trait for state proof validation service.
 pub trait StateProofValidationService: Send + Sync {
     /// Validate `proof` against the rules of the network named by `scope`.
-    fn validate(
-        &self,
-        proof: &StateProof,
-        scope: &NetworkScope,
-    ) -> Result<bool, StateProofError>;
+    fn validate(&self, proof: &StateProof, scope: &NetworkScope) -> Result<bool, StateProofError>;
 }
 
 impl StateProofValidationService for ValidationService {
-    fn validate(
-        &self,
-        proof: &StateProof,
-        scope: &NetworkScope,
-    ) -> Result<bool, StateProofError> {
+    fn validate(&self, proof: &StateProof, scope: &NetworkScope) -> Result<bool, StateProofError> {
         let requirements = self.resolve_rules(scope)?;
         if proof.validate_with_requirements(requirements) {
             Ok(true)
@@ -181,8 +170,14 @@ mod tests {
 
         let global_res = service.validate(&proof, &NetworkScope::Global);
         let private_res = service.validate(&proof, &private(3));
-        assert!(global_res.is_ok(), "Global proof must validate at the anchor");
-        assert!(private_res.is_ok(), "Private proof must validate identically");
+        assert!(
+            global_res.is_ok(),
+            "Global proof must validate at the anchor"
+        );
+        assert!(
+            private_res.is_ok(),
+            "Private proof must validate identically"
+        );
 
         // An invalid proof is rejected identically under either scope.
         let mut bad = StateProof::new_for_testing();
@@ -204,8 +199,7 @@ mod tests {
         let mut stale = StateProof::new_for_testing();
         // A WHEN offset an hour past the freshness bound; recompute the proof
         // hash so the proof stays structurally valid (only freshness differs).
-        stale.time_proof =
-            trustchain::proof_of_state::TimeProof::new(Duration::from_secs(3600));
+        stale.time_proof = trustchain::proof_of_state::TimeProof::new(Duration::from_secs(3600));
         assert!(stale.validate(), "test: proof is structurally valid");
 
         // Local path applies the freshness gate → rejected.
@@ -231,6 +225,8 @@ mod tests {
         let mut bad = StateProof::new_for_testing();
         bad.stake_proof.stake_holder_id = String::new(); // WHO unbound → invalid
         assert!(!bad.validate(), "test: proof is structurally invalid");
-        assert!(service.validate_received(&bad, &NetworkScope::Global).is_err());
+        assert!(service
+            .validate_received(&bad, &NetworkScope::Global)
+            .is_err());
     }
 }

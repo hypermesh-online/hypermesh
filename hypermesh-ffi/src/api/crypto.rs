@@ -55,8 +55,8 @@ use crate::ffi_util::{catch_ffi, copy_into_out};
 use hypermesh_lib::{compute_blake3_hash, NodeSigner};
 use pqcrypto_falcon::falcon1024;
 use std::os::raw::c_int;
-use trustchain::proof_of_state::{StateProof, WireSignedProof};
 use trustchain::proof_of_state::StateProofOps;
+use trustchain::proof_of_state::{StateProof, WireSignedProof};
 
 /// Publish an asset payload: compute its content address AND produce a
 /// FALCON-signed [`WireSignedProof`] for this identity.
@@ -169,10 +169,7 @@ pub unsafe extern "C" fn hypermesh_publish(
 ///
 /// `wire_proof` must point to `wire_len` readable bytes.
 #[no_mangle]
-pub unsafe extern "C" fn hypermesh_verify_proof(
-    wire_proof: *const u8,
-    wire_len: usize,
-) -> c_int {
+pub unsafe extern "C" fn hypermesh_verify_proof(wire_proof: *const u8, wire_len: usize) -> c_int {
     // Single source of truth: the WireSignedProof verify already lives in the
     // identity module and mirrors validate_proof. Reuse it, don't duplicate.
     crate::api::identity::hypermesh_signed_proof_verify(wire_proof, wire_len)
@@ -224,8 +221,8 @@ fn build_wire_signed_proof(id: &HmIdentity) -> anyhow::Result<Vec<u8>> {
         .map_err(|e| anyhow::anyhow!("StateProof generation: {e}"))?;
 
     // 2. Serialize the inner StateProof as JSON (matches generate_proof).
-    let proof_bytes = serde_json::to_vec(&proof)
-        .map_err(|e| anyhow::anyhow!("serialize StateProof: {e}"))?;
+    let proof_bytes =
+        serde_json::to_vec(&proof).map_err(|e| anyhow::anyhow!("serialize StateProof: {e}"))?;
 
     // 3. Random 32-byte nonce for replay prevention.
     let mut nonce = [0u8; 32];
@@ -282,7 +279,11 @@ mod tests {
 
     #[test]
     fn falcon_sizes_are_pqclean_canonical() {
-        assert_eq!(hypermesh_falcon_signature_max_len(), 1280, "FALCON-1024 sig");
+        assert_eq!(
+            hypermesh_falcon_signature_max_len(),
+            1280,
+            "FALCON-1024 sig"
+        );
         assert_eq!(falcon1024::public_key_bytes(), 1793, "FALCON-1024 pubkey");
         assert_eq!(falcon1024::secret_key_bytes(), 2305, "FALCON-1024 sk");
     }

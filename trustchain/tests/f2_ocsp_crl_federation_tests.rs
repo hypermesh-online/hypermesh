@@ -24,9 +24,7 @@ use trustchain::ca::crl::CrlDistributor;
 use trustchain::ca::federation::{
     FederatedCA, FederationManager, FederationPolicy, FederationTrustLevel,
 };
-use trustchain::ca::ocsp::{
-    FederationOcspTransport, OcspCertStatus, OcspResponder, OcspRequest,
-};
+use trustchain::ca::ocsp::{FederationOcspTransport, OcspCertStatus, OcspRequest, OcspResponder};
 use trustchain::ca::stoq_ca_client::RevocationReason;
 use trustchain::ca::types::{CertificateMetadata, CertificateStatus, IssuedCertificate};
 use trustchain::crypto::falcon::FalconCrypto;
@@ -116,17 +114,15 @@ impl FederationOcspTransport for RecordingTransport {
             .and_then(|a| a.revocation.clone())
     }
 
-    async fn push_revocation(
-        &self,
-        peer_ca_id: &str,
-        serial_number: &str,
-        reason: &str,
-    ) -> bool {
-        self.pushed.lock().expect("test: pushed lock").push(PushRecord {
-            peer_ca_id: peer_ca_id.to_string(),
-            serial: serial_number.to_string(),
-            reason: reason.to_string(),
-        });
+    async fn push_revocation(&self, peer_ca_id: &str, serial_number: &str, reason: &str) -> bool {
+        self.pushed
+            .lock()
+            .expect("test: pushed lock")
+            .push(PushRecord {
+                peer_ca_id: peer_ca_id.to_string(),
+                serial: serial_number.to_string(),
+                reason: reason.to_string(),
+            });
         self.answers
             .lock()
             .expect("test: answers lock")
@@ -181,7 +177,11 @@ async fn make_responder() -> (Arc<CertificateStore>, OcspResponder) {
     (store, responder)
 }
 
-fn make_federated_peer(ca_id: &str, public_key: Vec<u8>, level: FederationTrustLevel) -> FederatedCA {
+fn make_federated_peer(
+    ca_id: &str,
+    public_key: Vec<u8>,
+    level: FederationTrustLevel,
+) -> FederatedCA {
     FederatedCA {
         ca_id: ca_id.to_string(),
         name: format!("peer-{ca_id}"),
@@ -258,9 +258,7 @@ async fn test_ocsp_unknown_falls_back_to_federation() {
     let transport = RecordingTransport::new();
 
     // Wire opt-in transport (Phase F.2).
-    responder
-        .set_federation_transport(transport.clone())
-        .await;
+    responder.set_federation_transport(transport.clone()).await;
 
     // Add a Full-trust peer; mock transport reports the cert as revoked.
     add_trusted_peer(
@@ -275,9 +273,7 @@ async fn test_ocsp_unknown_falls_back_to_federation() {
         PeerAnswer::revoked(RevocationReason::CaCompromise),
     );
 
-    let status = responder
-        .federated_check("serial-not-local", &fm)
-        .await;
+    let status = responder.federated_check("serial-not-local", &fm).await;
     assert!(
         matches!(status, OcspCertStatus::Revoked { .. }),
         "expected federated Revoked, got {:?}",
@@ -294,9 +290,7 @@ async fn test_ocsp_federation_unanimous_unknown() {
     let (_store, responder) = make_responder().await;
     let fm = FederationManager::new("local-ca".into(), FederationPolicy::default());
     let transport = RecordingTransport::new();
-    responder
-        .set_federation_transport(transport.clone())
-        .await;
+    responder.set_federation_transport(transport.clone()).await;
 
     for ca_id in &["peer-a", "peer-b", "peer-c"] {
         add_trusted_peer(
@@ -309,9 +303,7 @@ async fn test_ocsp_federation_unanimous_unknown() {
         transport.set_answer(ca_id, PeerAnswer::unknown());
     }
 
-    let status = responder
-        .federated_check("serial-nobody-knows", &fm)
-        .await;
+    let status = responder.federated_check("serial-nobody-knows", &fm).await;
     assert!(
         matches!(status, OcspCertStatus::Unknown),
         "expected Unknown when all peers Unknown, got {:?}",
@@ -368,11 +360,7 @@ async fn test_revocation_propagates_to_federation() {
         .expect("test: revoke");
 
     let pushed = transport.pushes();
-    assert_eq!(
-        pushed.len(),
-        1,
-        "expected exactly one push, got {pushed:?}"
-    );
+    assert_eq!(pushed.len(), 1, "expected exactly one push, got {pushed:?}");
     assert_eq!(pushed[0].peer_ca_id, "peer-receiver");
     assert_eq!(pushed[0].serial, "serial-prop");
     assert_eq!(pushed[0].reason, "KeyCompromise");

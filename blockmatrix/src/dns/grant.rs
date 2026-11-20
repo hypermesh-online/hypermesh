@@ -91,9 +91,8 @@ impl FoundationGrant {
     /// for signing and for verification; any field reordering must bump
     /// the typedef version.
     pub fn signing_payload(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(
-            self.domain.len() + 1 + self.recipient_pubkey.len() + 1 + 24,
-        );
+        let mut buf =
+            Vec::with_capacity(self.domain.len() + 1 + self.recipient_pubkey.len() + 1 + 24);
         buf.extend_from_slice(self.domain.as_bytes());
         buf.push(0u8);
         buf.extend_from_slice(&self.recipient_pubkey);

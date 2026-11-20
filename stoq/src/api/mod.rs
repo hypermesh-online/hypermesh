@@ -21,7 +21,9 @@ use crate::transport::{Connection, Endpoint, StoqTransport};
 pub mod service_discovery;
 
 // Re-exports for backward compatibility
-pub use service_discovery::{ServiceDiscovery, ServiceEndpoint, ServiceMetadata, ServiceType};
+pub use service_discovery::{
+    DiscoveryContext, DnsBinding, ServiceDiscovery, ServiceEndpoint, ServiceMetadata, ServiceType,
+};
 
 /// API request over STOQ protocol
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -278,11 +280,31 @@ impl StoqApiClient {
         }
     }
 
-    /// Set TrustChain DNS client for service discovery
-    pub fn set_trustchain_dns(&mut self, _client: Arc<dyn service_discovery::TrustChainDnsClient>) {
-        // This would require making service_discovery mutable or using interior mutability
-        // For now, we'll log that TrustChain DNS integration is pending
-        info!("TrustChain DNS client configuration pending - requires mutable service discovery");
+    /// Construct one locally configured namespace and its independent connection pool.
+    pub fn with_dns(transport: Arc<StoqTransport>, binding: DnsBinding) -> Self {
+        Self {
+            transport,
+            connections: Arc::new(RwLock::new(HashMap::new())),
+            service_discovery: Arc::new(ServiceDiscovery::with_dns(
+                std::time::Duration::from_secs(300),
+                binding,
+            )),
+        }
+    }
+
+    /// Install once, before first resolution. Existing connections are not DNS-TTL revoked.
+    pub fn set_dns_binding(&mut self, binding: DnsBinding) -> Result<()> {
+        self.service_discovery.set_dns_binding(binding)
+    }
+
+    /// Legacy client-only configuration cannot establish a trusted local namespace.
+    pub fn set_trustchain_dns(
+        &mut self,
+        _client: Arc<dyn service_discovery::TrustChainDnsClient>,
+    ) -> Result<()> {
+        Err(anyhow!(
+            "explicit DiscoveryContext required; use set_dns_binding"
+        ))
     }
 
     /// Get service discovery metrics
@@ -380,7 +402,7 @@ impl StoqApiClient {
 
     /// Resolve service name to endpoint using service discovery
     async fn resolve_service(&self, service: &str) -> Result<Endpoint> {
-        // Use service discovery with fallback chain: DNS → Cache → Hardcoded
+        // Resolve only within this client's immutable local DNS binding.
         let service_endpoint = self.service_discovery.resolve(service)?;
 
         // Log the discovery operation

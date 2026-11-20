@@ -38,21 +38,29 @@ async fn make_transport() -> Result<StoqTransport> {
     StoqTransport::new(config).await
 }
 
-/// Build a test BlockAssetEntry whose proof is bound to its asset_hash.
+/// Build a test BlockAssetEntry whose proof is bound to its asset_hash AND
+/// claims `author` as its state-proof author.
 ///
 /// The proof is bound via `BlockAssetEntry::new_bound` so the entry satisfies
-/// the signed-to-content half of the mirror invariant (P1) enforced on the
-/// block-receive path.
-fn test_asset_entry(label: &str) -> BlockAssetEntry {
+/// the signed-to-content half of the mirror invariant (P1). The `stake_holder_id`
+/// is set to `author.node_id()` (`BLAKE3(pubkey)`) so that when the entry is
+/// FALCON-signed by that same identity — done inside `add_block` on a chain
+/// carrying `author` as its signer — the accept-path author binding
+/// (`signer_binds_to_author`) holds and the block passes the H3 gate on the
+/// receive path WITHOUT the legacy accept-unsigned flag.
+fn test_asset_entry(label: &str, author: &FalconIdentity) -> BlockAssetEntry {
     let data = format!("test-asset-{label}");
     let asset_hash = *blake3::hash(data.as_bytes()).as_bytes();
 
     let coord = MatrixCoordinate::new(1, 1, 1).expect("test: valid coord");
     let registration = blockmatrix::assets::core::AssetRegistration::genesis(coord);
 
+    let mut proof = StateProof::new_for_testing();
+    proof.stake_proof.stake_holder_id = author.node_id().to_string();
+
     BlockAssetEntry::new_bound(
         asset_hash,
-        &StateProof::new_for_testing(),
+        &proof,
         StoragePointer::Local {
             path: format!("/test/{label}"),
         },
@@ -72,8 +80,7 @@ fn build_wire_payload(block: &Block) -> Vec<u8> {
     let block_json = serde_json::to_vec(block).expect("test: serialize block");
     let block_json_len = block_json.len() as u64;
 
-    let first_proof_hash: Option<[u8; 32]> =
-        block.entries.first().map(|e| e.proof_hash);
+    let first_proof_hash: Option<[u8; 32]> = block.entries.first().map(|e| e.proof_hash);
     let (proof_hash_len, proof_hash_bytes): (u64, Vec<u8>) = match first_proof_hash {
         Some(hash) => (32u64, hash.to_vec()),
         None => (0u64, Vec::new()),
@@ -101,12 +108,15 @@ fn parse_block_from_wire(data: &[u8]) -> Result<Block> {
 
     let tag = data[0];
     if tag != TAG_BLOCK_ANNOUNCE {
-        anyhow::bail!("unexpected tag 0x{:02x}, expected 0x{:02x}", tag, TAG_BLOCK_ANNOUNCE);
+        anyhow::bail!(
+            "unexpected tag 0x{:02x}, expected 0x{:02x}",
+            tag,
+            TAG_BLOCK_ANNOUNCE
+        );
     }
 
-    let block_json_len = u64::from_le_bytes(
-        data[1..9].try_into().expect("test: 8 bytes for len"),
-    ) as usize;
+    let block_json_len =
+        u64::from_le_bytes(data[1..9].try_into().expect("test: 8 bytes for len")) as usize;
 
     if data.len() < 9 + block_json_len {
         anyhow::bail!(
@@ -133,11 +143,8 @@ fn parse_block_from_wire(data: &[u8]) -> Result<Block> {
 
 #[tokio::test]
 async fn block_sync_wire_protocol() {
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(15),
-        run_wire_protocol_test(),
-    )
-    .await;
+    let result =
+        tokio::time::timeout(std::time::Duration::from_secs(15), run_wire_protocol_test()).await;
 
     match result {
         Ok(Ok(())) => {}
@@ -153,11 +160,16 @@ async fn run_wire_protocol_test() -> Result<()> {
     let addr_b = transport_b.local_addr()?;
 
     // --- 2. Create a block on Node A ---
+    // A carries a FALCON signer so `add_block` attaches a signed_proof envelope
+    // to every entry (the real produced-block shape a peer receives).
     let coord_a = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
-    let blockchain_a = NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing());
+    let identity_a = Arc::new(FalconIdentity::generate());
+    let blockchain_a =
+        NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+            .with_signer(identity_a.clone() as Arc<dyn NodeSigner + Send + Sync>);
     assert_eq!(blockchain_a.get_height().await, 0, "genesis only");
 
-    let entry = test_asset_entry("wire-test");
+    let entry = test_asset_entry("wire-test", &identity_a);
     let block_a = blockchain_a
         .add_block(vec![entry])
         .await
@@ -171,22 +183,20 @@ async fn run_wire_protocol_test() -> Result<()> {
     // --- 4. Node B accepts, Node A connects and sends ---
     let transport_b_clone = transport_b.clone();
     let receiver = tokio::spawn(async move {
-        let conn = transport_b_clone.accept().await
+        let conn = transport_b_clone
+            .accept()
+            .await
             .expect("test: B accept connection");
-        let mut stream = conn.accept_stream().await
-            .expect("test: B accept stream");
+        let mut stream = conn.accept_stream().await.expect("test: B accept stream");
 
         // Read the full payload (discriminator + block announce)
-        let data = stream.receive().await
-            .expect("test: B receive data");
+        let data = stream.receive().await.expect("test: B receive data");
         data.to_vec()
     });
 
     // A connects to B
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
     let conn_a = transport_a.connect(&endpoint_b).await?;
 
     // A opens stream, writes discriminator + payload
@@ -205,8 +215,8 @@ async fn run_wire_protocol_test() -> Result<()> {
     );
 
     // Parse the block from the remaining bytes
-    let received_block = parse_block_from_wire(&received[1..])
-        .expect("test: parse block from wire");
+    let received_block =
+        parse_block_from_wire(&received[1..]).expect("test: parse block from wire");
 
     // --- 6. Verify the block arrived intact ---
     assert_eq!(received_block.index, block_a.index);
@@ -248,8 +258,17 @@ async fn run_full_insertion_test() -> Result<()> {
     let coord_a = MatrixCoordinate::new(5, 5, 5).expect("test: valid coord");
     let coord_b = MatrixCoordinate::new(10, 10, 10).expect("test: valid coord");
 
-    let blockchain_a = Arc::new(NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing()));
-    let blockchain_b = Arc::new(NodeBlockchain::with_requirements(coord_b, StateRequirements::localhost_testing()));
+    // A carries a FALCON signer so its produced block-1 arrives at B with a
+    // valid, author-bound signed_proof envelope (H3 gate on the receive path).
+    let identity_a = Arc::new(FalconIdentity::generate());
+    let blockchain_a = Arc::new(
+        NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+            .with_signer(identity_a.clone() as Arc<dyn NodeSigner + Send + Sync>),
+    );
+    let blockchain_b = Arc::new(NodeBlockchain::with_requirements(
+        coord_b,
+        StateRequirements::localhost_testing(),
+    ));
 
     // Both start at height 0 (genesis only)
     assert_eq!(blockchain_a.get_height().await, 0);
@@ -267,13 +286,14 @@ async fn run_full_insertion_test() -> Result<()> {
     // predecessor. To join A's network, B ADOPTS A's genesis first — a foreign
     // block-1 referencing a genesis B does not have would be HARD-REJECTED
     // (no cross-genesis graft). This mirrors the real join-a-network flow.
+    // TODO(cluster-C): adopt_genesis / cross-genesis convergence is being retired for the per-asset-genesis model
     blockchain_b
         .adopt_genesis(genesis_a.clone())
         .await
         .expect("test: B adopts A's genesis to join A's chain");
 
     // --- 2. Node A creates a block with a test asset ---
-    let entry = test_asset_entry("sync-test");
+    let entry = test_asset_entry("sync-test", &identity_a);
     let block_from_a = blockchain_a
         .add_block(vec![entry])
         .await
@@ -285,19 +305,13 @@ async fn run_full_insertion_test() -> Result<()> {
 
     let transport_b_clone = transport_b.clone();
     let receiver = tokio::spawn(async move {
-        let conn = transport_b_clone.accept().await
-            .expect("test: B accept");
-        let mut stream = conn.accept_stream().await
-            .expect("test: B accept stream");
-        stream.receive().await
-            .expect("test: B receive")
-            .to_vec()
+        let conn = transport_b_clone.accept().await.expect("test: B accept");
+        let mut stream = conn.accept_stream().await.expect("test: B accept stream");
+        stream.receive().await.expect("test: B receive").to_vec()
     });
 
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
     let conn_a = transport_a.connect(&endpoint_b).await?;
     let mut stream_a = conn_a.open_stream().await?;
 
@@ -308,8 +322,7 @@ async fn run_full_insertion_test() -> Result<()> {
     let received = receiver.await.expect("test: receiver join");
 
     // --- 4. Parse and insert into B's blockchain ---
-    let received_block = parse_block_from_wire(&received[1..])
-        .expect("test: parse block");
+    let received_block = parse_block_from_wire(&received[1..]).expect("test: parse block");
 
     // B adopted A's genesis (step 1), so A's block-1 links legitimately —
     // verified predecessor, zero-trust insertion succeeds.
@@ -330,11 +343,16 @@ async fn run_full_insertion_test() -> Result<()> {
         "B should have A's block by hash"
     );
 
-    let stored = blockchain_b.get_block(1).await
+    let stored = blockchain_b
+        .get_block(1)
+        .await
         .expect("test: B should have block at index 1");
     assert_eq!(stored.hash, block_from_a.hash);
     assert_eq!(stored.entries.len(), 1);
-    assert_eq!(stored.entries[0].asset_hash, block_from_a.entries[0].asset_hash);
+    assert_eq!(
+        stored.entries[0].asset_hash,
+        block_from_a.entries[0].asset_hash
+    );
 
     // A's chain should be unaffected
     assert_eq!(blockchain_a.get_height().await, 1);
@@ -361,23 +379,20 @@ async fn handshake_then_block_sync() {
 
 async fn run_handshake_then_sync() -> Result<()> {
     // --- 1. Create FALCON identities and proof providers ---
-    let identity_a = FalconIdentity::generate();
+    // Keep A's identity as an Arc<FalconIdentity> so it serves BOTH as the
+    // handshake signer AND as A's blockchain signer — the block A produces is
+    // then FALCON-signed and author-bound for the H3 receive gate.
+    let identity_a = Arc::new(FalconIdentity::generate());
     let identity_b = FalconIdentity::generate();
 
     let node_id_a = identity_a.node_id.clone();
     let node_id_b = identity_b.node_id.clone();
 
-    let signer_a: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_a);
+    let signer_a: Arc<dyn NodeSigner + Send + Sync> = identity_a.clone();
     let signer_b: Arc<dyn NodeSigner + Send + Sync> = Arc::new(identity_b);
 
-    let proof_provider_a = BlockMatrixProofProvider::new(
-        node_id_a.clone(),
-        signer_a.clone(),
-    );
-    let proof_provider_b = BlockMatrixProofProvider::new(
-        node_id_b.clone(),
-        signer_b.clone(),
-    );
+    let proof_provider_a = BlockMatrixProofProvider::new(node_id_a.clone(), signer_a.clone());
+    let proof_provider_b = BlockMatrixProofProvider::new(node_id_b.clone(), signer_b.clone());
 
     // --- 2. Transports and blockchains ---
     let transport_a = Arc::new(make_transport().await?);
@@ -387,12 +402,19 @@ async fn run_handshake_then_sync() -> Result<()> {
     let coord_a = MatrixCoordinate::new(1, 2, 3).expect("test: valid coord");
     let coord_b = MatrixCoordinate::new(4, 5, 6).expect("test: valid coord");
 
-    let blockchain_a = Arc::new(NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing()));
-    let blockchain_b = Arc::new(NodeBlockchain::with_requirements(coord_b, StateRequirements::localhost_testing()));
+    let blockchain_a = Arc::new(
+        NodeBlockchain::with_requirements(coord_a, StateRequirements::localhost_testing())
+            .with_signer(signer_a.clone()),
+    );
+    let blockchain_b = Arc::new(NodeBlockchain::with_requirements(
+        coord_b,
+        StateRequirements::localhost_testing(),
+    ));
 
     // Zero-trust (P1/F7): B joins A's chain by adopting A's genesis, so A's
     // block-1 links to a verified predecessor. A foreign block-1 would be
     // hard-rejected (no cross-genesis graft).
+    // TODO(cluster-C): adopt_genesis / cross-genesis convergence is being retired for the per-asset-genesis model
     let genesis_a = blockchain_a.get_block(0).await.expect("test: A genesis");
     blockchain_b
         .adopt_genesis(genesis_a)
@@ -400,7 +422,7 @@ async fn run_handshake_then_sync() -> Result<()> {
         .expect("test: B adopts A's genesis");
 
     // --- 3. Create a block on A ---
-    let entry = test_asset_entry("handshake-sync");
+    let entry = test_asset_entry("handshake-sync", &identity_a);
     let block_from_a = blockchain_a
         .add_block(vec![entry])
         .await
@@ -412,10 +434,11 @@ async fn run_handshake_then_sync() -> Result<()> {
     let coord_b_tuple = (coord_b.x, coord_b.y, coord_b.z);
 
     let acceptor = tokio::spawn(async move {
-        let conn = transport_b_hs.accept().await
+        let conn = transport_b_hs
+            .accept()
+            .await
             .expect("test: B accept for handshake");
-        let mut stream = conn.accept_stream().await
-            .expect("test: B accept stream");
+        let mut stream = conn.accept_stream().await.expect("test: B accept stream");
         let result = stoq::protocol::bilateral::accept_handshake(
             &mut stream,
             signer_b_clone.as_ref(),
@@ -427,10 +450,8 @@ async fn run_handshake_then_sync() -> Result<()> {
         (conn, result)
     });
 
-    let endpoint_b = stoq::transport::connection::Endpoint::new(
-        std::net::Ipv6Addr::LOCALHOST,
-        addr_b.port(),
-    );
+    let endpoint_b =
+        stoq::transport::connection::Endpoint::new(std::net::Ipv6Addr::LOCALHOST, addr_b.port());
     let conn_a = transport_a.connect(&endpoint_b).await?;
     let coord_a_tuple = (coord_a.x, coord_a.y, coord_a.z);
 
@@ -458,17 +479,19 @@ async fn run_handshake_then_sync() -> Result<()> {
     let block_hash_expected = block_from_a.hash.clone();
 
     let block_receiver = tokio::spawn(async move {
-        let conn = transport_b_block.accept().await
+        let conn = transport_b_block
+            .accept()
+            .await
             .expect("test: B accept block connection");
-        let mut stream = conn.accept_stream().await
+        let mut stream = conn
+            .accept_stream()
+            .await
             .expect("test: B accept block stream");
-        let data = stream.receive().await
-            .expect("test: B receive block");
+        let data = stream.receive().await.expect("test: B receive block");
         let data = data.to_vec();
 
         // Parse (skip discriminator byte)
-        let block = parse_block_from_wire(&data[1..])
-            .expect("test: parse received block");
+        let block = parse_block_from_wire(&data[1..]).expect("test: parse received block");
 
         // Insert into B's chain
         blockchain_b_clone
@@ -493,10 +516,15 @@ async fn run_handshake_then_sync() -> Result<()> {
     assert_eq!(blockchain_b.get_height().await, 1);
     assert!(blockchain_b.has_block(&expected_hash).await);
 
-    let synced_block = blockchain_b.get_block(1).await
+    let synced_block = blockchain_b
+        .get_block(1)
+        .await
         .expect("test: B has block 1");
     assert_eq!(synced_block.hash, block_from_a.hash);
-    assert_eq!(synced_block.entries[0].asset_hash, block_from_a.entries[0].asset_hash);
+    assert_eq!(
+        synced_block.entries[0].asset_hash,
+        block_from_a.entries[0].asset_hash
+    );
 
     Ok(())
 }

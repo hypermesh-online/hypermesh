@@ -9,7 +9,6 @@
 //! These tests are prepared for when Catalog is implemented.
 
 use blockmatrix::assets::core::{AssetManager, AssetRegistration, AssetType, PrivacyMode};
-use blockmatrix::proof_of_state::{StateProof, ProofType};
 use blockmatrix::extensions::loader::{ExtensionLoader, LoaderConfig};
 use blockmatrix::extensions::registry::{ExtensionLocation, ExtensionRegistry, RegistryConfig};
 use blockmatrix::extensions::security::{
@@ -19,6 +18,7 @@ use blockmatrix::extensions::{
     ExtensionCapability, ExtensionConfig, ExtensionManager, ExtensionManagerConfig,
     ExtensionMetadata, ExtensionRequest, ExtensionResponse, ResourceLimits,
 };
+use blockmatrix::proof_of_state::{ProofType, StateProof};
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;

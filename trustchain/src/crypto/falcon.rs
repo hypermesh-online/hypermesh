@@ -440,7 +440,10 @@ mod tests {
         let test_data = b"Test data for FALCON-1024 signature";
 
         // Sign the data
-        let signature = falcon.sign(test_data, &keypair.private_key).await.expect("test: async operation");
+        let signature = falcon
+            .sign(test_data, &keypair.private_key)
+            .await
+            .expect("test: async operation");
 
         assert_eq!(signature.algorithm, "FALCON-1024");
         assert!(!signature.signature_bytes.is_empty());
@@ -477,7 +480,9 @@ mod tests {
         let mut corrupted_keypair = keypair.clone();
         corrupted_keypair.public_key.key_bytes[0] ^= 0xFF; // Flip bits
 
-        let is_invalid = falcon.validate_keypair(&corrupted_keypair).expect("test: validation");
+        let is_invalid = falcon
+            .validate_keypair(&corrupted_keypair)
+            .expect("test: validation");
         assert!(!is_invalid);
     }
 
@@ -503,7 +508,10 @@ mod tests {
             .expect("test: expected success");
 
         let test_data = b"Size test for FALCON-1024 signatures";
-        let signature = falcon.sign(test_data, &keypair.private_key).await.expect("test: async operation");
+        let signature = falcon
+            .sign(test_data, &keypair.private_key)
+            .await
+            .expect("test: async operation");
 
         // FALCON-1024 signatures are variable length but should be reasonable
         assert!(signature.signature_bytes.len() > 400); // Minimum reasonable size
@@ -541,7 +549,10 @@ mod tests {
 
         // Cross-verification should fail
         let test_data = b"Cross-verification test";
-        let signature1 = falcon.sign(test_data, &keypair1.private_key).await.expect("test: async operation");
+        let signature1 = falcon
+            .sign(test_data, &keypair1.private_key)
+            .await
+            .expect("test: async operation");
 
         let is_cross_valid = falcon
             .verify(test_data, &signature1, &keypair2.public_key)

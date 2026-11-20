@@ -8,8 +8,8 @@
 //! with detailed error reporting and BlockMatrix AssetId integration.
 
 use std::time::Duration;
-use trustchain::proof_of_state::{AssetProofRequirements, AssetValidationContext, StateProof};
 use trustchain::proof_of_state::StateProofOps;
+use trustchain::proof_of_state::{AssetProofRequirements, AssetValidationContext, StateProof};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

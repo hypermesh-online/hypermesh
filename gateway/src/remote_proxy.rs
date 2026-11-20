@@ -247,9 +247,8 @@ impl StoqStreamForwarder for MockStreamForwarder {
             .into_bytes(),
             content_type: "text/plain; charset=utf-8".to_string(),
         };
-        serde_json::to_vec(&canned).map_err(|e| {
-            RemoteProxyError::ForwardError(format!("serialize mock response: {e}"))
-        })
+        serde_json::to_vec(&canned)
+            .map_err(|e| RemoteProxyError::ForwardError(format!("serialize mock response: {e}")))
     }
 }
 
@@ -386,9 +385,8 @@ impl RemoteDashboardProxy {
             capability_token_hex: hex::encode(&self.capability_token),
             request: &request,
         };
-        let request_bytes = serde_json::to_vec(&envelope).map_err(|e| {
-            RemoteProxyError::ForwardError(format!("serialize envelope: {e}"))
-        })?;
+        let request_bytes = serde_json::to_vec(&envelope)
+            .map_err(|e| RemoteProxyError::ForwardError(format!("serialize envelope: {e}")))?;
 
         // Hand off to STOQ. Wire is encrypted by QUIC; authentication
         // happens at the target via the capability token in the body.
@@ -398,10 +396,8 @@ impl RemoteDashboardProxy {
             .await?;
 
         // Parse the response.
-        let response: ForwardedResponse =
-            serde_json::from_slice(&response_bytes).map_err(|e| {
-                RemoteProxyError::ForwardError(format!("deserialize response: {e}"))
-            })?;
+        let response: ForwardedResponse = serde_json::from_slice(&response_bytes)
+            .map_err(|e| RemoteProxyError::ForwardError(format!("deserialize response: {e}")))?;
         Ok(response)
     }
 
@@ -665,10 +661,8 @@ mod tests {
     fn remote_proxy_error_maps_to_gateway_error() {
         let invalid: GatewayError = RemoteProxyError::InvalidToken("bad".into()).into();
         assert_eq!(invalid.status_code(), 401);
-        let unreach: GatewayError = RemoteProxyError::UnreachableTarget {
-            target: "x".into(),
-        }
-        .into();
+        let unreach: GatewayError =
+            RemoteProxyError::UnreachableTarget { target: "x".into() }.into();
         assert_eq!(unreach.status_code(), 404);
         let other: GatewayError = RemoteProxyError::SessionClosed.into();
         assert_eq!(other.status_code(), 502);

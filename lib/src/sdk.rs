@@ -51,7 +51,9 @@ impl Default for SdkCapabilities {
 
 impl fmt::Display for SdkCapabilities {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "SDK v{} (query={}, discovery={}, pos={})",
+        write!(
+            f,
+            "SDK v{} (query={}, discovery={}, pos={})",
             self.version,
             self.supports_asset_query,
             self.supports_node_discovery,
@@ -111,8 +113,12 @@ impl fmt::Display for NodeDescriptor {
         write!(
             f,
             "Node({}, pos=({:.0},{:.0},{:.0}), {}, {})",
-            self.id, self.position.x, self.position.y, self.position.z,
-            self.state, self.privacy_mode,
+            self.id,
+            self.position.x,
+            self.position.y,
+            self.position.z,
+            self.state,
+            self.privacy_mode,
         )
     }
 }
@@ -211,7 +217,11 @@ mod tests {
     fn node_descriptor_display() {
         let desc = NodeDescriptor {
             id: NodeId::from_public_key(b"test-key"),
-            position: MatrixPosition { x: 1.0, y: 2.0, z: 3.0 },
+            position: MatrixPosition {
+                x: 1.0,
+                y: 2.0,
+                z: 3.0,
+            },
             state: NodeState::Ready,
             privacy_mode: PrivacyMode::PUBLIC,
         };

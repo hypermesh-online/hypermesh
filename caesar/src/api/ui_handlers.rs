@@ -509,12 +509,9 @@ impl ApiHandler for EarningsHandler {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn serialize_response<T: Serialize>(
-    request_id: &str,
-    body: &T,
-) -> Result<ApiResponse, ApiError> {
-    let payload = serde_json::to_vec(body)
-        .map_err(|e| ApiError::SerializationError(e.to_string()))?;
+fn serialize_response<T: Serialize>(request_id: &str, body: &T) -> Result<ApiResponse, ApiError> {
+    let payload =
+        serde_json::to_vec(body).map_err(|e| ApiError::SerializationError(e.to_string()))?;
 
     Ok(ApiResponse {
         request_id: request_id.to_string(),
@@ -579,7 +576,13 @@ mod tests {
             serde_json::from_slice(&resp.payload).expect("test: deserialize");
         assert!(body.success);
         assert!(body.wallet.is_some());
-        assert_eq!(body.wallet.as_ref().map(|w| &w.id).expect("test: wallet should exist"), "evp-node-wallet");
+        assert_eq!(
+            body.wallet
+                .as_ref()
+                .map(|w| &w.id)
+                .expect("test: wallet should exist"),
+            "evp-node-wallet"
+        );
     }
 
     #[tokio::test]
@@ -665,8 +668,7 @@ mod tests {
             .expect("test: staking handler");
         assert!(resp.success);
 
-        let body: StakingInfo =
-            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        let body: StakingInfo = serde_json::from_slice(&resp.payload).expect("test: deserialize");
         assert_eq!(body.lock_periods.len(), 3);
         assert_eq!(body.lock_periods[0].days, 30);
     }
@@ -683,8 +685,7 @@ mod tests {
             .expect("test: rewards handler");
         assert!(resp.success);
 
-        let body: RewardsInfo =
-            serde_json::from_slice(&resp.payload).expect("test: deserialize");
+        let body: RewardsInfo = serde_json::from_slice(&resp.payload).expect("test: deserialize");
         assert_eq!(body.multiplier, 1.0);
     }
 

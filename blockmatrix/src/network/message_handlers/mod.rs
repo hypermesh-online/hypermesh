@@ -25,11 +25,12 @@ mod sync_and_reflection;
 mod transfer_handlers;
 
 // Wire-protocol tags — re-exported for other crate modules that drive sends.
+#[allow(unused_imports)]
 pub(crate) use protocol::{
     TAG_BLOCK_ANNOUNCE, TAG_BLOCK_FETCH_REQUEST, TAG_CA_KEY_SHARE, TAG_CA_SIGN_REQUEST,
     TAG_CA_SIGN_RESPONSE, TAG_DIRECT_MESSAGE, TAG_DNS_QUERY, TAG_DNS_RESOLVE,
-    TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE, TAG_GOSSIP, TAG_KEY_ROTATION,
-    TAG_MIRROR_ATTEST, TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
+    TAG_DNS_RESOLVE_RESPONSE, TAG_DNS_RESPONSE, TAG_GOSSIP, TAG_KEY_ROTATION, TAG_MIRROR_ATTEST,
+    TAG_SHARD_ANNOUNCE, TAG_SHARD_FETCH, TAG_SHARD_SEND, TAG_SHARE_INVITE, TAG_SYNC_MESSAGE,
     TAG_TRANSFER, TAG_TRANSFER_LOCK, TAG_TRANSFER_REGISTER_ACK, TAG_TRANSFER_REGISTER_REQ,
     TAG_TRANSFER_RELEASE, TAG_TRANSFER_ROLLBACK,
 };
@@ -38,6 +39,7 @@ pub(crate) use protocol::{
 pub use dns_protocol::{select_canonical, DistributedDnsQuery, DistributedDnsResponse};
 
 // Public entry points used by the network module.
+#[allow(unused_imports)]
 pub(crate) use peer_connection::{
     dispatch_message, handle_incoming_connection, run_peer_message_loop,
 };

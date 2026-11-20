@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::assets::core::{AssetRegistration, AssetType, StateProof, ProxyAddress};
+use crate::assets::core::{AssetRegistration, AssetType, ProxyAddress, StateProof};
 
 /// Asset package information
 #[derive(Debug, Clone, Serialize, Deserialize)]

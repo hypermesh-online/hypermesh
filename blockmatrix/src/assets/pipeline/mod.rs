@@ -130,12 +130,8 @@ pub enum PipelineError {
 impl From<hypermesh_lib::ShardingError> for PipelineError {
     fn from(err: hypermesh_lib::ShardingError) -> Self {
         match err {
-            hypermesh_lib::ShardingError::ShardingFailed(msg) => {
-                PipelineError::ShardingFailed(msg)
-            }
-            hypermesh_lib::ShardingError::InvalidConfig(msg) => {
-                PipelineError::InvalidConfig(msg)
-            }
+            hypermesh_lib::ShardingError::ShardingFailed(msg) => PipelineError::ShardingFailed(msg),
+            hypermesh_lib::ShardingError::InvalidConfig(msg) => PipelineError::InvalidConfig(msg),
         }
     }
 }

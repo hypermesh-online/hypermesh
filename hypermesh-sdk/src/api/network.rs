@@ -37,10 +37,7 @@ impl<'a> NetworkApi<'a> {
     pub async fn connect_peer(&self, address: &str) -> Result<PeerInfo, SdkError> {
         let val = self
             .client
-            .raw_call(
-                "network.connect",
-                serde_json::json!({"address": address}),
-            )
+            .raw_call("network.connect", serde_json::json!({"address": address}))
             .await?;
         serde_json::from_value(val).map_err(|e| SdkError::Serialization(e.to_string()))
     }

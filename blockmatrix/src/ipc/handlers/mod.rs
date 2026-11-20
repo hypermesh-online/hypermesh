@@ -15,14 +15,14 @@ pub mod catalog;
 pub mod config;
 pub mod dashboard;
 pub mod dns;
-pub mod ngauge;
+pub mod domain;
 pub mod gateway;
 pub mod intelligence;
-pub mod domain;
 pub mod message;
 pub mod network;
-pub mod share;
+pub mod ngauge;
 pub mod shard;
+pub mod share;
 pub mod stoq;
 pub mod store;
 pub mod system;
@@ -137,8 +137,7 @@ pub(crate) mod tests {
 
     /// Build a minimal DaemonState for testing.
     pub(crate) async fn test_state() -> Arc<DaemonState> {
-        let coord =
-            MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
+        let coord = MatrixCoordinate::new(0, 0, 0).expect("test: valid coord");
         let blockchain = Arc::new(NodeBlockchain::new(coord));
         let config = PersistenceConfig {
             storage_dir: PathBuf::from("/tmp"),
@@ -160,12 +159,12 @@ pub(crate) mod tests {
             shard_transport: None,
             coordinate: coord,
             node_id: "test-node".to_string(),
+            network_id: "trustnet-test".to_string(),
             data_dir: PathBuf::from("/tmp"),
             privacy_mode: "Private".to_string(),
             started_at: Instant::now(),
             shutdown_tx,
             dns_resolver: dns,
-            dns_popularity_tracker: None,
             shard_location_index: None,
             consumer_provider_manager: None,
             #[cfg(feature = "caesar")]
